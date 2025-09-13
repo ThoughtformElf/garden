@@ -43,7 +43,6 @@ export class Editor {
       window.location.hash = '#/README.md';
       return;
     }
-
     this.targetSelector = target;
     this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
@@ -51,12 +50,9 @@ export class Editor {
     this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
-
     this.languageCompartment = new Compartment();
     this.markdownLanguage = this.createMarkdownLanguage();
-
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
-
     this.init();
   }
 
@@ -70,12 +66,23 @@ export class Editor {
       return;
     }
 
+    // This is the long-running operation. The loading message will be displayed during this time.
     await gitClient.cloneRepo();
 
+    // Now that the repo is ready, we can initialize the sidebar and prepare the editor.
     this.sidebar = new Sidebar({ target: '#sidebar' });
     await this.sidebar.init();
     
     const initialContent = await gitClient.readFile(this.filePath);
+
+    // Remove the loading indicator now that we have content.
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.remove();
+    }
+    
+    // Stop centering content now that the editor will be added.
+    container.style.display = 'block';
 
     const updateListener = EditorView.updateListener.of(update => {
       // Only trigger a save if the document changed AND it was not a programmatic change.
@@ -90,9 +97,9 @@ export class Editor {
         '.cm-scroller': { fontFamily: 'monospace' }
       });
     };
+
     const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('1rem');
-
     Vim.map('jj', '<Esc>', 'insert');
 
     this.editorView = new EditorView({
@@ -111,7 +118,6 @@ export class Editor {
 
     Editor.editors.push(this);
     this.isReady = true;
-
     this.listenForNavigation();
     this.editorView.focus();
   }
@@ -138,7 +144,6 @@ export class Editor {
   getLanguageExtension(filepath) {
     const filename = filepath.split('/').pop();
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
-
     // First, check for specific filenames that don't have standard extensions.
     switch (filename) {
       case '.gitignore':
@@ -193,23 +198,19 @@ export class Editor {
     console.log(`Loading ${filepath}...`);
     const newContent = await gitClient.readFile(filepath);
     this.filePath = filepath;
-
     const newLanguage = this.getLanguageExtension(filepath);
     this.editorView.dispatch({
       effects: this.languageCompartment.reconfigure(newLanguage)
     });
-
     const currentDoc = this.editorView.state.doc;
     this.editorView.dispatch({
       changes: { from: 0, to: currentDoc.length, insert: newContent },
       // Annotate this transaction to mark it as a programmatic change.
       annotations: programmaticChange.of(true)
     });
-
     if (this.sidebar) {
       await this.sidebar.refresh();
     }
-
     this.editorView.focus();
   }
 

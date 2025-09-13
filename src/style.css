@@ -20,6 +20,7 @@ html, body {
   min-width: 0; /* Allow sidebar to shrink to 0 */
   border-right: 1px solid #333; /* Darker border */
   padding: 10px;
+  overflow-y: auto;
   box-sizing: border-box;
   background-color: #222; /* Match theme background */
 }
@@ -62,7 +63,25 @@ main {
   flex-grow: 1;
   height: 100%;
   overflow: hidden; /* Prevent editor from causing page overflow */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* Set background to match the theme */
+  background-color: #222;
 }
+
+/* Styles for the new loading indicator */
+#loading-indicator {
+  /* Use a lighter color for the text */
+  color: #ccc;
+  font-family: monospace;
+  text-align: center;
+}
+
+#loading-indicator p {
+  margin: 0.5em;
+}
+
 
 /* --- Resizer and Collapse Styles --- */
 #resizer {
@@ -91,7 +110,7 @@ main {
 #sidebar-toggle {
   position: absolute;
   top: 5px;
-  right: -30px;
+  right: 5px;
   background: #444;
   color: #ccc;
   border: 1px solid #555;
@@ -108,10 +127,16 @@ main {
   width: 0;
   padding: 0;
   border-right: none;
+  overflow: hidden;
 }
 
 main, .cm-editor {
   height: 100%;
+}
+
+/* When the editor is loaded, it provides its own background */
+.cm-editor {
+    background-color: #222;
 }
 
 /* Styles for Eruda container */
