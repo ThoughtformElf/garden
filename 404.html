@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <title>Thoughtform Garden</title>
   <link rel="icon" type="image/png" href="/garden/assets/favicon-CyruPqWy.png" />
-  <script type="module" crossorigin src="/garden/assets/index-DDgjnYBJ.js"></script>
-  <link rel="stylesheet" crossorigin href="/garden/assets/index-D3WHWdAM.css">
+  <script type="module" crossorigin src="/garden/assets/index-CaSryc4n.js"></script>
+  <link rel="stylesheet" crossorigin href="/garden/assets/index-DDtyAWeV.css">
 <link rel="manifest" href="/garden/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/garden/registerSW.js"></script></head>
 <body>
   <div class="app-container">
@@ -15,7 +15,13 @@
     </aside>
     <!-- This handle is for resizing -->
     <div id="resizer"></div>
-    <main></main>
+    <main>
+      <!-- Add this loading indicator -->
+      <div id="loading-indicator">
+        <p>Cloning repository...</p>
+        <p>(This only happens on the first visit)</p>
+      </div>
+    </main>
   </div>
   <div id="eruda-container"></div>
   <!-- This overlay ensures smooth resizing without losing the handle -->
