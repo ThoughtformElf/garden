@@ -10,6 +10,7 @@ import { css } from '@codemirror/lang-css';
 import debounce from 'lodash/debounce';
 import {amy} from 'thememirror';
 import { gitClient } from './git-integration.js';
+import { Sidebar } from './sidebar.js';
 
 /**
  * @class Editor
@@ -24,15 +25,22 @@ export class Editor {
 
   /**
    * @param {Object} options Configuration object for the editor.
-   * @param {string} [options.url=window.location.pathname] The URL to determine the file path.
+   * @param {string} [options.url=window.location.hash] The URL to determine the file path.
    * @param {string} [options.target='body > main'] A CSS selector for the container element.
    * @param {Object} [options.editorConfig] Custom CodeMirror configuration options.
    */
   constructor({ url, target = 'body > main', editorConfig = {} } = {}) {
+    // If no hash is present on load, redirect to the default file.
+    if (!window.location.hash) {
+      window.location.hash = '#/README.md';
+      return;
+    }
+
     this.targetSelector = target;
-    this.url = url || window.location.pathname;
+    this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
     this.editorView = null;
+    this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
 
@@ -51,6 +59,10 @@ export class Editor {
 
     // Wait for the repo to be cloned
     await gitClient.cloneRepo();
+
+    // Initialize sidebar
+    this.sidebar = new Sidebar({ target: '#sidebar' });
+    await this.sidebar.init();
     
     const initialContent = await gitClient.readFile(this.filePath);
 
@@ -104,7 +116,38 @@ export class Editor {
     Editor.editors.push(this);
     this.isReady = true;
 
+    // Listen for URL changes to load new files
+    this.listenForNavigation();
+
     // Autofocus the editor on creation for immediate use.
+    this.editorView.focus();
+  }
+
+  /**
+   * Sets up an event listener for hash changes to enable client-side navigation.
+   */
+  listenForNavigation() {
+    window.addEventListener('hashchange', async () => {
+      const newFilePath = this.getFilePath(window.location.hash);
+      if (newFilePath !== this.filePath) {
+        await this.loadFile(newFilePath);
+      }
+    });
+  }
+
+  /**
+   * Loads a file into the editor, replacing its current content.
+   * @param {string} filepath The path to the file to load.
+   */
+  async loadFile(filepath) {
+    console.log(`Loading ${filepath}...`);
+    const newContent = await gitClient.readFile(filepath);
+    this.filePath = filepath;
+
+    const currentDoc = this.editorView.state.doc;
+    this.editorView.dispatch({
+      changes: { from: 0, to: currentDoc.length, insert: newContent }
+    });
     this.editorView.focus();
   }
 
@@ -119,14 +162,12 @@ export class Editor {
   }
 
   /**
-   * Determines the correct file path from the given URL.
-   * @param {string} url The URL.
+   * Determines the correct file path from the given URL hash.
+   * @param {string} hash The URL hash (e.g., #/path/to/file.md).
    * @returns {string} The final file path.
    */
-  getFilePath(url) {
-    const base = import.meta.env.BASE_URL || '/';
-    const locationPathname = new URL(url, 'http://localhost').pathname;
-    let filepath = locationPathname.startsWith(base) ? locationPathname.slice(base.length - 1) : locationPathname;
+  getFilePath(hash) {
+    let filepath = hash.startsWith('#') ? hash.substring(1) : hash;
     if (filepath === '/' || filepath === '') {
       filepath = '/README.md';
     }
