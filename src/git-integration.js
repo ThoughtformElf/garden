@@ -2,53 +2,81 @@ import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
 
-
-const REPO_URL = 'https://github.com/thoughtforms/garden';
-const CORS_PROXY = 'https://cors.isomorphic-git.org';
-
-const fs = new FS('garden-fs');
-const pfs = fs.promises;
-
-let isCloned = false;
-
-async function checkCloneStatus() {
-  try {
-    await pfs.stat('/.git');
-    isCloned = true;
-  } catch (e) {
-    isCloned = false;
+/**
+ * @class Git
+ * @description Encapsulates all isomorphic-git and file system functionality.
+ * This class can be instantiated once and shared across multiple editor instances.
+ */
+class Git {
+  constructor() {
+    this.REPO_URL = 'https://github.com/thoughtforms/garden';
+    this.CORS_PROXY = 'https://cors.isomorphic-git.org';
+    this.fs = new FS('garden-fs');
+    this.pfs = this.fs.promises;
   }
-  return isCloned;
-}
 
-export async function cloneRepo() {
-  if (await checkCloneStatus()) {
-    console.log('Repository already cloned.');
-    return;
+  /**
+   * Checks if the repository has already been cloned and clones it if not.
+   */
+  async cloneRepo() {
+    let isCloned = false;
+    try {
+      await this.pfs.stat('/.git');
+      isCloned = true;
+    } catch (e) {
+      isCloned = false;
+    }
+
+    if (isCloned) {
+      console.log('Repository already cloned.');
+      return;
+    }
+
+    console.log('Cloning repository...');
+    try {
+      await git.clone({
+        fs: this.fs,
+        http,
+        dir: '/',
+        url: this.REPO_URL,
+        corsProxy: this.CORS_PROXY,
+        singleBranch: true,
+        depth: 10,
+      });
+      console.log('Clone complete.');
+    } catch (e) {
+      console.error('Error cloning repository:', e);
+    }
   }
-  console.log('Cloning repository...');
-  await git.clone({
-    fs,
-    http,
-    dir: '/',
-    url: REPO_URL,
-    corsProxy: CORS_PROXY,
-    singleBranch: true,
-    depth: 10,
-  });
-  console.log('Clone complete.');
-}
 
-export async function readFile(filepath) {
-  try {
-    const content = await pfs.readFile(filepath, 'utf8');
-    return content;
-  } catch (e) {
-    console.warn(`File not found: ${filepath}`);
-    return `// File not found: ${filepath}`;
+  /**
+   * Reads the content of a file from the virtual file system.
+   * @param {string} filepath The path to the file.
+   * @returns {Promise<string>} The file content or a not-found message.
+   */
+  async readFile(filepath) {
+    try {
+      const content = await this.pfs.readFile(filepath, 'utf8');
+      return content;
+    } catch (e) {
+      console.warn(`File not found: ${filepath}`);
+      return `// File not found: ${filepath}`;
+    }
+  }
+
+  /**
+   * Writes content to a file in the virtual file system.
+   * @param {string} filepath The path to the file.
+   * @param {string} content The content to write.
+   */
+  async writeFile(filepath, content) {
+    try {
+      await this.pfs.writeFile(filepath, content, 'utf8');
+    } catch (e) {
+      console.error(`Error writing file ${filepath}:`, e);
+    }
   }
 }
 
-export async function writeFile(filepath, content) {
-  await pfs.writeFile(filepath, content, 'utf8');
-}
+// Create and export a single instance to be shared across modules
+export const gitClient = new Git();

@@ -4,6 +4,6 @@ html, body {
   font-family: Arial, sans-serif;
 }
 
-main, .editor, .cm-editor {
+main, .cm-editor {
   height: 100%;
 }
