@@ -6,10 +6,18 @@ import { cloneRepo, readFile, writeFile } from './git-integration.js';
 
 async function main() {
   await cloneRepo();
-  let filepath = window.location.pathname === '/' ? '/README.md' : window.location.pathname;
-  const initialContent = await readFile(filepath);
+
+  const base = import.meta.env.BASE_URL;
+  const location = window.location.pathname;
+
+  // This logic is now clean and works in both environments.
+  const filepath = location.startsWith(base) ? location.slice(base.length - 1) : location;
+  const finalFilepath = (filepath === '/' || filepath === '') ? '/README.md' : filepath;
+
+  const initialContent = await readFile(finalFilepath);
+
   createEditor(initialContent, (newContent) => {
-    writeFile(filepath, newContent);
+    writeFile(finalFilepath, newContent);
   });
 }
 
