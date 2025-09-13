@@ -1,4 +1,5 @@
 import { EditorView, basicSetup } from "codemirror";
+import { EditorState } from '@codemirror/state';
 import { vim, Vim } from "@replit/codemirror-vim";
 import { LanguageDescription } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
@@ -6,8 +7,24 @@ import { yamlFrontmatter } from "@codemirror/lang-yaml";
 import debounce from 'lodash/debounce';
 import {amy} from 'thememirror';
 
+// Responsive font size theme
+const createFontTheme = (size) => {
+  return EditorView.theme({
+    "&": {
+      fontSize: size,
+    },
+    ".cm-scroller": {
+      fontFamily: "monospace",
+    }
+  });
+};
+const isMobile = window.matchMedia("(max-width: 768px)").matches;
+const editorFontSize = isMobile ? createFontTheme("2rem") : createFontTheme("1rem");
+
+// Vim keybindings
 Vim.map("jj", "<Esc>", "insert");
 
+// Markdown language support with embedded JavaScript, HTML, and CSS
 const markdownLang = markdown({
   codeLanguages: [
     LanguageDescription.of({ name: "javascript", load: () => import("@codemirror/lang-javascript").then(m => m.javascript()) }),
@@ -16,6 +33,7 @@ const markdownLang = markdown({
   ]
 });
 
+// Combine YAML frontmatter with Markdown
 const mainLanguage = yamlFrontmatter({ content: markdownLang });
 
 export function createEditor(initialDoc, onUpdate) {
@@ -36,6 +54,7 @@ export function createEditor(initialDoc, onUpdate) {
       mainLanguage,
       updateListener,
       amy,
+      editorFontSize,
     ],
     parent: document.querySelector(".editor"),
   });

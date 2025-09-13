@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "vite",
     "dev": "vite",
     "build": "vite build --base=/garden/ && shx cp dist/index.html dist/404.html",
     "preview": "vite preview"
