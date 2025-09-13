@@ -18,7 +18,7 @@ const createFontTheme = (size) => {
     }
   });
 };
-const isMobile = window.matchMedia("(max-width: 768px)").matches;
+const isMobile = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 const editorFontSize = isMobile ? createFontTheme("2rem") : createFontTheme("1rem");
 
 // Vim keybindings
