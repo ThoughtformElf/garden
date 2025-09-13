@@ -8,10 +8,17 @@
 </head>
 <body>
   <div class="app-container">
-    <aside id="sidebar"></aside>
+    <aside id="sidebar">
+      <!-- This button will be used to toggle the sidebar -->
+      <button id="sidebar-toggle" title="Toggle Sidebar">‹</button>
+    </aside>
+    <!-- This handle is for resizing -->
+    <div id="resizer"></div>
     <main></main>
   </div>
   <div id="eruda-container"></div>
+  <!-- This overlay ensures smooth resizing without losing the handle -->
+  <div id="resize-overlay"></div>
   <script type="module" src="./src/index.js"></script>
 </body>
 </html>

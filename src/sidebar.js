@@ -1,5 +1,4 @@
 import { gitClient } from './git-integration.js';
-
 /**
  * @class Sidebar
  * @description Manages the file listing sidebar.
@@ -11,13 +10,16 @@ export class Sidebar {
    */
   constructor({ target }) {
     this.targetSelector = target;
-    this.container = document.querySelector(this.targetSelector);
-    if (!this.container) {
+    const container = document.querySelector(this.targetSelector);
+    if (!container) {
       console.error(`Sidebar container not found: ${this.targetSelector}`);
       return;
     }
+    this.container = container;
+    // Create a dedicated element for the file list to avoid overwriting other controls.
+    this.listContainer = document.createElement('div');
+    this.container.appendChild(this.listContainer);
   }
-
   /**
    * Initializes the sidebar by listing and rendering repository files.
    */
@@ -26,7 +28,6 @@ export class Sidebar {
     await this.refresh();
     console.log('Sidebar initialized.');
   }
-
   /**
    * Re-fetches files and statuses and re-renders the sidebar.
    */
@@ -41,7 +42,6 @@ export class Sidebar {
       console.error('Error refreshing sidebar:', e);
     }
   }
-
   /**
    * Recursively lists all files in a directory, ignoring '.git'.
    * @param {string} dir The directory to start from.
@@ -51,7 +51,6 @@ export class Sidebar {
     const pfs = gitClient.pfs;
     let fileList = [];
     const items = await pfs.readdir(dir);
-
     for (const item of items) {
       if (item === '.git') continue;
       const path = `${dir === '/' ? '' : dir}/${item}`;
@@ -69,7 +68,6 @@ export class Sidebar {
     }
     return fileList;
   }
-
   /**
    * Renders the list of files as HTML links with status and active classes.
    * @param {string[]} files An array of file paths.
@@ -85,9 +83,8 @@ export class Sidebar {
       if (file === currentFile) {
         classes.push('active');
       }
-
       return `<li><a href="${href}" class="${classes.join(' ')}">${file}</a></li>`;
     }).join('');
-    this.container.innerHTML = `<ul>${fileListHTML}</ul>`;
+    this.listContainer.innerHTML = `<ul>${fileListHTML}</ul>`;
   }
 }

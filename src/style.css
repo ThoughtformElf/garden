@@ -1,7 +1,12 @@
+:root {
+  --sidebar-width: 250px;
+}
+
 html, body {
   height: 100%;
   margin: 0;
   font-family: Arial, sans-serif;
+  overflow: hidden; /* Prevent body scrollbars during resize */
 }
 
 .app-container {
@@ -10,11 +15,11 @@ html, body {
 }
 
 #sidebar {
-  width: 250px;
-  min-width: 200px;
+  position: relative; /* For positioning the toggle button */
+  width: var(--sidebar-width);
+  min-width: 0; /* Allow sidebar to shrink to 0 */
   border-right: 1px solid #333; /* Darker border */
   padding: 10px;
-  overflow-y: auto;
   box-sizing: border-box;
   background-color: #222; /* Match theme background */
 }
@@ -57,6 +62,52 @@ main {
   flex-grow: 1;
   height: 100%;
   overflow: hidden; /* Prevent editor from causing page overflow */
+}
+
+/* --- Resizer and Collapse Styles --- */
+#resizer {
+  flex: 0 0 5px; /* Give it a small, fixed width */
+  cursor: col-resize;
+  background-color: #333;
+  z-index: 10;
+  transition: background-color 0.2s;
+}
+
+#resizer:hover {
+  background-color: #555;
+}
+
+#resize-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9998; /* Below eruda, above everything else */
+  cursor: col-resize;
+  display: none; /* Hidden by default */
+}
+
+#sidebar-toggle {
+  position: absolute;
+  top: 5px;
+  right: -30px;
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  z-index: 5;
+  line-height: 20px; /* Center the character */
+  padding: 0;
+}
+
+.sidebar-collapsed #sidebar {
+  width: 0;
+  padding: 0;
+  border-right: none;
 }
 
 main, .cm-editor {
