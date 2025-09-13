@@ -1,16 +1,22 @@
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { LanguageDescription } from '@codemirror/language';
-import { markdown } from '@codemirror/lang-markdown';
-import { yamlFrontmatter } from '@codemirror/lang-yaml';
+import { LanguageDescription, StreamLanguage } from '@codemirror/language';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
+import { json } from '@codemirror/lang-json';
+import { xml } from '@codemirror/lang-xml';
+import { yaml } from '@codemirror/lang-yaml';
+import { shell } from '@codemirror/legacy-modes/mode/shell'; // Correct import from legacy package
 import debounce from 'lodash/debounce';
-import {amy} from 'thememirror';
 import { gitClient } from './git-integration.js';
 import { Sidebar } from './sidebar.js';
+import { basicDark } from './theme.js';
+
+// Define the shell language using the legacy stream parser
+const shellLanguage = StreamLanguage.define(shell);
 
 /**
  * @class Editor
@@ -30,7 +36,6 @@ export class Editor {
    * @param {Object} [options.editorConfig] Custom CodeMirror configuration options.
    */
   constructor({ url, target = 'body > main', editorConfig = {} } = {}) {
-    // If no hash is present on load, redirect to the default file.
     if (!window.location.hash) {
       window.location.hash = '#/README.md';
       return;
@@ -43,6 +48,9 @@ export class Editor {
     this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
+
+    this.languageCompartment = new Compartment();
+    this.markdownLanguage = this.createMarkdownLanguage();
 
     this.init();
   }
@@ -57,16 +65,12 @@ export class Editor {
       return;
     }
 
-    // Wait for the repo to be cloned
     await gitClient.cloneRepo();
 
-    // Initialize sidebar
     this.sidebar = new Sidebar({ target: '#sidebar' });
     await this.sidebar.init();
     
     const initialContent = await gitClient.readFile(this.filePath);
-
-    // CodeMirror extensions
     const debouncedOnUpdate = debounce(this.handleUpdate.bind(this), 500);
 
     const updateListener = EditorView.updateListener.of(update => {
@@ -84,43 +88,84 @@ export class Editor {
     const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('1rem');
 
-    // Vim keybindings
     Vim.map('jj', '<Esc>', 'insert');
-
-    // Markdown language support with embedded languages
-    const markdownLang = markdown({
-      codeLanguages: [
-        LanguageDescription.of({ name: 'javascript', load: () => Promise.resolve(javascript()) }),
-        LanguageDescription.of({ name: 'html', load: () => Promise.resolve(html()) }),
-        LanguageDescription.of({ name: 'css', load: () => Promise.resolve(css()) })
-      ]
-    });
-
-    const mainLanguage = yamlFrontmatter({ content: markdownLang });
 
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: [
         vim(),
         basicSetup,
-        mainLanguage,
+        this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
-        amy,
+        basicDark,
         editorFontSize,
         ...this.editorConfig.extensions || []
       ],
       parent: container,
     });
 
-    // Add this instance to the global list
     Editor.editors.push(this);
     this.isReady = true;
 
-    // Listen for URL changes to load new files
     this.listenForNavigation();
-
-    // Autofocus the editor on creation for immediate use.
     this.editorView.focus();
+  }
+
+  /**
+   * Creates the markdown language configuration with support for fenced code blocks.
+   */
+  createMarkdownLanguage() {
+    return markdown({
+      base: markdownLanguage,
+      codeLanguages: [
+        LanguageDescription.of({ name: 'javascript', load: () => Promise.resolve(javascript()) }),
+        LanguageDescription.of({ name: 'html', load: () => Promise.resolve(html()) }),
+        LanguageDescription.of({ name: 'css', load: () => Promise.resolve(css()) })
+      ]
+    });
+  }
+
+  /**
+   * Determines the CodeMirror language extension based on file extension.
+   * @param {string} filepath The path to the file.
+   * @returns {LanguageSupport} The CodeMirror language extension.
+   */
+  getLanguageExtension(filepath) {
+    const filename = filepath.split('/').pop();
+    const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
+
+    // First, check for specific filenames that don't have standard extensions.
+    switch (filename) {
+      case '.gitignore':
+      case '.npmrc':
+      case '.editorconfig':
+      case 'Dockerfile':
+        return shellLanguage;
+    }
+    
+    // Then, fall back to checking extensions.
+    switch (extension) {
+      case 'js':
+        return javascript();
+      case 'css':
+        return css();
+      case 'html':
+        return html();
+      case 'json':
+        return json();
+      case 'xml':
+        return xml();
+      case 'yaml':
+      case 'yml':
+        return yaml();
+      case 'sh':
+      case 'bash':
+      case 'zsh':
+        return shellLanguage;
+      case 'md':
+      default:
+        return this.markdownLanguage;
+    }
   }
 
   /**
@@ -136,13 +181,18 @@ export class Editor {
   }
 
   /**
-   * Loads a file into the editor, replacing its current content.
+   * Loads a file into the editor, replacing its content and updating the language.
    * @param {string} filepath The path to the file to load.
    */
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
     const newContent = await gitClient.readFile(filepath);
     this.filePath = filepath;
+
+    const newLanguage = this.getLanguageExtension(filepath);
+    this.editorView.dispatch({
+      effects: this.languageCompartment.reconfigure(newLanguage)
+    });
 
     const currentDoc = this.editorView.state.doc;
     this.editorView.dispatch({
