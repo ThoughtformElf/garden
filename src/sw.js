@@ -1,38 +1,23 @@
-const CACHE_NAME = 'garden-v1';
+import { precacheAndRoute } from 'workbox-precaching';
 
-// The build process automatically injects the list of assets to cache here.
-const urlsToCache = self.__WB_MANIFEST;
-
-self.addEventListener('install', (event) => {
-  // Only pre-cache assets if this is a production build.
-  if (import.meta.env.PROD) {
-    event.waitUntil(
-      caches.open(CACHE_NAME)
-        .then((cache) => {
-          console.log('Opened cache');
-          return cache.addAll(urlsToCache);
-        })
-    );
-  }
-});
+precacheAndRoute(self.__WB_MANIFEST);
 
 self.addEventListener('fetch', (event) => {
+  // Network-first, then cache.
+  // This strategy ensures that the latest version is always fetched when online,
+  // and the cached version is used only when offline.
   event.respondWith(
-    // Try to get from the network first.
-    fetch(event.request)
-      .then((response) => {
-        // If we get a valid response and we are in production, add it to the cache for future use.
-        if (response && response.status === 200 && response.type === 'basic' && import.meta.env.PROD) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        // Network failed, fall back to the cache.
-        return caches.match(event.request);
-      })
+    caches.open('garden-cache-v1').then((cache) => {
+      return cache.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          if (networkResponse.status === 200) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        });
+
+        return cachedResponse || fetchPromise;
+      });
+    })
   );
 });
