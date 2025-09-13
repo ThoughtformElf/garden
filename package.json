@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && shx cp dist/index.html dist/404.html",
     "preview": "vite preview"
   },
   "keywords": [],
@@ -25,6 +25,7 @@
   "devDependencies": {
     "@isomorphic-git/lightning-fs": "^4.6.2",
     "isomorphic-git": "^1.33.1",
+    "shx": "^0.4.0",
     "vite": "^7.1.5",
     "vite-plugin-node-polyfills": "^0.24.0"
   }
