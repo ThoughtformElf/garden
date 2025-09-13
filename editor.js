@@ -3,6 +3,7 @@ import { vim, Vim } from "@replit/codemirror-vim";
 import { LanguageDescription } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
 import { yamlFrontmatter } from "@codemirror/lang-yaml";
+import {amy} from 'thememirror';
 
 // Map "jj" to <Esc> in insert mode
 Vim.map("jj", "<Esc>", "insert");
@@ -45,7 +46,8 @@ new EditorView({
   extensions: [
     vim(),
     basicSetup,
-    mainLanguage // This single extension now correctly handles both frontmatter and markdown
+    mainLanguage, // This single extension now correctly handles both frontmatter and markdown
+    amy
   ],
   parent: document.querySelector(".editor"),
 });
