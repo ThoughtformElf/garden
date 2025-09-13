@@ -1,5 +1,5 @@
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { LanguageDescription, StreamLanguage } from '@codemirror/language';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -17,6 +17,9 @@ import { basicDark } from './theme.js';
 
 // Define the shell language using the legacy stream parser
 const shellLanguage = StreamLanguage.define(shell);
+
+// Create a unique annotation type to mark programmatic changes
+const programmaticChange = Annotation.define();
 
 /**
  * @class Editor
@@ -52,7 +55,6 @@ export class Editor {
     this.languageCompartment = new Compartment();
     this.markdownLanguage = this.createMarkdownLanguage();
 
-    // Create a debounced version of handleUpdate, bound to this instance.
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
 
     this.init();
@@ -75,9 +77,9 @@ export class Editor {
     
     const initialContent = await gitClient.readFile(this.filePath);
 
-    // Use the debounced method from the instance.
     const updateListener = EditorView.updateListener.of(update => {
-      if (update.docChanged) {
+      // Only trigger a save if the document changed AND it was not a programmatic change.
+      if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
     });
@@ -199,10 +201,11 @@ export class Editor {
 
     const currentDoc = this.editorView.state.doc;
     this.editorView.dispatch({
-      changes: { from: 0, to: currentDoc.length, insert: newContent }
+      changes: { from: 0, to: currentDoc.length, insert: newContent },
+      // Annotate this transaction to mark it as a programmatic change.
+      annotations: programmaticChange.of(true)
     });
 
-    // Refresh the sidebar to update the active file highlight.
     if (this.sidebar) {
       await this.sidebar.refresh();
     }

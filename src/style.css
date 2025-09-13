@@ -62,3 +62,11 @@ main {
 main, .cm-editor {
   height: 100%;
 }
+
+/* Styles for Eruda container */
+#eruda-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  z-index: 9999; /* Ensure it's on top of everything */
+}
