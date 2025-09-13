@@ -76,6 +76,21 @@ class Git {
       console.error(`Error writing file ${filepath}:`, e);
     }
   }
+
+  /**
+   * Gets the git status for all files in the repository.
+   * @returns {Promise<Map<string, string>>} A map of filepaths to their status.
+   */
+  async getStatuses() {
+    const statusMatrix = await git.statusMatrix({ fs: this.fs, dir: '/' });
+    const statuses = new Map();
+    for (const [filepath, head, workdir, stage] of statusMatrix) {
+      // For our purpose, we only care if the working directory is modified.
+      // 1 means unmodified, 2 means modified.
+      statuses.set(`/${filepath}`, workdir === 2 ? 'modified' : 'unmodified');
+    }
+    return statuses;
+  }
 }
 
 // Create and export a single instance to be shared across modules

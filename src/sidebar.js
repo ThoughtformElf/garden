@@ -23,12 +23,22 @@ export class Sidebar {
    */
   async init() {
     console.log('Initializing sidebar...');
+    await this.refresh();
+    console.log('Sidebar initialized.');
+  }
+
+  /**
+   * Re-fetches files and statuses and re-renders the sidebar.
+   */
+  async refresh() {
     try {
-      const files = await this.listFiles('/');
-      this.render(files);
-      console.log('Sidebar initialized.');
+      const [files, statuses] = await Promise.all([
+        this.listFiles('/'),
+        gitClient.getStatuses()
+      ]);
+      this.render(files, statuses);
     } catch (e) {
-      console.error('Error initializing sidebar:', e);
+      console.error('Error refreshing sidebar:', e);
     }
   }
 
@@ -61,14 +71,22 @@ export class Sidebar {
   }
 
   /**
-   * Renders the list of files as HTML links.
+   * Renders the list of files as HTML links with status and active classes.
    * @param {string[]} files An array of file paths.
+   * @param {Map<string, string>} statuses A map of filepaths to their git status.
    */
-  render(files) {
+  render(files, statuses) {
+    const currentFile = window.location.hash.substring(1); // Get file from hash (e.g., /README.md)
     const fileListHTML = files.sort().map(file => {
-      // Create hash-based links.
       const href = `#${file}`;
-      return `<li><a href="${href}">${file}</a></li>`;
+      const status = statuses.get(file) || 'unmodified';
+      
+      const classes = [`status-${status}`];
+      if (file === currentFile) {
+        classes.push('active');
+      }
+
+      return `<li><a href="${href}" class="${classes.join(' ')}">${file}</a></li>`;
     }).join('');
     this.container.innerHTML = `<ul>${fileListHTML}</ul>`;
   }

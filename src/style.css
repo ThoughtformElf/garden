@@ -12,10 +12,11 @@ html, body {
 #sidebar {
   width: 250px;
   min-width: 200px;
-  border-right: 1px solid #ccc;
+  border-right: 1px solid #333; /* Darker border */
   padding: 10px;
   overflow-y: auto;
   box-sizing: border-box;
+  background-color: #222; /* Match theme background */
 }
 
 #sidebar ul {
@@ -27,17 +28,29 @@ html, body {
 
 #sidebar li a {
   text-decoration: none;
-  color: #333;
   display: block;
   padding: 4px 8px;
   border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #ccc; /* Default text color */
+}
+
+#sidebar li a.status-modified {
+  color: #E5C07B; /* A yellow/gold color for modified files */
+}
+
+#sidebar li a.status-unmodified {
+  color: #ccc; /* Standard color for unmodified files */
+}
+
+#sidebar li a.active {
+  background-color: #444; /* Add a background for the active file */
 }
 
 #sidebar li a:hover {
-  background-color: #f0f0f0;
+  background-color: #333;
 }
 
 main {

@@ -9,7 +9,7 @@ import { css } from '@codemirror/lang-css';
 import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { yaml } from '@codemirror/lang-yaml';
-import { shell } from '@codemirror/legacy-modes/mode/shell'; // Correct import from legacy package
+import { shell } from '@codemirror/legacy-modes/mode/shell';
 import debounce from 'lodash/debounce';
 import { gitClient } from './git-integration.js';
 import { Sidebar } from './sidebar.js';
@@ -52,6 +52,9 @@ export class Editor {
     this.languageCompartment = new Compartment();
     this.markdownLanguage = this.createMarkdownLanguage();
 
+    // Create a debounced version of handleUpdate, bound to this instance.
+    this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
+
     this.init();
   }
 
@@ -71,11 +74,11 @@ export class Editor {
     await this.sidebar.init();
     
     const initialContent = await gitClient.readFile(this.filePath);
-    const debouncedOnUpdate = debounce(this.handleUpdate.bind(this), 500);
 
+    // Use the debounced method from the instance.
     const updateListener = EditorView.updateListener.of(update => {
       if (update.docChanged) {
-        debouncedOnUpdate(update.state.doc.toString());
+        this.debouncedHandleUpdate(update.state.doc.toString());
       }
     });
 
@@ -198,17 +201,26 @@ export class Editor {
     this.editorView.dispatch({
       changes: { from: 0, to: currentDoc.length, insert: newContent }
     });
+
+    // Refresh the sidebar to update the active file highlight.
+    if (this.sidebar) {
+      await this.sidebar.refresh();
+    }
+
     this.editorView.focus();
   }
 
   /**
-   * Handles saving the document content to the virtual file system.
+   * Handles saving the document content and refreshing the sidebar.
    * @param {string} newContent The new document content.
    */
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     console.log(`Saving ${this.filePath}...`);
     await gitClient.writeFile(this.filePath, newContent);
+    if (this.sidebar) {
+      await this.sidebar.refresh();
+    }
   }
 
   /**
