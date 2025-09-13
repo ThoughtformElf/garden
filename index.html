@@ -4,9 +4,22 @@
   <meta charset="UTF-8" />
   <title>Thoughtform Garden</title>
   <link rel="stylesheet" href="./src/style.css" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
 </head>
 <body>
   <main></main>
+  <script>
+    // Register the service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/src/sw.js').then(registration => {
+          console.log('Service Worker registered: ', registration);
+        }).catch(registrationError => {
+          console.log('Service Worker registration failed: ', registrationError);
+        });
+      });
+    }
+  </script>
   <script type="module" src="./src/index.js"></script>
 </body>
 </html>
