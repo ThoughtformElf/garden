@@ -1,51 +1,79 @@
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
-import http from 'isomorphic-git/http/web';
 
 /**
  * @class Git
- * @description Encapsulates all isomorphic-git and file system functionality.
- * This class can be instantiated once and shared across multiple editor instances.
+ * @description Encapsulates all isomorphic-git and file system functionality
+ * for a SINGLE garden.
  */
-class Git {
-  constructor() {
-    this.REPO_URL = 'https://github.com/thoughtforms/garden';
-    this.CORS_PROXY = 'https://cors.isomorphic-git.org';
-    this.fs = new FS('garden-fs');
+export class Git {
+  /**
+   * @param {string} gardenName The unique name for this garden/database.
+   */
+  constructor(gardenName) {
+    if (!gardenName) {
+      throw new Error('A garden name is required to initialize the Git client.');
+    }
+    this.gardenName = gardenName;
+    // The FS name is now dynamic, creating a separate DB for each garden
+    this.fs = new FS(`garden-fs-${this.gardenName}`);
     this.pfs = this.fs.promises;
   }
 
   /**
-   * Checks if the repository has already been cloned and clones it if not.
+   * Initializes a new git repository in the filesystem if one doesn't exist.
+   * This replaces the old cloneRepo method.
    */
-  async cloneRepo() {
-    let isCloned = false;
+  async initRepo() {
+    let isInitialized = false;
     try {
+      // Check for the .git directory to see if it's an existing repo
       await this.pfs.stat('/.git');
-      isCloned = true;
+      isInitialized = true;
+      console.log(`Garden "${this.gardenName}" already exists. Loading it.`);
     } catch (e) {
-      isCloned = false;
+      isInitialized = false;
     }
 
-    if (isCloned) {
-      console.log('Repository already cloned.');
-      return;
+    if (isInitialized) {
+      return; // Nothing more to do
     }
 
-    console.log('Cloning repository...');
+    // If not initialized, create a new repository from scratch
+    console.log(`Initializing new garden: "${this.gardenName}"...`);
     try {
-      await git.clone({
+      await git.init({
         fs: this.fs,
-        http,
         dir: '/',
-        url: this.REPO_URL,
-        corsProxy: this.CORS_PROXY,
-        singleBranch: true,
-        depth: 10,
+        defaultBranch: 'main' // Use 'main' as the modern default
       });
-      console.log('Clone complete.');
+
+      // Create a default README.md for the new garden
+      const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
+      await this.pfs.writeFile('/README.md', defaultContent, 'utf8');
+
+      // Add the new garden to our central registry in localStorage
+      this.registerNewGarden();
+      
+      console.log('New garden initialized successfully.');
     } catch (e) {
-      console.error('Error cloning repository:', e);
+      console.error('Error initializing repository:', e);
+    }
+  }
+  
+  /**
+   * Adds the current garden's name to the registry in localStorage.
+   */
+  registerNewGarden() {
+    try {
+      const gardensRaw = localStorage.getItem('thoughtform_gardens');
+      const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
+      if (!gardens.includes(this.gardenName)) {
+        gardens.push(this.gardenName);
+        localStorage.setItem('thoughtform_gardens', JSON.stringify(gardens));
+      }
+    } catch (e) {
+      console.error('Failed to update garden registry:', e);
     }
   }
 
@@ -60,7 +88,7 @@ class Git {
       return content;
     } catch (e) {
       console.warn(`File not found: ${filepath}`);
-      return `// File not found: ${filepath}`;
+      return `// File not found: ${filepath}\n// Start typing to create it.`;
     }
   }
 
@@ -71,6 +99,11 @@ class Git {
    */
   async writeFile(filepath, content) {
     try {
+      // Ensure directory exists
+      const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
+      if (dirname) {
+        await this.pfs.mkdir(dirname, { recursive: true });
+      }
       await this.pfs.writeFile(filepath, content, 'utf8');
     } catch (e) {
       console.error(`Error writing file ${filepath}:`, e);
@@ -92,6 +125,3 @@ class Git {
     return statuses;
   }
 }
-
-// Create and export a single instance to be shared across modules
-export const gitClient = new Git();

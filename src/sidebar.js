@@ -1,4 +1,3 @@
-import { gitClient } from './git-integration.js';
 /**
  * @class Sidebar
  * @description Manages the file listing sidebar.
@@ -7,19 +6,26 @@ export class Sidebar {
   /**
    * @param {Object} options Configuration for the sidebar.
    * @param {string} options.target A CSS selector for the container element.
+   * @param {Git} options.gitClient An instance of the Git client.
    */
-  constructor({ target }) {
+  constructor({ target, gitClient }) {
+    if (!gitClient) {
+      throw new Error('Sidebar requires a gitClient instance.');
+    }
+    this.gitClient = gitClient;
     this.targetSelector = target;
     const container = document.querySelector(this.targetSelector);
+
     if (!container) {
       console.error(`Sidebar container not found: ${this.targetSelector}`);
       return;
     }
     this.container = container;
-    // Create a dedicated element for the file list to avoid overwriting other controls.
+    
     this.listContainer = document.createElement('div');
     this.container.appendChild(this.listContainer);
   }
+
   /**
    * Initializes the sidebar by listing and rendering repository files.
    */
@@ -28,6 +34,7 @@ export class Sidebar {
     await this.refresh();
     console.log('Sidebar initialized.');
   }
+
   /**
    * Re-fetches files and statuses and re-renders the sidebar.
    */
@@ -35,20 +42,21 @@ export class Sidebar {
     try {
       const [files, statuses] = await Promise.all([
         this.listFiles('/'),
-        gitClient.getStatuses()
+        this.gitClient.getStatuses()
       ]);
       this.render(files, statuses);
     } catch (e) {
       console.error('Error refreshing sidebar:', e);
     }
   }
+
   /**
    * Recursively lists all files in a directory, ignoring '.git'.
    * @param {string} dir The directory to start from.
    * @returns {Promise<string[]>} A list of file paths.
    */
   async listFiles(dir) {
-    const pfs = gitClient.pfs;
+    const pfs = this.gitClient.pfs;
     let fileList = [];
     const items = await pfs.readdir(dir);
     for (const item of items) {
@@ -62,12 +70,12 @@ export class Sidebar {
           fileList.push(path);
         }
       } catch (e) {
-        // Ignore errors for symlinks or other unstat-able files
         console.warn(`Could not stat ${path}, skipping.`);
       }
     }
     return fileList;
   }
+
   /**
    * Renders the list of files as HTML links with status and active classes.
    * @param {string[]} files An array of file paths.
@@ -85,6 +93,7 @@ export class Sidebar {
       }
       return `<li><a href="${href}" class="${classes.join(' ')}">${file}</a></li>`;
     }).join('');
+
     this.listContainer.innerHTML = `<ul>${fileListHTML}</ul>`;
   }
 }

@@ -11,7 +11,6 @@ import { xml } from '@codemirror/lang-xml';
 import { yaml } from '@codemirror/lang-yaml';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import debounce from 'lodash/debounce';
-import { gitClient } from './git-integration.js';
 import { Sidebar } from './sidebar.js';
 import { basicDark } from './theme.js';
 
@@ -37,12 +36,18 @@ export class Editor {
    * @param {string} [options.url=window.location.hash] The URL to determine the file path.
    * @param {string} [options.target='body > main'] A CSS selector for the container element.
    * @param {Object} [options.editorConfig] Custom CodeMirror configuration options.
+   * @param {Git} options.gitClient An instance of the Git client.
    */
-  constructor({ url, target = 'body > main', editorConfig = {} } = {}) {
+  constructor({ url, target = 'body > main', editorConfig = {}, gitClient } = {}) {
+    if (!gitClient) {
+      throw new Error('Editor requires a gitClient instance.');
+    }
+    this.gitClient = gitClient;
+
     if (!window.location.hash) {
       window.location.hash = '#/README.md';
-      return;
     }
+    
     this.targetSelector = target;
     this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
@@ -53,11 +58,12 @@ export class Editor {
     this.languageCompartment = new Compartment();
     this.markdownLanguage = this.createMarkdownLanguage();
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
+
     this.init();
   }
 
   /**
-   * Initializes the editor by cloning the repo and creating the CodeMirror view.
+   * Initializes the editor by initializing the repo and creating the CodeMirror view.
    */
   async init() {
     const container = document.querySelector(this.targetSelector);
@@ -66,15 +72,15 @@ export class Editor {
       return;
     }
 
-    // This is the long-running operation. The loading message will be displayed during this time.
-    await gitClient.cloneRepo();
+    // This method now initializes a local repo if it doesn't exist.
+    await this.gitClient.initRepo();
 
-    // Now that the repo is ready, we can initialize the sidebar and prepare the editor.
-    this.sidebar = new Sidebar({ target: '#sidebar' });
+    // Now that the repo is ready, we can initialize the sidebar, passing the client.
+    this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient });
     await this.sidebar.init();
     
-    const initialContent = await gitClient.readFile(this.filePath);
-
+    const initialContent = await this.gitClient.readFile(this.filePath);
+    
     // Remove the loading indicator now that we have content.
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
@@ -85,7 +91,6 @@ export class Editor {
     container.style.display = 'block';
 
     const updateListener = EditorView.updateListener.of(update => {
-      // Only trigger a save if the document changed AND it was not a programmatic change.
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
@@ -111,7 +116,7 @@ export class Editor {
         updateListener,
         basicDark,
         editorFontSize,
-        ...this.editorConfig.extensions || []
+        ...(this.editorConfig.extensions || [])
       ],
       parent: container,
     });
@@ -144,7 +149,7 @@ export class Editor {
   getLanguageExtension(filepath) {
     const filename = filepath.split('/').pop();
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
-    // First, check for specific filenames that don't have standard extensions.
+    
     switch (filename) {
       case '.gitignore':
       case '.npmrc':
@@ -153,28 +158,15 @@ export class Editor {
         return shellLanguage;
     }
     
-    // Then, fall back to checking extensions.
     switch (extension) {
-      case 'js':
-        return javascript();
-      case 'css':
-        return css();
-      case 'html':
-        return html();
-      case 'json':
-        return json();
-      case 'xml':
-        return xml();
-      case 'yaml':
-      case 'yml':
-        return yaml();
-      case 'sh':
-      case 'bash':
-      case 'zsh':
-        return shellLanguage;
-      case 'md':
-      default:
-        return this.markdownLanguage;
+      case 'js': return javascript();
+      case 'css': return css();
+      case 'html': return html();
+      case 'json': return json();
+      case 'xml': return xml();
+      case 'yaml': case 'yml': return yaml();
+      case 'sh': case 'bash': case 'zsh': return shellLanguage;
+      case 'md': default: return this.markdownLanguage;
     }
   }
 
@@ -196,18 +188,20 @@ export class Editor {
    */
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
-    const newContent = await gitClient.readFile(filepath);
+    const newContent = await this.gitClient.readFile(filepath);
     this.filePath = filepath;
+    
     const newLanguage = this.getLanguageExtension(filepath);
     this.editorView.dispatch({
       effects: this.languageCompartment.reconfigure(newLanguage)
     });
+    
     const currentDoc = this.editorView.state.doc;
     this.editorView.dispatch({
       changes: { from: 0, to: currentDoc.length, insert: newContent },
-      // Annotate this transaction to mark it as a programmatic change.
       annotations: programmaticChange.of(true)
     });
+
     if (this.sidebar) {
       await this.sidebar.refresh();
     }
@@ -221,7 +215,7 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     console.log(`Saving ${this.filePath}...`);
-    await gitClient.writeFile(this.filePath, newContent);
+    await this.gitClient.writeFile(this.filePath, newContent);
     if (this.sidebar) {
       await this.sidebar.refresh();
     }
