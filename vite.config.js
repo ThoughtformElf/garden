@@ -13,12 +13,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
-        globPatterns: [
-          'index.html',
-          'favicon.png',
-          '**/*.js',
-          '**/*.css',
-        ],
+        // Cache all assets in the dist folder for better offline support.
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,md}'],
       },
     }),
   ],
