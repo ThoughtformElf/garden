@@ -1,8 +1,10 @@
+// src/index.js
 import { Buffer } from 'buffer';
 window.Buffer = Buffer; // Polyfill for isomorphic-git
 import { Editor } from './editor.js';
 import { Git } from './git-integration.js';
 import { initializeAppInteractions } from './ui-interactions.js';
+import { initializeDevTools } from './devtools.js'; // Import the new module
 
 // --- Main Application Logic ---
 
@@ -24,18 +26,9 @@ console.log(`Loading garden: "${gardenName}"`);
 const gitClient = new Git(gardenName);
 
 initializeAppInteractions();
+initializeDevTools(); // Initialize Eruda and the custom data tab
 
 new Editor({ 
   target: 'main',
   gitClient: gitClient
-});
-
-const el = document.getElementById('eruda-container');
-import('eruda').then(({ default: eruda }) => {
-  eruda.init({
-    container: el,
-    tool: ['console', 'elements', 'network', 'resources'],
-    inline: true,
-    useShadowDom: false,
-  });
 });
