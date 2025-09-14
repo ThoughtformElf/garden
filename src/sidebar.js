@@ -1,6 +1,7 @@
 import { ContextMenu } from './context-menu.js';
 import { fileActions } from './sidebar-files.js';
 import { gardenActions } from './sidebar-gardens.js';
+import { gitActions } from './sidebar-git.js';
 
 export class Sidebar {
   /**
@@ -37,6 +38,7 @@ export class Sidebar {
 
     Object.assign(this, fileActions);
     Object.assign(this, gardenActions);
+    Object.assign(this, gitActions);
   }
 
   async init() {
@@ -78,6 +80,7 @@ export class Sidebar {
     this.tabsContainer.innerHTML = `
       <button class="sidebar-tab" data-tab="Files">Files</button>
       <button class="sidebar-tab" data-tab="Gardens">Gardens</button>
+      <button class="sidebar-tab" data-tab="Git">Git</button>
     `;
 
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
@@ -96,14 +99,21 @@ export class Sidebar {
     
     this.contentContainer.classList.toggle('files-view', this.activeTab === 'Files');
     this.contentContainer.classList.toggle('gardens-view', this.activeTab === 'Gardens');
+    this.contentContainer.classList.toggle('git-view', this.activeTab === 'Git');
 
     if (this.activeTab === 'Files') {
-      // FIX: Pass the statuses map to renderFiles.
       const statuses = await this.gitClient.getStatuses();
       await this.renderFiles(statuses);
     } else if (this.activeTab === 'Gardens') {
       await this.renderGardens();
+    } else if (this.activeTab === 'Git') {
+      await this.renderGitView();
     }
+
+    // Always check for dirty status to show the indicator dot on the Git tab
+    const statuses = await this.gitClient.getStatuses();
+    const isDirty = Array.from(statuses.values()).some(s => s === 'modified');
+    this.tabsContainer.querySelector('[data-tab="Git"]').classList.toggle('dirty', isDirty);
   }
 
   async listFiles(gitClient, dir) {

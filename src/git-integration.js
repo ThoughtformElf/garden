@@ -18,7 +18,7 @@ export class Git {
     this.fs = new FS(`garden-fs-${this.gardenName}`);
     this.pfs = this.fs.promises;
   }
-
+  
   async initRepo() {
     try {
       await this.pfs.stat('/.git');
@@ -59,6 +59,28 @@ export class Git {
     }
   }
 
+  async readBlob(filepath) {
+    try {
+      const headOid = await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' });
+      const { blob } = await git.readBlob({
+        fs: this.fs,
+        dir: '/',
+        oid: headOid,
+        filepath: filepath.startsWith('/') ? filepath.substring(1) : filepath
+      });
+      return new TextDecoder().decode(blob);
+    } catch (e) {
+      // If the ref or blob is not found, it means it's a new repo or a new file.
+      // In either case, the "original" content is empty.
+      if (e.name === 'NotFoundError') {
+        console.log(`No commit history found for ${filepath}. Assuming empty original content.`);
+        return '';
+      }
+      console.error(`Could not read blob for ${filepath} from HEAD:`, e);
+      return null; // Return null on other errors to indicate a problem.
+    }
+  }
+
   async readFile(filepath) {
     try {
       const content = await this.pfs.readFile(filepath, 'utf8');
@@ -77,7 +99,6 @@ export class Git {
       }
       await this.pfs.writeFile(filepath, content, 'utf8');
 
-      // FIX: Mark this garden as dirty in the global registry
       this.markGardenAsDirty(true);
 
     } catch (e) {

@@ -13,6 +13,7 @@ import { shell } from '@codemirror/legacy-modes/mode/shell';
 import debounce from 'lodash/debounce';
 import { Sidebar } from './sidebar.js';
 import { basicDark } from './theme.js';
+import { diffCompartment, createDiffExtension } from './editor-diff.js';
 
 // Define the shell language using the legacy stream parser
 const shellLanguage = StreamLanguage.define(shell);
@@ -73,8 +74,7 @@ export class Editor {
     }
 
     await this.gitClient.initRepo();
-
-    // FIX: Pass the editor instance `this` to the Sidebar constructor.
+    // Pass the editor instance `this` to the Sidebar constructor.
     this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
     
@@ -113,6 +113,7 @@ export class Editor {
         updateListener,
         basicDark,
         editorFontSize,
+        diffCompartment.of([]), // Initialize the diff compartment as empty
         ...(this.editorConfig.extensions || [])
       ],
       parent: container,
@@ -122,6 +123,25 @@ export class Editor {
     this.isReady = true;
     this.listenForNavigation();
     this.editorView.focus();
+  }
+
+  async showDiff(filepath) {
+    const originalContent = await this.gitClient.readBlob(filepath);
+    if (originalContent === null) {
+      console.error("Failed to show diff because original content couldn't be loaded.");
+      return;
+    }
+
+    const diffExt = createDiffExtension(originalContent);
+    this.editorView.dispatch({
+      effects: diffCompartment.reconfigure(diffExt)
+    });
+  }
+
+  hideDiff() {
+    this.editorView.dispatch({
+      effects: diffCompartment.reconfigure([])
+    });
   }
 
   createMarkdownLanguage() {
@@ -161,6 +181,7 @@ export class Editor {
 
   listenForNavigation() {
     window.addEventListener('hashchange', async () => {
+      this.hideDiff(); // Always hide diff on navigation
       const newFilePath = this.getFilePath(window.location.hash);
       if (newFilePath !== this.filePath) {
         await this.loadFile(newFilePath);
@@ -170,6 +191,7 @@ export class Editor {
 
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
+    this.hideDiff(); // Ensure diff is hidden when explicitly loading a new file
     const newContent = await this.gitClient.readFile(filepath);
     this.filePath = filepath;
     
