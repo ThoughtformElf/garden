@@ -419,7 +419,8 @@ main, .cm-editor { height: 100%; }
   cursor: pointer;
 }
 
-.history-file-list .history-file-path:hover {
+.history-file-list .history-file-path:hover,
+.history-file-list .history-file-path.active {
   background-color: #444;
   color: #eee;
 }

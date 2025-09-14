@@ -162,7 +162,7 @@ export const gitActions = {
                   if (this.editor.filePath !== filepath) {
                       await this.editor.loadFile(filepath);
                   }
-                  this.editor.showDiff(this.editor.filePath);
+                  this.editor.showDiff(await this.gitClient.readBlob(filepath));
               } else if (target.matches('.git-action-button')) {
                   e.stopPropagation();
                   if (target.classList.contains('discard')) {
@@ -213,6 +213,11 @@ export const gitActions = {
                 }
               }
             } else if (target.closest('.history-file-path')) {
+                // Remove active class from any other selected history file
+                viewContainer.querySelectorAll('.history-file-path.active').forEach(el => el.classList.remove('active'));
+                // Add active class to the clicked file
+                target.classList.add('active');
+
                 const historyItemForFile = target.closest('.git-history-item');
                 const filepath = target.dataset.path;
                 const oid = historyItemForFile.dataset.oid;
