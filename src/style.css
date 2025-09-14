@@ -138,6 +138,21 @@ main {
   padding: 0;
   border-right: none;
 }
+/* Style for the "Files" tab when the repo has modified files */
+.sidebar-tab.dirty {
+  position: relative;
+}
+/* A small indicator dot, similar to VS Code's dirty file icon */
+.sidebar-tab.dirty::after {
+  content: '';
+  position: absolute;
+  top: 8px; /* Adjust for vertical alignment */
+  right: 8px; /* Adjust for horizontal alignment */
+  width: 8px;
+  height: 8px;
+  background-color: #E5C07B; /* Use your existing accent color */
+  border-radius: 50%;
+}
 main, .cm-editor { height: 100%; }
 .cm-editor { background-color: #222; }
 
