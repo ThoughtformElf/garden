@@ -106,13 +106,12 @@ export class Editor {
     this.editorView.focus();
   }
 
-  async showDiff(filepath) {
-    const originalContent = await this.gitClient.readBlob(filepath);
+  async showDiff(originalContent) {
     if (originalContent === null) {
-      console.error("Failed to show diff because original content couldn't be loaded.");
+      console.error("Cannot show diff, original content is null.");
+      this.hideDiff();
       return;
     }
-
     const diffExt = createDiffExtension(originalContent);
     this.editorView.dispatch({
       effects: diffCompartment.reconfigure(diffExt)
@@ -166,6 +165,27 @@ export class Editor {
       }
     });
   }
+  
+  async previewHistoricalFile(filepath, oid, parentOid) {
+    const [currentContent, parentContent] = await Promise.all([
+      this.gitClient.readBlobFromCommit(oid, filepath),
+      this.gitClient.readBlobFromCommit(parentOid, filepath)
+    ]);
+
+    if (currentContent === null || parentContent === null) {
+      alert('Could not load historical diff for this file.');
+      return;
+    }
+    
+    // Temporarily update the editor's content for preview
+    this.editorView.dispatch({
+      changes: { from: 0, to: this.editorView.state.doc.length, insert: currentContent },
+      annotations: programmaticChange.of(true)
+    });
+    
+    // Show the diff against the parent commit's content
+    this.showDiff(parentContent);
+  }
 
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
@@ -201,12 +221,18 @@ export class Editor {
       annotations: programmaticChange.of(true)
     });
     
-    // After force-reloading, the diff view should be cleared.
     this.hideDiff();
   }
 
   async handleUpdate(newContent) {
     if (!this.isReady) return;
+    
+    // Do not save changes if we are in a historical preview state
+    if (this.filePath !== this.getFilePath(window.location.hash)) {
+        console.log("In preview mode, not saving changes.");
+        return;
+    }
+
     console.log(`Saving ${this.filePath}...`);
     await this.gitClient.writeFile(this.filePath, newContent);
     if (this.sidebar) {

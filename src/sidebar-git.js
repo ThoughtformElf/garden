@@ -3,7 +3,11 @@
 export const gitActions = {
   async renderGitView() {
     try {
-      const statusMatrix = await this.gitClient.getStatuses();
+      const [statusMatrix, commits] = await Promise.all([
+        this.gitClient.getStatuses(),
+        this.gitClient.log()
+      ]);
+
       const stagedFiles = [];
       const unstagedFiles = [];
 
@@ -25,8 +29,9 @@ export const gitActions = {
         </div>
       `;
 
-      const stagedFilesHTML = this.renderFileSection('Staged Changes', stagedFiles, true);
       const unstagedFilesHTML = this.renderFileSection('Changes', unstagedFiles, false);
+      const stagedFilesHTML = this.renderFileSection('Staged Changes', stagedFiles, true);
+      const historyHTML = this.renderHistorySection(commits);
 
       const oldMessage = this.contentContainer.querySelector('#git-commit-message')?.value || '';
 
@@ -35,6 +40,7 @@ export const gitActions = {
           ${commitAreaHTML}
           ${stagedFilesHTML}
           ${unstagedFilesHTML}
+          ${historyHTML}
         </div>
       `;
       
@@ -86,6 +92,40 @@ export const gitActions = {
     `;
   },
   
+  renderHistorySection(commits) {
+    let historyListHTML = '';
+    if (commits.length > 0) {
+        historyListHTML = commits.map(commit => {
+            const message = commit.commit.message.split('\n')[0];
+            const shortOid = commit.oid.substring(0, 7);
+            const author = commit.commit.author.name;
+            const date = new Date(commit.commit.author.timestamp * 1000).toLocaleString();
+            const parentOid = commit.commit.parent[0] || '';
+
+            return `
+              <li class="git-history-item" data-oid="${commit.oid}" data-parent-oid="${parentOid}" data-author="${author}" data-date="${date}">
+                <div class="git-history-header">
+                  <span class="git-history-message">${message}</span>
+                  <span class="git-history-oid">${shortOid}</span>
+                </div>
+                <div class="git-history-details" style="display: none;"></div>
+              </li>
+            `;
+        }).join('');
+    } else {
+        historyListHTML = '<li><span class="no-changes">No commit history.</span></li>';
+    }
+
+    return `
+        <div class="git-history-section">
+            <h3 class="git-section-header">History</h3>
+            <ul class="git-history-list">
+                ${historyListHTML}
+            </ul>
+        </div>
+    `;
+  },
+  
   updateCommitButtonState() {
       const commitMessage = this.contentContainer.querySelector('#git-commit-message');
       const commitButton = this.contentContainer.querySelector('#git-commit-button');
@@ -110,33 +150,72 @@ export const gitActions = {
         viewContainer.addEventListener('click', async (e) => {
             const target = e.target;
             const fileItem = target.closest('.git-file-item');
-            if (!fileItem) return;
+            const historyItem = target.closest('.git-history-item');
 
-            const filepath = fileItem.dataset.filepath;
+            if (fileItem) {
+              const filepath = fileItem.dataset.filepath;
 
-            if (target.matches('.git-file-path')) {
-                if (this.editor.getFilePath(window.location.hash) !== filepath) {
-                    await this.editor.loadFile(filepath);
+              if (target.matches('.git-file-path')) {
+                  if (this.editor.getFilePath(window.location.hash) !== filepath) {
+                      await this.editor.loadFile(filepath);
+                  }
+                  this.editor.showDiff(filepath);
+              } else if (target.matches('.git-action-button')) {
+                  e.stopPropagation();
+                  if (target.classList.contains('discard')) {
+                      if (confirm(`Are you sure you want to discard all changes to "${filepath}"?\nThis cannot be undone.`)) {
+                          await this.gitClient.discard(filepath);
+                          if (this.editor.getFilePath(window.location.hash) === filepath) {
+                              await this.editor.forceReloadFile(filepath);
+                          }
+                          await this.refresh();
+                      }
+                  } else if (target.classList.contains('stage')) {
+                      await this.gitClient.stage(filepath);
+                      await this.renderGitView();
+                  } else if (target.classList.contains('unstage')) {
+                      await this.gitClient.unstage(filepath);
+                      await this.renderGitView();
+                  }
+              }
+            } else if (historyItem && target.closest('.git-history-header')) {
+              const detailsPanel = historyItem.querySelector('.git-history-details');
+              const isVisible = detailsPanel.style.display !== 'none';
+              
+              if (isVisible) {
+                detailsPanel.style.display = 'none';
+              } else {
+                detailsPanel.style.display = 'block';
+                if (!detailsPanel.dataset.loaded) {
+                  detailsPanel.innerHTML = '<span class="no-changes">Loading...</span>';
+                  const oid = historyItem.dataset.oid;
+                  const changedFiles = await this.gitClient.getChangedFiles(oid);
+                  
+                  const author = historyItem.dataset.author;
+                  const date = historyItem.dataset.date;
+
+                  const filesHTML = changedFiles.map(file => {
+                    const path = typeof file === 'string' ? file : file.path;
+                    return `<div class="history-file-path" data-path="${path}">${path.substring(1)}</div>`;
+                  }).join('');
+                  
+                  detailsPanel.innerHTML = `
+                    <div class="commit-meta">
+                      <div><strong>Author:</strong> ${author}</div>
+                      <div><strong>Date:</strong> ${date}</div>
+                    </div>
+                    <div class="history-file-list">${filesHTML || '<span class="no-changes">No files changed.</span>'}</div>
+                  `;
+                  detailsPanel.dataset.loaded = 'true';
                 }
-                this.editor.showDiff(filepath);
-            } else if (target.matches('.git-action-button')) {
-                e.stopPropagation();
-                if (target.classList.contains('discard')) {
-                    if (confirm(`Are you sure you want to discard all changes to "${filepath}"?\nThis cannot be undone.`)) {
-                        await this.gitClient.discard(filepath);
-                        if (this.editor.getFilePath(window.location.hash) === filepath) {
-                            await this.editor.forceReloadFile(filepath);
-                        }
-                        // This is the critical fix: refresh the entire sidebar state.
-                        await this.refresh();
-                    }
-                } else if (target.classList.contains('stage')) {
-                    await this.gitClient.stage(filepath);
-                    await this.renderGitView();
-                } else if (target.classList.contains('unstage')) {
-                    await this.gitClient.unstage(filepath);
-                    await this.renderGitView();
-                }
+              }
+            } else if (target.closest('.history-file-path')) {
+                const historyItemForFile = target.closest('.git-history-item');
+                const filepath = target.dataset.path;
+                const oid = historyItemForFile.dataset.oid;
+                const parentOid = historyItemForFile.dataset.parentOid;
+                
+                await this.editor.previewHistoricalFile(filepath, oid, parentOid);
             }
         });
     }

@@ -348,6 +348,79 @@ main, .cm-editor { height: 100%; }
   display: block;
 }
 
+/* --- History Section Styles --- */
+.git-history-section {
+  padding: 0 10px 10px;
+  overflow-y: auto;
+  border-top: 1px solid #333;
+  margin-top: 10px;
+}
+
+.git-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.git-history-item {
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.git-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 4px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.git-history-header:hover {
+  background-color: #333;
+}
+
+.git-history-message {
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.git-history-oid {
+  color: #888;
+  flex-shrink: 0;
+  margin-left: 10px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.git-history-details {
+  background-color: #1c1c1c;
+  padding: 10px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.commit-meta {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #333;
+}
+
+.history-file-list .history-file-path {
+  padding: 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.history-file-list .history-file-path:hover {
+  background-color: #444;
+  color: #eee;
+}
+
+
 /* --- Diff Viewer Styles --- */
 .cm-diff-inserted {
   background-color: rgba(15, 88, 39, 0.4);

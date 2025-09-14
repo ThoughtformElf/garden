@@ -94,7 +94,7 @@ export class Git {
                 fs: this.fs,
                 dir: '/',
                 filepaths: [cleanPath],
-                force: true // This is the critical fix.
+                force: true
             });
             console.log(`[discard] Successfully checked out ${cleanPath}.`);
         }
@@ -113,26 +113,77 @@ export class Git {
         email: 'user@thoughtform.garden'
       }
     });
-    // After committing, mark the garden as clean
     this.markGardenAsDirty(false);
     return sha;
   }
 
-  async readBlob(filepath) {
+  async log() {
     try {
-      const headOid = await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' });
+      return await git.log({
+        fs: this.fs,
+        dir: '/',
+        depth: 20
+      });
+    } catch (e) {
+      console.log('No commit history found.');
+      return [];
+    }
+  }
+
+  async getChangedFiles(oid) {
+    try {
+      const commit = await git.readCommit({ fs: this.fs, dir: '/', oid });
+      const parentOid = commit.commit.parent[0];
+      if (!parentOid) {
+        const files = await git.listFiles({ fs: this.fs, dir: '/', ref: oid });
+        return files.map(f => ({ path: `/${f}`, type: 'add' }));
+      }
+
+      const files = [];
+      await git.walk({
+        fs: this.fs,
+        dir: '/',
+        trees: [git.TREE({ ref: parentOid }), git.TREE({ ref: oid })],
+        map: async function(filepath, [A, B]) {
+          if (filepath === '.') return;
+          const aOid = await A.oid();
+          const bOid = await B.oid();
+          if (aOid !== bOid) {
+            files.push(`/${filepath}`);
+          }
+        }
+      });
+      return files;
+    } catch (e) {
+      console.error(`Error getting changed files for commit ${oid}:`, e);
+      return [];
+    }
+  }
+
+  async readBlob(filepath) {
+    return this.readBlobFromCommit('HEAD', filepath);
+  }
+
+  async readBlobFromCommit(oid, filepath) {
+    // This is the critical fix: always remove leading slashes.
+    const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
+    if (!oid) return ''; // A commit with no parent has no content to read.
+    
+    try {
+      const commitOid = oid === 'HEAD' ? await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' }) : oid;
+      
       const { blob } = await git.readBlob({
         fs: this.fs,
         dir: '/',
-        oid: headOid,
-        filepath: filepath.startsWith('/') ? filepath.substring(1) : filepath
+        oid: commitOid,
+        filepath: cleanPath
       });
       return new TextDecoder().decode(blob);
     } catch (e) {
       if (e.name === 'NotFoundError') {
         return '';
       }
-      console.error(`Could not read blob for ${filepath} from HEAD:`, e);
+      console.error(`Could not read blob for ${cleanPath} from commit ${oid}:`, e);
       return null;
     }
   }
