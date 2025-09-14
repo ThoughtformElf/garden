@@ -5,10 +5,11 @@ import { Modal } from './modal.js';
 
 // --- Helper function to generate the selection UI ---
 function createSelectionUI(title, items, allChecked = true) {
+  // FIX: Use 'display: block' for each label to ensure it takes its own line.
   const itemCheckboxes = items.map(item => `
-    <label style="display: block; margin: 5px 0; font-family: monospace; cursor: pointer;">
-      <input type="checkbox" class="garden-select-checkbox" value="${item}" ${allChecked ? 'checked' : ''}>
-      ${item}
+    <label style="display: block; margin: 8px 0; font-family: monospace; cursor: pointer;">
+      <input type="checkbox" class="garden-select-checkbox" value="${item}" ${allChecked ? 'checked' : ''} style="margin-right: 8px; vertical-align: middle;">
+      <span style="vertical-align: middle;">${item}</span>
     </label>
   `).join('');
 
@@ -48,7 +49,13 @@ export function initializeDevTools() {
           <button id="import-all-btn" class="eruda-button">Import...</button>
           <input type="file" id="import-file-input" accept=".zip" style="display: none;">
         </div>
-        <style>.eruda-button { /* ... styles ... */ }</style>
+        <style>
+          .eruda-button { 
+            padding: 8px 12px; background-color: #4EC9B0; color: #111; 
+            border: none; border-radius: 3px; cursor: pointer; font-weight: bold;
+          }
+          .eruda-button:hover { background-color: #5FDCC4; }
+        </style>
       `);
       
       const exportBtn = $el.find('#export-all-btn')[0];
@@ -68,21 +75,13 @@ export function initializeDevTools() {
 
         const exportHandler = async () => {
             const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
-            modal.clearFooter();
-            modal.updateContent('Starting export...');
-            
-            let progressHTML = '';
+            modal.destroy();
+            console.log('Starting export...');
             try {
-                await exportGardens(selectedGardens, (msg) => {
-                    progressHTML += `${msg}<br>`;
-                    modal.updateContent(progressHTML);
-                });
-                modal.updateContent(progressHTML + '<br><strong>Export Complete!</strong>');
-                modal.addFooterButton('Close', () => modal.destroy());
+                await exportGardens(selectedGardens, console.log);
+                console.log('%cExport process complete.', 'color: #4EC9B0; font-weight: bold;');
             } catch (e) {
                 console.error('Export failed:', e);
-                modal.updateContent(`<strong>Error:</strong><br>${e.message}`);
-                modal.addFooterButton('Close', () => modal.destroy());
             }
         };
         modal.addFooterButton('Export Selected', exportHandler);
@@ -137,7 +136,7 @@ export function initializeDevTools() {
             modal.updateContent(`<strong>Error:</strong> Could not read the zip file.<br>${e.message}`);
             modal.addFooterButton('Close', () => modal.destroy());
         } finally {
-            fileInput.value = ''; // Reset file input
+            fileInput.value = '';
         }
       });
     },
