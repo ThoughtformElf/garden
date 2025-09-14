@@ -1,10 +1,16 @@
 export const fileActions = {
-  // FIX: This function now correctly receives the statuses map as an argument.
-  async renderFiles(statuses) {
+  // FIX: This function now correctly receives the full status matrix as an argument.
+  async renderFiles(statusMatrix) {
     try {
-      // No longer needs to call getStatuses itself.
       const files = await this.listFiles(this.gitClient, '/');
-      
+      const statuses = new Map();
+      // Create a simple map of filepath -> status for easy lookup
+      for (const [filepath, head, workdir] of statusMatrix) {
+          if (head !== workdir) {
+              statuses.set(`/${filepath}`, 'modified');
+          }
+      }
+
       const currentFile = decodeURIComponent(window.location.hash.substring(1));
       
       const fileListHTML = files.sort().map(file => {

@@ -4,12 +4,6 @@ import { gardenActions } from './sidebar-gardens.js';
 import { gitActions } from './sidebar-git.js';
 
 export class Sidebar {
-  /**
-   * @param {Object} options Configuration for the sidebar.
-   * @param {string} options.target A CSS selector for the container element.
-   * @param {Git} options.gitClient An instance of the Git client.
-   * @param {Editor} options.editor The main editor instance.
-   */
   constructor({ target, gitClient, editor }) {
     if (!gitClient) throw new Error('Sidebar requires a gitClient instance.');
     if (!editor) throw new Error('Sidebar requires an editor instance.');
@@ -101,8 +95,9 @@ export class Sidebar {
     this.contentContainer.classList.toggle('gardens-view', this.activeTab === 'Gardens');
     this.contentContainer.classList.toggle('git-view', this.activeTab === 'Git');
 
+    const statuses = await this.gitClient.getStatuses();
+
     if (this.activeTab === 'Files') {
-      const statuses = await this.gitClient.getStatuses();
       await this.renderFiles(statuses);
     } else if (this.activeTab === 'Gardens') {
       await this.renderGardens();
@@ -110,9 +105,7 @@ export class Sidebar {
       await this.renderGitView();
     }
 
-    // Always check for dirty status to show the indicator dot on the Git tab
-    const statuses = await this.gitClient.getStatuses();
-    const isDirty = Array.from(statuses.values()).some(s => s === 'modified');
+    const isDirty = statuses.some(([, head, workdir]) => head !== workdir);
     this.tabsContainer.querySelector('[data-tab="Git"]').classList.toggle('dirty', isDirty);
   }
 

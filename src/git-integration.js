@@ -59,6 +59,40 @@ export class Git {
     }
   }
 
+  async stage(filepath) {
+    const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
+    await git.add({ fs: this.fs, dir: '/', filepath: cleanPath });
+  }
+
+  async unstage(filepath) {
+    const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
+    await git.remove({ fs: this.fs, dir: '/', filepath: cleanPath });
+  }
+
+  async discard(filepath) {
+    const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
+    await git.checkout({
+      fs: this.fs,
+      dir: '/',
+      filepaths: [cleanPath]
+    });
+  }
+
+  async commit(message) {
+    const sha = await git.commit({
+      fs: this.fs,
+      dir: '/',
+      message,
+      author: {
+        name: 'User',
+        email: 'user@thoughtform.garden'
+      }
+    });
+    // After committing, mark the garden as clean
+    this.markGardenAsDirty(false);
+    return sha;
+  }
+
   async readBlob(filepath) {
     try {
       const headOid = await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' });
@@ -70,14 +104,11 @@ export class Git {
       });
       return new TextDecoder().decode(blob);
     } catch (e) {
-      // If the ref or blob is not found, it means it's a new repo or a new file.
-      // In either case, the "original" content is empty.
       if (e.name === 'NotFoundError') {
-        console.log(`No commit history found for ${filepath}. Assuming empty original content.`);
         return '';
       }
       console.error(`Could not read blob for ${filepath} from HEAD:`, e);
-      return null; // Return null on other errors to indicate a problem.
+      return null;
     }
   }
 
@@ -98,9 +129,7 @@ export class Git {
         await this.pfs.mkdir(dirname, { recursive: true });
       }
       await this.pfs.writeFile(filepath, content, 'utf8');
-
       this.markGardenAsDirty(true);
-
     } catch (e) {
       console.error(`Error writing file ${filepath}:`, e);
     }
@@ -125,11 +154,6 @@ export class Git {
   }
 
   async getStatuses() {
-    const statusMatrix = await git.statusMatrix({ fs: this.fs, dir: '/' });
-    const statuses = new Map();
-    for (const [filepath, head, workdir, stage] of statusMatrix) {
-      statuses.set(`/${filepath}`, workdir === 2 ? 'modified' : 'unmodified');
-    }
-    return statuses;
+    return git.statusMatrix({ fs: this.fs, dir: '/' });
   }
 }
