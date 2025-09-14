@@ -124,11 +124,11 @@ export const gitActions = {
                 if (target.classList.contains('discard')) {
                     if (confirm(`Are you sure you want to discard all changes to "${filepath}"?\nThis cannot be undone.`)) {
                         await this.gitClient.discard(filepath);
-                        // If the discarded file was the one being viewed, forcibly reload it.
                         if (this.editor.getFilePath(window.location.hash) === filepath) {
                             await this.editor.forceReloadFile(filepath);
                         }
-                        await this.renderGitView(); // Re-render sidebar to remove file from list.
+                        // This is the critical fix: refresh the entire sidebar state.
+                        await this.refresh();
                     }
                 } else if (target.classList.contains('stage')) {
                     await this.gitClient.stage(filepath);
