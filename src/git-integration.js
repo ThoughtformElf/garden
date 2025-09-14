@@ -48,9 +48,9 @@ export class Git {
         defaultBranch: 'main' // Use 'main' as the modern default
       });
 
-      // Create a default README.md for the new garden
+      // Create a default README for the new garden
       const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
-      await this.pfs.writeFile('/README.md', defaultContent, 'utf8');
+      await this.pfs.writeFile('/README', defaultContent, 'utf8');
 
       // Add the new garden to our central registry in localStorage
       this.registerNewGarden();

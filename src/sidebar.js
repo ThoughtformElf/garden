@@ -5,12 +5,14 @@ export class Sidebar {
    * @param {Object} options Configuration for the sidebar.
    * @param {string} options.target A CSS selector for the container element.
    * @param {Git} options.gitClient An instance of the Git client.
+   * @param {Editor} options.editor The main editor instance.
    */
-  constructor({ target, gitClient }) {
-    if (!gitClient) {
-      throw new Error('Sidebar requires a gitClient instance.');
-    }
+  constructor({ target, gitClient, editor }) {
+    if (!gitClient) throw new Error('Sidebar requires a gitClient instance.');
+    if (!editor) throw new Error('Sidebar requires an editor instance.');
+    
     this.gitClient = gitClient;
+    this.editor = editor;
     this.targetSelector = target;
     const container = document.querySelector(this.targetSelector);
 
@@ -40,9 +42,6 @@ export class Sidebar {
     console.log('Sidebar initialized.');
   }
 
-  /**
-   * Sets up the context menu for the file list.
-   */
   setupContextMenu() {
     new ContextMenu({
       targetSelector: '.sidebar-content [data-filepath]',
@@ -98,7 +97,6 @@ export class Sidebar {
         this.gitClient.getStatuses()
       ]);
       
-      // FIX: Decode the hash to correctly compare against file paths with spaces.
       const currentFile = decodeURIComponent(window.location.hash.substring(1));
       
       const fileListHTML = files.sort().map(file => {
@@ -210,7 +208,7 @@ export class Sidebar {
     const newFilename = prompt('Enter name for duplicated file:', defaultName);
 
     if (!newFilename) {
-      return; // User cancelled
+      return;
     }
     
     const newPath = `${directory}/${newFilename}`;
@@ -232,12 +230,19 @@ export class Sidebar {
   async handleDelete(filepath) {
     if (confirm(`Are you sure you want to delete "${filepath}"?`)) {
       try {
+        const wasViewingDeletedFile = decodeURIComponent(window.location.hash) === `#${filepath}`;
+        
         await this.gitClient.pfs.unlink(filepath);
-        if (`#${filepath}` === window.location.hash) {
-          window.location.hash = '#/README.md';
+        
+        if (wasViewingDeletedFile) {
+          // Explicitly set hash and then force a reload of the default file.
+          window.location.hash = '#/README';
+          await this.editor.loadFile('/README');
         } else {
+          // If we weren't viewing the deleted file, a simple refresh is enough.
           await this.refresh();
         }
+
       } catch (e) {
         console.error(`Error deleting file:`, e);
         alert('Failed to delete file.');

@@ -45,7 +45,7 @@ export class Editor {
     this.gitClient = gitClient;
 
     if (!window.location.hash) {
-      window.location.hash = '#/README.md';
+      window.location.hash = '#/README';
     }
     
     this.targetSelector = target;
@@ -72,22 +72,19 @@ export class Editor {
       return;
     }
 
-    // This method now initializes a local repo if it doesn't exist.
     await this.gitClient.initRepo();
 
-    // Now that the repo is ready, we can initialize the sidebar, passing the client.
-    this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient });
+    // FIX: Pass the editor instance `this` to the Sidebar constructor.
+    this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
     
     const initialContent = await this.gitClient.readFile(this.filePath);
     
-    // Remove the loading indicator now that we have content.
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) {
       loadingIndicator.remove();
     }
     
-    // Stop centering content now that the editor will be added.
     container.style.display = 'block';
 
     const updateListener = EditorView.updateListener.of(update => {
@@ -127,9 +124,6 @@ export class Editor {
     this.editorView.focus();
   }
 
-  /**
-   * Creates the markdown language configuration with support for fenced code blocks.
-   */
   createMarkdownLanguage() {
     return markdown({
       base: markdownLanguage,
@@ -141,11 +135,6 @@ export class Editor {
     });
   }
 
-  /**
-   * Determines the CodeMirror language extension based on file extension.
-   * @param {string} filepath The path to the file.
-   * @returns {LanguageSupport} The CodeMirror language extension.
-   */
   getLanguageExtension(filepath) {
     const filename = filepath.split('/').pop();
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
@@ -170,9 +159,6 @@ export class Editor {
     }
   }
 
-  /**
-   * Sets up an event listener for hash changes to enable client-side navigation.
-   */
   listenForNavigation() {
     window.addEventListener('hashchange', async () => {
       const newFilePath = this.getFilePath(window.location.hash);
@@ -182,10 +168,6 @@ export class Editor {
     });
   }
 
-  /**
-   * Loads a file into the editor, replacing its content and updating the language.
-   * @param {string} filepath The path to the file to load.
-   */
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
     const newContent = await this.gitClient.readFile(filepath);
@@ -208,10 +190,6 @@ export class Editor {
     this.editorView.focus();
   }
 
-  /**
-   * Handles saving the document content and refreshing the sidebar.
-   * @param {string} newContent The new document content.
-   */
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     console.log(`Saving ${this.filePath}...`);
@@ -221,21 +199,14 @@ export class Editor {
     }
   }
 
-  /**
-   * Determines the correct file path from the given URL hash.
-   * @param {string} hash The URL hash (e.g., #/path/to/file.md).
-   * @returns {string} The final file path.
-   */
   getFilePath(hash) {
     let filepath = hash.startsWith('#') ? hash.substring(1) : hash;
-    // FIX: Decode the URI component to handle spaces (%20) and other encoded characters.
     filepath = decodeURIComponent(filepath);
     if (filepath === '/' || filepath === '') {
-      filepath = '/README.md';
+      filepath = '/README';
     }
     return filepath;
   }
 }
 
-// Expose the Editor class globally for console access
 window.Editor = Editor;
