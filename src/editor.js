@@ -21,24 +21,9 @@ const shellLanguage = StreamLanguage.define(shell);
 // Create a unique annotation type to mark programmatic changes
 const programmaticChange = Annotation.define();
 
-/**
- * @class Editor
- * @description Manages a single CodeMirror editor instance and its state.
- */
 export class Editor {
-  /**
-   * A static list of all created editor instances.
-   * @type {Editor[]}
-   */
   static editors = [];
 
-  /**
-   * @param {Object} options Configuration object for the editor.
-   * @param {string} [options.url=window.location.hash] The URL to determine the file path.
-   * @param {string} [options.target='body > main'] A CSS selector for the container element.
-   * @param {Object} [options.editorConfig] Custom CodeMirror configuration options.
-   * @param {Git} options.gitClient An instance of the Git client.
-   */
   constructor({ url, target = 'body > main', editorConfig = {}, gitClient } = {}) {
     if (!gitClient) {
       throw new Error('Editor requires a gitClient instance.');
@@ -63,9 +48,6 @@ export class Editor {
     this.init();
   }
 
-  /**
-   * Initializes the editor by initializing the repo and creating the CodeMirror view.
-   */
   async init() {
     const container = document.querySelector(this.targetSelector);
     if (!container) {
@@ -74,7 +56,6 @@ export class Editor {
     }
 
     await this.gitClient.initRepo();
-    // Pass the editor instance `this` to the Sidebar constructor.
     this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
     
@@ -113,7 +94,7 @@ export class Editor {
         updateListener,
         basicDark,
         editorFontSize,
-        diffCompartment.of([]), // Initialize the diff compartment as empty
+        diffCompartment.of([]),
         ...(this.editorConfig.extensions || [])
       ],
       parent: container,
@@ -160,10 +141,7 @@ export class Editor {
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
     
     switch (filename) {
-      case '.gitignore':
-      case '.npmrc':
-      case '.editorconfig':
-      case 'Dockerfile':
+      case '.gitignore': case '.npmrc': case '.editorconfig': case 'Dockerfile':
         return shellLanguage;
     }
     
@@ -181,7 +159,7 @@ export class Editor {
 
   listenForNavigation() {
     window.addEventListener('hashchange', async () => {
-      this.hideDiff(); // Always hide diff on navigation
+      this.hideDiff();
       const newFilePath = this.getFilePath(window.location.hash);
       if (newFilePath !== this.filePath) {
         await this.loadFile(newFilePath);
@@ -191,7 +169,7 @@ export class Editor {
 
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
-    this.hideDiff(); // Ensure diff is hidden when explicitly loading a new file
+    this.hideDiff();
     const newContent = await this.gitClient.readFile(filepath);
     this.filePath = filepath;
     
@@ -210,6 +188,21 @@ export class Editor {
       await this.sidebar.refresh();
     }
     this.editorView.focus();
+  }
+
+  async forceReloadFile(filepath) {
+    console.log(`[forceReloadFile] Forcibly reloading ${filepath} from disk.`);
+    const newContent = await this.gitClient.readFile(filepath);
+    this.filePath = filepath;
+
+    const currentDoc = this.editorView.state.doc;
+    this.editorView.dispatch({
+      changes: { from: 0, to: currentDoc.length, insert: newContent },
+      annotations: programmaticChange.of(true)
+    });
+    
+    // After force-reloading, the diff view should be cleared.
+    this.hideDiff();
   }
 
   async handleUpdate(newContent) {

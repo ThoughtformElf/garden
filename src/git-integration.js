@@ -70,12 +70,37 @@ export class Git {
   }
 
   async discard(filepath) {
+    console.log(`[discard] Starting discard for: ${filepath}`);
     const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
-    await git.checkout({
-      fs: this.fs,
-      dir: '/',
-      filepaths: [cleanPath]
-    });
+    
+    try {
+        const statusMatrix = await this.getStatuses();
+        const statusEntry = statusMatrix.find(entry => entry[0] === cleanPath);
+
+        if (!statusEntry) {
+            console.warn(`[discard] Could not find status for "${cleanPath}".`);
+            return;
+        }
+
+        const headStatus = statusEntry[1];
+        
+        if (headStatus === 0) {
+            console.log(`[discard] File is untracked. Deleting: ${filepath}`);
+            await this.pfs.unlink(filepath);
+            console.log(`[discard] Successfully unlinked ${filepath}.`);
+        } else {
+            console.log(`[discard] File is tracked. Force checking out from HEAD: ${cleanPath}`);
+            await git.checkout({
+                fs: this.fs,
+                dir: '/',
+                filepaths: [cleanPath],
+                force: true // This is the critical fix.
+            });
+            console.log(`[discard] Successfully checked out ${cleanPath}.`);
+        }
+    } catch (error) {
+        console.error(`[discard] An error occurred for ${filepath}:`, error);
+    }
   }
 
   async commit(message) {

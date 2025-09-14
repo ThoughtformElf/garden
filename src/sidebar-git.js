@@ -53,8 +53,8 @@ export const gitActions = {
 
   renderFileSection(title, files, isStaged) {
     const actionButton = isStaged
-      ? `<button class="git-action-button" title="Unstage Changes">-</button>`
-      : `<button class="git-action-button" title="Stage Changes">+</button>`;
+      ? `<button class="git-action-button unstage" title="Unstage Changes">-</button>`
+      : `<button class="git-action-button stage" title="Stage Changes">+</button>`;
       
     let fileListHTML = '';
     if (files.length > 0) {
@@ -74,7 +74,6 @@ export const gitActions = {
       fileListHTML = `<li><span class="no-changes">No ${isStaged ? 'staged ' : ''}changes.</span></li>`;
     }
     
-    // Add a specific class for the staged section for a more reliable query selector
     const sectionClass = isStaged ? 'git-staged-section' : '';
 
     return `
@@ -92,11 +91,9 @@ export const gitActions = {
       const commitButton = this.contentContainer.querySelector('#git-commit-button');
       if (!commitMessage || !commitButton) return;
 
-      // Use the specific class for a robust check.
       const hasStagedFiles = this.contentContainer.querySelector('.git-staged-section .git-file-item') !== null;
       const hasMessage = commitMessage.value.trim().length > 0;
       
-      // The button should be enabled only when BOTH conditions are true.
       commitButton.disabled = !(hasStagedFiles && hasMessage);
   },
 
@@ -127,17 +124,17 @@ export const gitActions = {
                 if (target.classList.contains('discard')) {
                     if (confirm(`Are you sure you want to discard all changes to "${filepath}"?\nThis cannot be undone.`)) {
                         await this.gitClient.discard(filepath);
+                        // If the discarded file was the one being viewed, forcibly reload it.
                         if (this.editor.getFilePath(window.location.hash) === filepath) {
-                            await this.editor.loadFile(filepath);
+                            await this.editor.forceReloadFile(filepath);
                         }
-                        await this.renderGitView();
+                        await this.renderGitView(); // Re-render sidebar to remove file from list.
                     }
-                } else {
-                    if (target.textContent === '+') {
-                        await this.gitClient.stage(filepath);
-                    } else {
-                        await this.gitClient.unstage(filepath);
-                    }
+                } else if (target.classList.contains('stage')) {
+                    await this.gitClient.stage(filepath);
+                    await this.renderGitView();
+                } else if (target.classList.contains('unstage')) {
+                    await this.gitClient.unstage(filepath);
                     await this.renderGitView();
                 }
             }
@@ -150,7 +147,7 @@ export const gitActions = {
         commitButton.addEventListener('click', async () => {
             const messageInput = this.contentContainer.querySelector('#git-commit-message');
             const message = messageInput.value.trim();
-            if (!message) return; // Should be disabled anyway, but as a safeguard.
+            if (!message) return;
             
             try {
                 commitButton.disabled = true;
