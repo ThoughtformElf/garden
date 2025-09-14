@@ -27,18 +27,12 @@ async function listAllFiles(gitClient, dir) {
   return fileList;
 }
 
-/**
- * Exports a specific list of gardens to a .zip file.
- * @param {string[]} gardensToExport - An array of garden names to export.
- * @param {function(string)} log - A function for progress logging.
- */
 export async function exportGardens(gardensToExport, log) {
   log('Starting export...');
   const zip = new JSZip();
 
   if (!gardensToExport || gardensToExport.length === 0) {
-    log('No gardens selected for export.');
-    return;
+    throw new Error('No gardens were selected for export.');
   }
 
   for (const gardenName of gardensToExport) {
@@ -66,14 +60,9 @@ export async function exportGardens(gardensToExport, log) {
   link.click();
   document.body.removeChild(link);
   
-  log(`Export complete: ${filename}`);
+  log(`Export process initiated: ${filename}`);
 }
 
-/**
- * Scans a zip file and returns a list of top-level directories (gardens).
- * @param {File} file - The .zip file from an input element.
- * @returns {Promise<string[]>} - A unique list of garden names found.
- */
 export async function getGardensFromZip(file) {
     const zip = await JSZip.loadAsync(file);
     const gardenSet = new Set();
@@ -86,13 +75,11 @@ export async function getGardensFromZip(file) {
     return Array.from(gardenSet).sort();
 }
 
-/**
- * Imports a selected list of gardens from a .zip file.
- * @param {File} file - The .zip file.
- * @param {string[]} gardensToImport - An array of garden names to import from the zip.
- * @param {function(string)} log - A function for progress logging.
- */
 export async function importGardensFromZip(file, gardensToImport, log) {
+  if (!gardensToImport || gardensToImport.length === 0) {
+    throw new Error('No gardens were selected for import.');
+  }
+
   log(`Reading ${file.name}...`);
   const zip = await JSZip.loadAsync(file);
   log('Zip file loaded. Starting import of selected gardens...');
@@ -104,14 +91,13 @@ export async function importGardensFromZip(file, gardensToImport, log) {
 
     const gardenName = relativePath.split('/')[0];
     
-    // Only process the file if its garden is in the list to import
     if (gardensToImport.includes(gardenName)) {
       const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
 
       const promise = zipEntry.async('string').then(async (content) => {
         log(`  Importing: ${gardenName}${filePath}`);
         const gitClient = new Git(gardenName);
-        await gitClient.initRepo(); // Creates garden if it doesn't exist
+        await gitClient.initRepo();
         await gitClient.writeFile(filePath, content);
       });
       importPromises.push(promise);
@@ -124,4 +110,58 @@ export async function importGardensFromZip(file, gardensToImport, log) {
   setTimeout(() => {
     window.location.reload();
   }, 1500);
+}
+
+/**
+ * Deletes a list of specified gardens.
+ * @param {string[]} gardensToDelete - An array of garden names.
+ * @param {function(string)} log - A logging callback for progress.
+ */
+export async function deleteGardens(gardensToDelete, log) {
+  if (!gardensToDelete || gardensToDelete.length === 0) {
+    throw new Error('No gardens were selected for deletion.');
+  }
+
+  log('Starting deletion process...');
+  const gardensRaw = localStorage.getItem('thoughtform_gardens');
+  let allGardens = gardensRaw ? JSON.parse(gardensRaw) : [];
+
+  for (const gardenName of gardensToDelete) {
+    log(`Deleting garden: "${gardenName}"...`);
+    
+    // Remove from localStorage registry
+    allGardens = allGardens.filter(g => g !== gardenName);
+    
+    // Delete the IndexedDB database
+    const dbName = `garden-fs-${gardenName}`;
+    await new Promise((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(dbName);
+      deleteRequest.onsuccess = () => {
+        log(`  Successfully deleted database: ${dbName}`);
+        resolve();
+      };
+      deleteRequest.onerror = (e) => {
+        log(`  Error deleting database: ${dbName}`);
+        reject(e.target.error);
+      };
+      deleteRequest.onblocked = () => {
+        log(`  Deletion blocked for ${dbName}. Please refresh and try again.`);
+        reject(new Error('Deletion blocked'));
+      };
+    });
+  }
+
+  localStorage.setItem('thoughtform_gardens', JSON.stringify(allGardens));
+  log('Updated garden registry in localStorage.');
+  log('Deletion complete. Reloading...');
+
+  setTimeout(() => {
+    const currentGarden = decodeURIComponent(window.location.pathname.split('/').pop() || 'home');
+    if (gardensToDelete.includes(currentGarden) || allGardens.length === 0) {
+        const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
+        window.location.href = `${window.location.origin}${basePath}/home`;
+    } else {
+        window.location.reload();
+    }
+  }, 2000);
 }

@@ -47,7 +47,6 @@
   font-size: 14px;
   line-height: 1.6;
   overflow-y: auto;
-  /* FIX: Removed white-space: pre-wrap; */
   word-break: break-all;
 }
 
@@ -66,8 +65,19 @@
   border-radius: 3px;
   cursor: pointer;
   font-weight: bold;
+  margin-left: 10px;
 }
 
 .modal-footer button:hover {
   background-color: #5FDCC4;
+}
+
+/* New style for destructive action buttons */
+.modal-footer button.destructive {
+  background-color: #F44747;
+  color: #fff;
+}
+
+.modal-footer button.destructive:hover {
+  background-color: #FF5A5A;
 }

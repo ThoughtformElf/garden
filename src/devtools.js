@@ -1,11 +1,9 @@
 // src/devtools.js
 import eruda from 'eruda';
-import { exportGardens, getGardensFromZip, importGardensFromZip } from './data-portability.js';
+import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data-portability.js';
 import { Modal } from './modal.js';
 
-// --- Helper function to generate the selection UI ---
 function createSelectionUI(title, items, allChecked = true) {
-  // FIX: Use 'display: block' for each label to ensure it takes its own line.
   const itemCheckboxes = items.map(item => `
     <label style="display: block; margin: 8px 0; font-family: monospace; cursor: pointer;">
       <input type="checkbox" class="garden-select-checkbox" value="${item}" ${allChecked ? 'checked' : ''} style="margin-right: 8px; vertical-align: middle;">
@@ -45,9 +43,13 @@ export function initializeDevTools() {
       $el.html(`
         <div style="padding: 10px; font-family: Arial, sans-serif; color: #ccc;">
           <h2 style="margin-top:0;">Data Portability</h2>
-          <button id="export-all-btn" class="eruda-button">Export...</button>
-          <button id="import-all-btn" class="eruda-button">Import...</button>
+          <button id="export-btn" class="eruda-button">Export...</button>
+          <button id="import-btn" class="eruda-button">Import...</button>
           <input type="file" id="import-file-input" accept=".zip" style="display: none;">
+          
+          <hr style="border: none; border-top: 1px solid #444; margin: 25px 0;">
+          <h3 style="color: #F44747;">Danger Zone</h3>
+          <button id="clear-data-btn" class="eruda-button destructive">Clear Data...</button>
         </div>
         <style>
           .eruda-button { 
@@ -55,12 +57,15 @@ export function initializeDevTools() {
             border: none; border-radius: 3px; cursor: pointer; font-weight: bold;
           }
           .eruda-button:hover { background-color: #5FDCC4; }
+          .eruda-button.destructive { background-color: #F44747; color: #fff; }
+          .eruda-button.destructive:hover { background-color: #FF5A5A; }
         </style>
       `);
       
-      const exportBtn = $el.find('#export-all-btn')[0];
-      const importBtn = $el.find('#import-all-btn')[0];
+      const exportBtn = $el.find('#export-btn')[0];
+      const importBtn = $el.find('#import-btn')[0];
       const fileInput = $el.find('#import-file-input')[0];
+      const clearDataBtn = $el.find('#clear-data-btn')[0];
 
       exportBtn.addEventListener('click', () => {
         const gardensRaw = localStorage.getItem('thoughtform_gardens');
@@ -79,9 +84,9 @@ export function initializeDevTools() {
             console.log('Starting export...');
             try {
                 await exportGardens(selectedGardens, console.log);
-                console.log('%cExport process complete.', 'color: #4EC9B0; font-weight: bold;');
+                console.log('%cExport process initiated.', 'color: #4EC9B0; font-weight: bold;');
             } catch (e) {
-                console.error('Export failed:', e);
+                console.error('Export failed:', e.message);
             }
         };
         modal.addFooterButton('Export Selected', exportHandler);
@@ -90,6 +95,7 @@ export function initializeDevTools() {
       
       importBtn.addEventListener('click', () => fileInput.click());
       
+      // FIX: Full import logic is restored here.
       fileInput.addEventListener('change', async () => {
         const file = fileInput.files[0];
         if (!file) return;
@@ -138,6 +144,40 @@ export function initializeDevTools() {
         } finally {
             fileInput.value = '';
         }
+      });
+
+      clearDataBtn.addEventListener('click', () => {
+        const gardensRaw = localStorage.getItem('thoughtform_gardens');
+        const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
+
+        const modal = new Modal({ title: 'Clear Garden Data' });
+        modal.show(createSelectionUI('Select gardens to permanently delete:', gardens, false));
+
+        const contentEl = modal.content;
+        contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
+        contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
+
+        const deleteHandler = async () => {
+            const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
+            modal.clearFooter();
+            modal.updateContent('Starting deletion...');
+            
+            let progressHTML = '';
+            try {
+                await deleteGardens(selectedGardens, (msg) => {
+                    progressHTML += `${msg}<br>`;
+                    modal.updateContent(progressHTML);
+                });
+            } catch (e) {
+                console.error('Deletion failed:', e);
+                modal.updateContent(`<strong>Error during deletion:</strong><br>${e.message}`);
+                const closeBtn = modal.addFooterButton('Close', () => modal.destroy());
+                closeBtn.classList.add('destructive');
+            }
+        };
+        const deleteBtn = modal.addFooterButton('Delete Selected', deleteHandler);
+        deleteBtn.classList.add('destructive');
+        modal.addFooterButton('Cancel', () => modal.destroy());
       });
     },
     show() { this._$el.show(); },
