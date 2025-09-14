@@ -16,7 +16,7 @@ export class Modal {
     
     this.footer = document.createElement('div');
     this.footer.className = 'modal-footer';
-    this.footer.style.display = 'none'; // Hidden by default
+    this.footer.style.display = 'none';
 
     this.container.appendChild(this.header);
     this.container.appendChild(this.content);
@@ -35,7 +35,9 @@ export class Modal {
   }
 
   destroy() {
-    this.overlay.remove();
+    if (this.overlay.parentNode) {
+      this.overlay.remove();
+    }
   }
 
   updateContent(html) {
@@ -48,5 +50,11 @@ export class Modal {
     button.textContent = text;
     button.addEventListener('click', onClick);
     this.footer.appendChild(button);
+    return button; // Return the button element
+  }
+  
+  clearFooter() {
+      this.footer.innerHTML = '';
+      this.footer.style.display = 'none';
   }
 }

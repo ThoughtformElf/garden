@@ -2,12 +2,6 @@
 import JSZip from 'jszip';
 import { Git } from './git-integration.js';
 
-/**
- * Recursively lists all files for a given garden.
- * @param {object} gitClient - An instance of the Git class.
- * @param {string} dir - The directory to start from.
- * @returns {Promise<string[]>} A list of file paths.
- */
 async function listAllFiles(gitClient, dir) {
   const pfs = gitClient.pfs;
   let fileList = [];
@@ -28,27 +22,26 @@ async function listAllFiles(gitClient, dir) {
       }
     }
   } catch (e) {
-    console.log(`Directory not found: ${dir}. No files to list.`);
+    console.log(`Could not read directory: ${dir}.`);
   }
   return fileList;
 }
 
 /**
- * Exports all gardens to a single .zip file and triggers a download.
- * @param {function(string)} log - A function to log progress messages to the UI.
+ * Exports a specific list of gardens to a .zip file.
+ * @param {string[]} gardensToExport - An array of garden names to export.
+ * @param {function(string)} log - A function for progress logging.
  */
-export async function exportAllGardens(log) {
+export async function exportGardens(gardensToExport, log) {
   log('Starting export...');
   const zip = new JSZip();
-  const gardensRaw = localStorage.getItem('thoughtform_gardens');
-  const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
 
-  if (gardens.length === 0) {
-    log('No gardens found to export.');
+  if (!gardensToExport || gardensToExport.length === 0) {
+    log('No gardens selected for export.');
     return;
   }
 
-  for (const gardenName of gardens) {
+  for (const gardenName of gardensToExport) {
     log(`Processing garden: "${gardenName}"...`);
     const gardenFolder = zip.folder(gardenName);
     const gitClient = new Git(gardenName);
@@ -56,85 +49,79 @@ export async function exportAllGardens(log) {
 
     for (const filePath of files) {
       const content = await gitClient.readFile(filePath);
-      // Remove leading slash for correct zip path
       const zipPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
       gardenFolder.file(zipPath, content);
     }
   }
 
   log('Generating zip file...');
-  try {
-    const content = await zip.generateAsync({ type: 'blob' });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `thoughtform-gardens-backup-${timestamp}.zip`;
-    
-    // Create a link and trigger the download
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(content);
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    log(`Export complete: ${filename}`);
-  } catch (e) {
-    log(`Error during zip generation: ${e.message}`);
-    console.error(e);
-  }
+  const content = await zip.generateAsync({ type: 'blob' });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `thoughtform-gardens-backup-${timestamp}.zip`;
+  
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(content);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  log(`Export complete: ${filename}`);
 }
 
 /**
- * Imports gardens from a selected .zip file.
- * @param {File} file - The .zip file from the input element.
- * @param {function(string)} log - A function to log progress messages to the UI.
- * @returns {Promise<void>}
+ * Scans a zip file and returns a list of top-level directories (gardens).
+ * @param {File} file - The .zip file from an input element.
+ * @returns {Promise<string[]>} - A unique list of garden names found.
  */
-export async function importFromZip(file, log) {
+export async function getGardensFromZip(file) {
+    const zip = await JSZip.loadAsync(file);
+    const gardenSet = new Set();
+    zip.forEach((relativePath) => {
+        if (relativePath.includes('/')) {
+            const gardenName = relativePath.split('/')[0];
+            gardenSet.add(gardenName);
+        }
+    });
+    return Array.from(gardenSet).sort();
+}
+
+/**
+ * Imports a selected list of gardens from a .zip file.
+ * @param {File} file - The .zip file.
+ * @param {string[]} gardensToImport - An array of garden names to import from the zip.
+ * @param {function(string)} log - A function for progress logging.
+ */
+export async function importGardensFromZip(file, gardensToImport, log) {
   log(`Reading ${file.name}...`);
-  const reader = new FileReader();
+  const zip = await JSZip.loadAsync(file);
+  log('Zip file loaded. Starting import of selected gardens...');
 
-  reader.onload = async (event) => {
-    try {
-      const zip = await JSZip.loadAsync(event.target.result);
-      log('Zip file loaded. Starting import...');
+  const importPromises = [];
 
-      const importPromises = [];
+  zip.forEach((relativePath, zipEntry) => {
+    if (zipEntry.dir) return;
 
-      zip.forEach((relativePath, zipEntry) => {
-        if (zipEntry.dir) return;
+    const gardenName = relativePath.split('/')[0];
+    
+    // Only process the file if its garden is in the list to import
+    if (gardensToImport.includes(gardenName)) {
+      const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
 
-        const pathParts = relativePath.split('/');
-        const gardenName = pathParts.shift();
-        const filePath = `/${pathParts.join('/')}`;
-
-        const promise = zipEntry.async('string').then(async (content) => {
-          log(`  Importing: ${gardenName}${filePath}`);
-          const gitClient = new Git(gardenName);
-          // initRepo is smart and will only create if it doesn't exist.
-          // It also handles adding the garden to localStorage.
-          await gitClient.initRepo();
-          await gitClient.writeFile(filePath, content);
-        });
-        importPromises.push(promise);
+      const promise = zipEntry.async('string').then(async (content) => {
+        log(`  Importing: ${gardenName}${filePath}`);
+        const gitClient = new Git(gardenName);
+        await gitClient.initRepo(); // Creates garden if it doesn't exist
+        await gitClient.writeFile(filePath, content);
       });
-      
-      await Promise.all(importPromises);
-      log('Import complete! Refreshing page to apply changes...');
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-
-    } catch (e) {
-      log(`Error processing zip file: ${e.message}`);
-      console.error(e);
+      importPromises.push(promise);
     }
-  };
-
-  reader.onerror = (e) => {
-    log('Failed to read the file.');
-    console.error(e);
-  };
+  });
   
-  reader.readAsArrayBuffer(file);
+  await Promise.all(importPromises);
+  log('Import complete! Reloading page...');
+  
+  setTimeout(() => {
+    window.location.reload();
+  }, 1500);
 }

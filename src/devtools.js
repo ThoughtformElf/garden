@@ -1,7 +1,30 @@
 // src/devtools.js
 import eruda from 'eruda';
-import { exportAllGardens, importFromZip } from './data-portability.js';
+import { exportGardens, getGardensFromZip, importGardensFromZip } from './data-portability.js';
 import { Modal } from './modal.js';
+
+// --- Helper function to generate the selection UI ---
+function createSelectionUI(title, items, allChecked = true) {
+  const itemCheckboxes = items.map(item => `
+    <label style="display: block; margin: 5px 0; font-family: monospace; cursor: pointer;">
+      <input type="checkbox" class="garden-select-checkbox" value="${item}" ${allChecked ? 'checked' : ''}>
+      ${item}
+    </label>
+  `).join('');
+
+  return `
+    <div style="font-family: Arial, sans-serif;">
+      <p style="margin-top: 0;">${title}</p>
+      <div style="margin-bottom: 10px;">
+        <button type="button" class="select-all-btn" style="margin-right: 5px;">Select All</button>
+        <button type="button" class="select-none-btn">Deselect All</button>
+      </div>
+      <div class="garden-selection-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #444; padding: 10px; border-radius: 3px;">
+        ${itemCheckboxes}
+      </div>
+    </div>
+  `;
+}
 
 export function initializeDevTools() {
   const el = document.getElementById('eruda-container');
@@ -20,63 +43,101 @@ export function initializeDevTools() {
       this._$el = $el;
       $el.html(`
         <div style="padding: 10px; font-family: Arial, sans-serif; color: #ccc;">
-          <h2 style="margin-top:0; border-bottom: 1px solid #555; padding-bottom: 5px;">Data Portability</h2>
-          <h3 style="color: #E5C07B;">Export</h3>
-          <p style="font-size: 14px; margin-bottom: 10px;">Export all gardens into a .zip archive.</p>
-          <button id="export-all-btn" class="eruda-button">Export All Gardens</button>
-          <hr style="border: none; border-top: 1px solid #444; margin: 25px 0;">
-          <h3 style="color: #E5C07B;">Import</h3>
-          <p style="font-size: 14px; margin-bottom: 10px;">Import from a .zip archive. Overwrites existing files.</p>
-          <button id="import-all-btn" class="eruda-button">Import from .zip</button>
+          <h2 style="margin-top:0;">Data Portability</h2>
+          <button id="export-all-btn" class="eruda-button">Export...</button>
+          <button id="import-all-btn" class="eruda-button">Import...</button>
           <input type="file" id="import-file-input" accept=".zip" style="display: none;">
         </div>
-        <style>
-          .eruda-button { 
-            padding: 8px 12px; background-color: #4EC9B0; color: #111; 
-            border: none; border-radius: 3px; cursor: pointer; font-weight: bold;
-          }
-          .eruda-button:hover { background-color: #5FDCC4; }
-        </style>
+        <style>.eruda-button { /* ... styles ... */ }</style>
       `);
       
-      this._$exportBtn = $el.find('#export-all-btn');
-      this._$importBtn = $el.find('#import-all-btn');
-      this._$fileInput = $el.find('#import-file-input');
+      const exportBtn = $el.find('#export-all-btn')[0];
+      const importBtn = $el.find('#import-all-btn')[0];
+      const fileInput = $el.find('#import-file-input')[0];
 
-      // Export: Simple, non-blocking, logs to console.
-      this._$exportBtn.on('click', async () => {
-        console.log('Starting export of all gardens...');
-        try {
-          await exportAllGardens(console.log);
-          console.log('%cExport completed successfully.', 'color: #4EC9B0; font-weight: bold;');
-        } catch (e) {
-          console.error('Export failed:', e);
-        }
+      exportBtn.addEventListener('click', () => {
+        const gardensRaw = localStorage.getItem('thoughtform_gardens');
+        const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
+        
+        const modal = new Modal({ title: 'Select Gardens to Export' });
+        modal.show(createSelectionUI('Choose which gardens to include in the export:', gardens));
+        
+        const contentEl = modal.content;
+        contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
+        contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
+
+        const exportHandler = async () => {
+            const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
+            modal.clearFooter();
+            modal.updateContent('Starting export...');
+            
+            let progressHTML = '';
+            try {
+                await exportGardens(selectedGardens, (msg) => {
+                    progressHTML += `${msg}<br>`;
+                    modal.updateContent(progressHTML);
+                });
+                modal.updateContent(progressHTML + '<br><strong>Export Complete!</strong>');
+                modal.addFooterButton('Close', () => modal.destroy());
+            } catch (e) {
+                console.error('Export failed:', e);
+                modal.updateContent(`<strong>Error:</strong><br>${e.message}`);
+                modal.addFooterButton('Close', () => modal.destroy());
+            }
+        };
+        modal.addFooterButton('Export Selected', exportHandler);
+        modal.addFooterButton('Cancel', () => modal.destroy());
       });
       
-      this._$importBtn.on('click', () => {
-        this._$fileInput[0].click();
-      });
+      importBtn.addEventListener('click', () => fileInput.click());
       
-      // Import: Uses a modal that persists on error.
-      this._$fileInput.on('change', async () => {
-        const file = this._$fileInput[0].files[0];
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
         if (!file) return;
 
-        const modal = new Modal({ title: 'Import in Progress' });
-        modal.show(`Reading ${file.name}...`);
+        const modal = new Modal({ title: 'Select Gardens to Import' });
+        modal.show('Scanning zip file...');
         
-        let progressHTML = '';
         try {
-          await importFromZip(file, (msg) => {
-            progressHTML += `${msg}<br>`;
-            modal.updateContent(progressHTML);
-          });
-          // On success, importFromZip reloads the page, so the modal is destroyed automatically.
+            const gardensInZip = await getGardensFromZip(file);
+            if (gardensInZip.length === 0) {
+                modal.updateContent('No valid gardens found in this zip file.');
+                modal.addFooterButton('Close', () => modal.destroy());
+                return;
+            }
+            
+            modal.updateContent(createSelectionUI(`Found ${gardensInZip.length} garden(s). Select which to import:`, gardensInZip));
+            
+            const contentEl = modal.content;
+            contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
+            contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
+
+            const importHandler = async () => {
+                const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
+                modal.clearFooter();
+                modal.updateContent('Starting import...');
+                
+                let progressHTML = '';
+                try {
+                    await importGardensFromZip(file, selectedGardens, (msg) => {
+                        progressHTML += `${msg}<br>`;
+                        modal.updateContent(progressHTML);
+                    });
+                } catch(e) {
+                    console.error('Import failed:', e);
+                    modal.updateContent(`<strong>Error during import:</strong><br>${e.message}`);
+                    modal.addFooterButton('Close', () => modal.destroy());
+                }
+            };
+            modal.addFooterButton('Import Selected', importHandler);
+            modal.addFooterButton('Cancel', () => modal.destroy());
+
         } catch (e) {
-          console.error('Import failed:', e);
-          modal.updateContent(`<strong>Error during import:</strong><br>${e.message}`);
-          modal.addFooterButton('Close', () => modal.destroy());
+            console.error('Failed to read zip file:', e);
+            modal.updateContent(`<strong>Error:</strong> Could not read the zip file.<br>${e.message}`);
+            modal.addFooterButton('Close', () => modal.destroy());
+        } finally {
+            fileInput.value = ''; // Reset file input
         }
       });
     },
