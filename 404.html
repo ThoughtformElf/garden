@@ -4,27 +4,27 @@
   <meta charset="UTF-8" />
   <title>Thoughtform Garden</title>
   <link rel="icon" type="image/png" href="/garden/assets/favicon-CyruPqWy.png" />
-  <script type="module" crossorigin src="/garden/assets/index-CaSryc4n.js"></script>
-  <link rel="stylesheet" crossorigin href="/garden/assets/index-DDtyAWeV.css">
+  <script type="module" crossorigin src="/garden/assets/index-CgwwxM3I.js"></script>
+  <link rel="stylesheet" crossorigin href="/garden/assets/index-DrzPG7pz.css">
 <link rel="manifest" href="/garden/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/garden/registerSW.js"></script></head>
 <body>
   <div class="app-container">
-    <aside id="sidebar">
-      <!-- This button will be used to toggle the sidebar -->
-      <button id="sidebar-toggle" title="Toggle Sidebar">‹</button>
-    </aside>
-    <!-- This handle is for resizing -->
-    <div id="resizer"></div>
-    <main>
-      <!-- Add this loading indicator -->
-      <div id="loading-indicator">
-        <p>Cloning repository...</p>
-        <p>(This only happens on the first visit)</p>
-      </div>
-    </main>
+    <div class="main-content">
+      <aside id="sidebar">
+        <button id="sidebar-toggle" title="Toggle Sidebar">‹</button>
+      </aside>
+      <div id="resizer"></div>
+      <main>
+        <div id="loading-indicator">
+          <p>Cloning repository...</p>
+          <p>(This only happens on the first visit)</p>
+        </div>
+      </main>
+    </div>
+    <!-- Add the resizer handle for Eruda -->
+    <div id="eruda-resizer"></div>
+    <div id="eruda-container"></div>
   </div>
-  <div id="eruda-container"></div>
-  <!-- This overlay ensures smooth resizing without losing the handle -->
   <div id="resize-overlay"></div>
 </body>
 </html>
