@@ -2,38 +2,39 @@ import { Buffer } from 'buffer';
 window.Buffer = Buffer; // Polyfill for isomorphic-git
 
 import { Editor } from './editor.js';
-import { Git } from './git-integration.js'; // Import the class, not an instance
+import { Git } from './git-integration.js';
 import { initializeAppInteractions } from './ui-interactions.js';
 
 // --- Main Application Logic ---
 
-// 1. Get the base path from the vite config (hardcoded for now as it's static)
-const basePath = '/garden/';
+// Get the base path dynamically. For GitHub Pages, it's the repo name.
+// This is more robust than hardcoding.
+const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/');
 
-// 2. Determine the garden name from the URL path
+// Determine the garden name by removing the base path from the window's pathname.
 let gardenName = window.location.pathname.startsWith(basePath)
   ? window.location.pathname.substring(basePath.length)
-  : window.location.pathname.substring(1);
+  : window.location.pathname;
 
-// Sanitize the name: remove trailing slashes and default if empty
-gardenName = gardenName.replace(/\/$/, '') || 'home';
+// Clean up the name: remove leading/trailing slashes and default if empty.
+gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
 
+console.log(`Base Path: "${basePath}"`);
 console.log(`Loading garden: "${gardenName}"`);
 
-// 3. Create a specific Git client instance for this garden
+// Create a specific Git client instance for this garden
 const gitClient = new Git(gardenName);
 
-// 4. Initialize UI interactions
+// Initialize UI interactions
 initializeAppInteractions();
 
-// 5. Initialize the application by creating the editor instance
-//    and passing the dedicated gitClient to it.
+// Initialize the application by creating the editor instance
 new Editor({ 
   target: 'main',
   gitClient: gitClient
 });
 
-// Initialize Eruda (no changes here)
+// Initialize Eruda
 const el = document.getElementById('eruda-container');
 import('eruda').then(({ default: eruda }) => {
   eruda.init({
