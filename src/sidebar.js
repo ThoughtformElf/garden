@@ -1,4 +1,5 @@
 import { ContextMenu } from './context-menu.js';
+import { Git } from './git-integration.js';
 
 export class Sidebar {
   /**
@@ -37,29 +38,35 @@ export class Sidebar {
   async init() {
     console.log('Initializing sidebar...');
     this.renderTabs();
+    this.setupContextMenus();
     await this.refresh();
-    this.setupContextMenu();
     console.log('Sidebar initialized.');
   }
 
-  setupContextMenu() {
+  setupContextMenus() {
     new ContextMenu({
-      targetSelector: '.sidebar-content [data-filepath]',
+      targetSelector: '.sidebar-content.files-view',
+      itemSelector: '[data-filepath]',
       dataAttribute: 'data-filepath',
       items: [
-        {
-          label: 'Rename',
-          action: (filepath) => this.handleRename(filepath)
-        },
-        {
-          label: 'Duplicate',
-          action: (filepath) => this.handleDuplicate(filepath)
-        },
-        {
-          label: 'Delete',
-          action: (filepath) => this.handleDelete(filepath)
-        }
-      ]
+        { label: 'New File', action: () => this.handleNewFile() },
+        { label: 'Rename', action: (filepath) => this.handleRename(filepath) },
+        { label: 'Duplicate', action: (filepath) => this.handleDuplicate(filepath) },
+        { label: 'Delete', action: (filepath) => this.handleDelete(filepath) }
+      ],
+      containerItems: [{ label: 'New File', action: () => this.handleNewFile() }]
+    });
+
+    new ContextMenu({
+      targetSelector: '.sidebar-content.gardens-view',
+      itemSelector: '[data-garden-name]',
+      dataAttribute: 'data-garden-name',
+      items: [
+        { label: 'New Garden', action: () => this.handleNewGarden() },
+        { label: 'Duplicate', action: (name) => this.handleDuplicateGarden(name) },
+        { label: 'Delete', action: (name) => this.handleDeleteGarden(name) }
+      ],
+      containerItems: [{ label: 'New Garden', action: () => this.handleNewGarden() }]
     });
   }
 
@@ -82,6 +89,9 @@ export class Sidebar {
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
       button.classList.toggle('active', button.dataset.tab === this.activeTab);
     });
+    
+    this.contentContainer.classList.toggle('files-view', this.activeTab === 'Files');
+    this.contentContainer.classList.toggle('gardens-view', this.activeTab === 'Gardens');
 
     if (this.activeTab === 'Files') {
       await this.renderFiles();
@@ -93,7 +103,7 @@ export class Sidebar {
   async renderFiles() {
     try {
       const [files, statuses] = await Promise.all([
-        this.listFiles('/'),
+        this.listFiles(this.gitClient, '/'),
         this.gitClient.getStatuses()
       ]);
       
@@ -122,17 +132,19 @@ export class Sidebar {
     try {
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
       const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
-      const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/');
+      const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
       
       if (gardens.length === 0) {
-        this.contentContainer.innerHTML = `<p class="sidebar-info">No other gardens found.</p>`;
+        this.contentContainer.innerHTML = `<p class="sidebar-info">No gardens found. Create one!</p>`;
         return;
       }
       
       const gardenListHTML = gardens.sort().map(name => {
         const href = `${basePath}/${name}`;
-        const isActive = this.gitClient.gardenName === name;
-        return `<li><a href="${href}" class="${isActive ? 'active' : ''}">${name}</a></li>`;
+        // FIX: Always decode the name for display to handle legacy encoded names.
+        const displayText = decodeURIComponent(name);
+        const isActive = this.gitClient.gardenName === displayText;
+        return `<li><a href="${href}" class="${isActive ? 'active' : ''}" data-garden-name="${name}">${displayText}</a></li>`;
       }).join('');
 
       this.contentContainer.innerHTML = `<ul>${gardenListHTML}</ul>`;
@@ -142,8 +154,8 @@ export class Sidebar {
     }
   }
 
-  async listFiles(dir) {
-    const pfs = this.gitClient.pfs;
+  async listFiles(gitClient, dir) {
+    const pfs = gitClient.pfs;
     let fileList = [];
     try {
       const items = await pfs.readdir(dir);
@@ -153,7 +165,7 @@ export class Sidebar {
         try {
           const stat = await pfs.stat(path);
           if (stat.isDirectory()) {
-            fileList = fileList.concat(await this.listFiles(path));
+            fileList = fileList.concat(await this.listFiles(gitClient, path));
           } else {
             fileList.push(path);
           }
@@ -163,22 +175,33 @@ export class Sidebar {
     return fileList;
   }
 
-  // --- Context Menu Action Handlers ---
-
+  // --- File Action Handlers ---
+  async handleNewFile() {
+    const newName = prompt('Enter new file name:');
+    if (!newName) return;
+    const newPath = `/${newName}`;
+    try {
+      await this.gitClient.pfs.stat(newPath);
+      alert(`File "${newName}" already exists.`);
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        await this.gitClient.writeFile(newPath, '');
+        window.location.hash = `#${newPath}`;
+      } else {
+        console.error('Error checking for file:', e);
+        alert('An error occurred while creating the file.');
+      }
+    }
+  }
   async handleRename(oldPath) {
     const oldName = oldPath.substring(oldPath.lastIndexOf('/') + 1);
     const newName = prompt('Enter new file name:', oldName);
-
-    if (!newName || newName === oldName) {
-      return;
-    }
-    
+    if (!newName || newName === oldName) return;
     const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
     const newPath = `${dir}/${newName}`;
-    
     try {
       await this.gitClient.pfs.rename(oldPath, newPath);
-      if (`#${oldPath}` === window.location.hash) {
+      if (decodeURIComponent(window.location.hash) === `#${oldPath}`) {
         window.location.hash = `#${newPath}`;
       } else {
         await this.refresh();
@@ -188,14 +211,11 @@ export class Sidebar {
       alert('Failed to rename file.');
     }
   }
-  
   async handleDuplicate(filepath) {
     const directory = filepath.substring(0, filepath.lastIndexOf('/'));
     const originalFilename = filepath.substring(filepath.lastIndexOf('/') + 1);
-
     const lastDotIndex = originalFilename.lastIndexOf('.');
     const hasExtension = lastDotIndex > 0;
-    
     let defaultName;
     if (hasExtension) {
         const base = originalFilename.substring(0, lastDotIndex);
@@ -204,49 +224,129 @@ export class Sidebar {
     } else {
         defaultName = `${originalFilename} (copy)`;
     }
-
     const newFilename = prompt('Enter name for duplicated file:', defaultName);
-
-    if (!newFilename) {
-      return;
-    }
-    
+    if (!newFilename) return;
     const newPath = `${directory}/${newFilename}`;
-
     try {
       const content = await this.gitClient.pfs.readFile(filepath, 'utf8');
       await this.gitClient.writeFile(newPath, content);
       await this.refresh();
     } catch (e) {
       console.error('Error duplicating file:', e);
-      if (e.code === 'ENOENT') {
-        alert(`Cannot duplicate. Original file not found: ${filepath}`);
-      } else {
-        alert('Failed to duplicate file.');
-      }
+      alert('Failed to duplicate file.');
     }
   }
-
   async handleDelete(filepath) {
     if (confirm(`Are you sure you want to delete "${filepath}"?`)) {
       try {
         const wasViewingDeletedFile = decodeURIComponent(window.location.hash) === `#${filepath}`;
-        
         await this.gitClient.pfs.unlink(filepath);
-        
         if (wasViewingDeletedFile) {
-          // Explicitly set hash and then force a reload of the default file.
           window.location.hash = '#/README';
           await this.editor.loadFile('/README');
         } else {
-          // If we weren't viewing the deleted file, a simple refresh is enough.
           await this.refresh();
         }
-
       } catch (e) {
         console.error(`Error deleting file:`, e);
         alert('Failed to delete file.');
       }
+    }
+  }
+
+  // --- Garden Action Handlers ---
+  handleNewGarden() {
+    const newName = prompt('Enter new garden name:');
+    if (!newName || !newName.trim()) return;
+    const gardensRaw = localStorage.getItem('thoughtform_gardens');
+    const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
+    if (gardens.includes(newName)) {
+      alert(`Garden "${newName}" already exists.`);
+      return;
+    }
+    const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
+    window.location.href = `${basePath}/${newName}`;
+  }
+
+  async handleDuplicateGarden(sourceName) {
+    if (!sourceName) return;
+    
+    const decodedSourceName = decodeURIComponent(sourceName);
+    const defaultName = `${decodedSourceName} (copy)`;
+    const newName = prompt('Enter name for new garden:', defaultName);
+
+    if (!newName || !newName.trim() || newName === sourceName) return;
+
+    const originalContent = this.contentContainer.innerHTML;
+    this.contentContainer.innerHTML = `<p class="sidebar-info">Preparing duplication...<br>(UI may be unresponsive)</p>`;
+
+    setTimeout(async () => {
+      try {
+        const sourceGit = new Git(sourceName);
+        const destGit = new Git(newName);
+        await destGit.initRepo();
+
+        const filesToCopy = await this.listFiles(sourceGit, '/');
+        
+        let count = 0;
+        for (const file of filesToCopy) {
+          count++;
+          this.contentContainer.innerHTML = `<p class="sidebar-info">Copying file ${count} of ${filesToCopy.length}:<br>${file.substring(1)}</p>`;
+          const content = await sourceGit.readFile(file);
+          await destGit.writeFile(file, content);
+        }
+        
+        this.contentContainer.innerHTML = `<p class="sidebar-info">Duplication complete. Redirecting...</p>`;
+
+        setTimeout(() => {
+          const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
+          const newUrl = `${window.location.origin}${basePath}/${newName}`;
+          window.location.replace(newUrl);
+        }, 500);
+
+      } catch(e) {
+        console.error('Error duplicating garden:', e);
+        alert('Failed to duplicate garden. Check console for details.');
+        this.contentContainer.innerHTML = originalContent;
+      }
+    }, 100);
+  }
+  
+  async handleDeleteGarden(name) {
+    if (!name) return;
+    if (name === 'home') {
+      alert('The default "home" garden cannot be deleted.');
+      return;
+    }
+    if (!confirm(`ARE YOU SURE you want to permanently delete the garden "${name}"?\nThis cannot be undone.`)) return;
+
+    try {
+      const gardensRaw = localStorage.getItem('thoughtform_gardens');
+      let gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
+      gardens = gardens.filter(g => g !== name);
+      localStorage.setItem('thoughtform_gardens', JSON.stringify(gardens));
+
+      const dbName = `garden-fs-${name}`;
+      await new Promise((resolve, reject) => {
+        const deleteRequest = indexedDB.deleteDatabase(dbName);
+        deleteRequest.onsuccess = () => resolve();
+        deleteRequest.onerror = (event) => reject(event.target.error);
+        deleteRequest.onblocked = () => {
+            alert("Could not delete the database because it's still in use. Please refresh the page and try again.");
+            reject(new Error('Deletion blocked'));
+        };
+      });
+
+      if (this.gitClient.gardenName === name) {
+        const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
+        window.location.href = `${basePath}/home`;
+      } else {
+        await this.refresh();
+      }
+
+    } catch(e) {
+      console.error('Error deleting garden:', e);
+      alert('Failed to delete garden.');
     }
   }
 }
