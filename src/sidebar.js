@@ -79,8 +79,17 @@ export class Sidebar {
 
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
       button.addEventListener('click', (e) => {
-        this.activeTab = e.target.dataset.tab;
+        const newTab = e.target.dataset.tab;
+        const oldTab = this.activeTab;
+        this.activeTab = newTab;
         sessionStorage.setItem('sidebarActiveTab', this.activeTab);
+
+        // If we are leaving the Git tab, restore the editor to the current file.
+        if (oldTab === 'Git' && newTab !== 'Git') {
+            const currentFile = this.editor.getFilePath(window.location.hash);
+            this.editor.loadFile(currentFile);
+        }
+
         this.refresh();
       });
     });

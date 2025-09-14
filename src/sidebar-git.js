@@ -66,8 +66,11 @@ export const gitActions = {
     if (files.length > 0) {
       fileListHTML = files.map(file => {
         const displayText = file.filepath.startsWith('/') ? file.filepath.substring(1) : file.filepath;
+        const isActive = this.editor.filePath === file.filepath;
+        const activeClass = isActive ? 'active' : '';
+
         return `
-          <li class="git-file-item" data-filepath="${file.filepath}">
+          <li class="git-file-item ${activeClass}" data-filepath="${file.filepath}">
             <span class="git-file-path">${displayText}</span>
             <span class="git-file-actions">
               <button class="git-action-button discard" title="Discard Changes">⭯</button>
@@ -156,16 +159,16 @@ export const gitActions = {
               const filepath = fileItem.dataset.filepath;
 
               if (target.matches('.git-file-path')) {
-                  if (this.editor.getFilePath(window.location.hash) !== filepath) {
+                  if (this.editor.filePath !== filepath) {
                       await this.editor.loadFile(filepath);
                   }
-                  this.editor.showDiff(filepath);
+                  this.editor.showDiff(this.editor.filePath);
               } else if (target.matches('.git-action-button')) {
                   e.stopPropagation();
                   if (target.classList.contains('discard')) {
                       if (confirm(`Are you sure you want to discard all changes to "${filepath}"?\nThis cannot be undone.`)) {
                           await this.gitClient.discard(filepath);
-                          if (this.editor.getFilePath(window.location.hash) === filepath) {
+                          if (this.editor.filePath === filepath) {
                               await this.editor.forceReloadFile(filepath);
                           }
                           await this.refresh();

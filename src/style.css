@@ -299,6 +299,10 @@ main, .cm-editor { height: 100%; }
   border-radius: 3px;
 }
 
+.git-file-item.active {
+  background-color: #444;
+}
+
 .git-file-item:hover {
   background-color: #333;
 }
