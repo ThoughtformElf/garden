@@ -1,3 +1,5 @@
+import { ContextMenu } from './context-menu.js';
+
 export class Sidebar {
   /**
    * @param {Object} options Configuration for the sidebar.
@@ -27,23 +29,41 @@ export class Sidebar {
     this.container.appendChild(this.tabsContainer);
     this.container.appendChild(this.contentContainer);
 
-    // Retrieve the last active tab from sessionStorage, defaulting to 'Files'
     this.activeTab = sessionStorage.getItem('sidebarActiveTab') || 'Files';
   }
 
-  /**
-   * Initializes the sidebar by rendering tabs and the default content.
-   */
   async init() {
     console.log('Initializing sidebar...');
     this.renderTabs();
     await this.refresh();
+    this.setupContextMenu();
     console.log('Sidebar initialized.');
   }
 
   /**
-   * Renders the tab buttons and sets up their click handlers.
+   * Sets up the context menu for the file list.
    */
+  setupContextMenu() {
+    new ContextMenu({
+      targetSelector: '.sidebar-content [data-filepath]',
+      dataAttribute: 'data-filepath',
+      items: [
+        {
+          label: 'Rename',
+          action: (filepath) => this.handleRename(filepath)
+        },
+        {
+          label: 'Duplicate',
+          action: (filepath) => this.handleDuplicate(filepath)
+        },
+        {
+          label: 'Delete',
+          action: (filepath) => this.handleDelete(filepath)
+        }
+      ]
+    });
+  }
+
   renderTabs() {
     this.tabsContainer.innerHTML = `
       <button class="sidebar-tab" data-tab="Files">Files</button>
@@ -53,16 +73,12 @@ export class Sidebar {
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
       button.addEventListener('click', (e) => {
         this.activeTab = e.target.dataset.tab;
-        // Save the active tab state to sessionStorage
         sessionStorage.setItem('sidebarActiveTab', this.activeTab);
         this.refresh();
       });
     });
   }
 
-  /**
-   * Refreshes the content of the active tab.
-   */
   async refresh() {
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
       button.classList.toggle('active', button.dataset.tab === this.activeTab);
@@ -75,9 +91,6 @@ export class Sidebar {
     }
   }
 
-  /**
-   * Fetches and renders the file list for the current garden.
-   */
   async renderFiles() {
     try {
       const [files, statuses] = await Promise.all([
@@ -85,18 +98,19 @@ export class Sidebar {
         this.gitClient.getStatuses()
       ]);
       
-      const currentFile = window.location.hash.substring(1);
+      // FIX: Decode the hash to correctly compare against file paths with spaces.
+      const currentFile = decodeURIComponent(window.location.hash.substring(1));
+      
       const fileListHTML = files.sort().map(file => {
         const href = `#${file}`;
         const status = statuses.get(file) || 'unmodified';
-        // NEW: Remove leading slash for cleaner display text
         const displayText = file.startsWith('/') ? file.substring(1) : file;
         
         const classes = [`status-${status}`];
         if (file === currentFile) {
           classes.push('active');
         }
-        return `<li><a href="${href}" class="${classes.join(' ')}">${displayText}</a></li>`;
+        return `<li><a href="${href}" class="${classes.join(' ')}" data-filepath="${file}">${displayText}</a></li>`;
       }).join('');
 
       this.contentContainer.innerHTML = `<ul>${fileListHTML}</ul>`;
@@ -106,9 +120,6 @@ export class Sidebar {
     }
   }
 
-  /**
-   * Fetches and renders the list of all available gardens from localStorage.
-   */
   renderGardens() {
     try {
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
@@ -133,11 +144,6 @@ export class Sidebar {
     }
   }
 
-  /**
-   * Recursively lists all files in a directory, ignoring '.git'.
-   * @param {string} dir The directory to start from.
-   * @returns {Promise<string[]>} A list of file paths.
-   */
   async listFiles(dir) {
     const pfs = this.gitClient.pfs;
     let fileList = [];
@@ -153,13 +159,89 @@ export class Sidebar {
           } else {
             fileList.push(path);
           }
-        } catch (e) {
-          console.warn(`Could not stat ${path}, skipping.`);
-        }
+        } catch (e) { console.warn(`Could not stat ${path}, skipping.`); }
+      }
+    } catch (e) { console.log(`Directory not found: ${dir}. No files to list.`); }
+    return fileList;
+  }
+
+  // --- Context Menu Action Handlers ---
+
+  async handleRename(oldPath) {
+    const oldName = oldPath.substring(oldPath.lastIndexOf('/') + 1);
+    const newName = prompt('Enter new file name:', oldName);
+
+    if (!newName || newName === oldName) {
+      return;
+    }
+    
+    const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
+    const newPath = `${dir}/${newName}`;
+    
+    try {
+      await this.gitClient.pfs.rename(oldPath, newPath);
+      if (`#${oldPath}` === window.location.hash) {
+        window.location.hash = `#${newPath}`;
+      } else {
+        await this.refresh();
       }
     } catch (e) {
-        console.log(`Directory not found: ${dir}. No files to list.`);
+      console.error(`Error renaming file:`, e);
+      alert('Failed to rename file.');
     }
-    return fileList;
+  }
+  
+  async handleDuplicate(filepath) {
+    const directory = filepath.substring(0, filepath.lastIndexOf('/'));
+    const originalFilename = filepath.substring(filepath.lastIndexOf('/') + 1);
+
+    const lastDotIndex = originalFilename.lastIndexOf('.');
+    const hasExtension = lastDotIndex > 0;
+    
+    let defaultName;
+    if (hasExtension) {
+        const base = originalFilename.substring(0, lastDotIndex);
+        const ext = originalFilename.substring(lastDotIndex);
+        defaultName = `${base} (copy)${ext}`;
+    } else {
+        defaultName = `${originalFilename} (copy)`;
+    }
+
+    const newFilename = prompt('Enter name for duplicated file:', defaultName);
+
+    if (!newFilename) {
+      return; // User cancelled
+    }
+    
+    const newPath = `${directory}/${newFilename}`;
+
+    try {
+      const content = await this.gitClient.pfs.readFile(filepath, 'utf8');
+      await this.gitClient.writeFile(newPath, content);
+      await this.refresh();
+    } catch (e) {
+      console.error('Error duplicating file:', e);
+      if (e.code === 'ENOENT') {
+        alert(`Cannot duplicate. Original file not found: ${filepath}`);
+      } else {
+        alert('Failed to duplicate file.');
+      }
+    }
+  }
+
+  async handleDelete(filepath) {
+    if (confirm(`Are you sure you want to delete "${filepath}"?`)) {
+      try {
+        await this.gitClient.pfs.unlink(filepath);
+        if (`#${filepath}` === window.location.hash) {
+          window.location.hash = '#/README.md';
+        } else {
+          await this.refresh();
+        }
+      } catch (e) {
+        console.error(`Error deleting file:`, e);
+        alert('Failed to delete file.');
+      }
+    }
   }
 }

@@ -228,6 +228,8 @@ export class Editor {
    */
   getFilePath(hash) {
     let filepath = hash.startsWith('#') ? hash.substring(1) : hash;
+    // FIX: Decode the URI component to handle spaces (%20) and other encoded characters.
+    filepath = decodeURIComponent(filepath);
     if (filepath === '/' || filepath === '') {
       filepath = '/README.md';
     }
