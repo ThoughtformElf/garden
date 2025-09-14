@@ -15,7 +15,7 @@ html, body {
 .main-content {
   display: flex;
   flex-grow: 1;
-  height: 100%;
+  height: calc(100% - 24px); 
   overflow: hidden;
 }
 #sidebar {
@@ -62,12 +62,15 @@ main {
   text-align: center;
 }
 #loading-indicator p { margin: 0.5em; }
+
 #resizer {
-  flex: 0 0 5px;
-  cursor: col-resize;
+  flex: 0 0 24px;
+  cursor: pointer;
   background-color: #333;
   z-index: 10;
-  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 #resizer:hover { background-color: #555; }
 #resize-overlay {
@@ -77,23 +80,19 @@ main {
   width: 100vw;
   height: 100vh;
   z-index: 9998;
-  cursor: col-resize;
   display: none;
 }
-#sidebar-toggle {
-  position: absolute;
-  top: 5px;
-  right: -30px;
-  background: #444;
+#sidebar-toggle-icon {
+  background: transparent;
   color: #ccc;
-  border: 1px solid #555;
-  border-radius: 4px;
+  border: none;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
-  z-index: 5;
-  line-height: 20px;
+  width: 100%;
+  height: 100%;
+  font-size: 20px;
+  line-height: 24px;
   padding: 0;
+  pointer-events: none; /* Let parent resizer handle events */
 }
 .sidebar-collapsed #sidebar {
   width: 0;
@@ -103,23 +102,37 @@ main {
 main, .cm-editor { height: 100%; }
 .cm-editor { background-color: #222; }
 
-/* Eruda Styling */
+/* --- Eruda Styling --- */
 #eruda-container {
   flex-shrink: 0;
   background: #1e1e1e;
-  overflow: hidden;
+  overflow: visible;
 }
 .eruda-dev-tools {
   position: relative !important;
-  height: 30vh; /* Default starting height */
-  min-height: 42px;
+  min-height: 0;
 }
 #eruda-resizer {
-  height: 5px;
-  cursor: row-resize;
+  height: 24px;
+  cursor: pointer;
   background-color: #333;
-  transition: background-color 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center the toggle button */
+  box-sizing: border-box;
 }
 #eruda-resizer:hover {
   background-color: #555;
+}
+#eruda-toggle {
+  width: 22px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 24px;
+  pointer-events: none; /* Let parent resizer handle events */
 }
