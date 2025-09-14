@@ -1,0 +1,72 @@
+/* src/css/modal.css */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modal-container {
+  background: #282c34;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+  min-width: 300px;
+  max-width: 80%;
+  max-height: 80%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 10px 15px;
+  font-size: 18px;
+  font-weight: bold;
+  border-bottom: 1px solid #444;
+}
+
+.modal-content {
+  padding: 15px;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.modal-footer {
+  padding: 10px;
+  border-top: 1px solid #444;
+  text-align: right;
+  background-color: #222;
+}
+
+.modal-footer button {
+  padding: 8px 15px;
+  background-color: #4EC9B0;
+  color: #111;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.modal-footer button:hover {
+  background-color: #5FDCC4;
+}
