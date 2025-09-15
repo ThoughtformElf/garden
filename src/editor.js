@@ -2,6 +2,8 @@
 
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
 import { LanguageDescription, StreamLanguage } from '@codemirror/language';
@@ -97,8 +99,9 @@ export class Editor {
       extensions: [
         vim(),
         basicSetup,
-        EditorView.lineWrapping, // Add word wrap
-        lineNumbersRelative,    // Add relative line numbers
+        keymap.of([indentWithTab]), // Enable tab indentation
+        EditorView.lineWrapping,
+        lineNumbersRelative,
         this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
         basicDark,

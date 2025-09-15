@@ -1,4 +1,5 @@
 // src/devtools.js
+
 import eruda from 'eruda';
 import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data-portability.js';
 import { Modal } from './modal.js';
@@ -35,6 +36,40 @@ export function initializeDevTools() {
     inline: true,
     useShadowDom: false,
   });
+
+  // --- FINAL FIX that works every time ---
+  setTimeout(() => {
+    const elementsPanel = el.querySelector('.eruda-elements');
+    if (!elementsPanel) return;
+
+    let isToggling = false; // Prevents the observer from firing multiple times rapidly
+
+    const observer = new MutationObserver(() => {
+      // Check if the panel is now visible and we're not already in the middle of a fix
+      if (elementsPanel.style.display !== 'none' && !isToggling) {
+        isToggling = true;
+        
+        const selectBtn = document.querySelector('.eruda-control > .eruda-icon-select');
+        if (selectBtn) {
+          // Double-click to ensure the state is toggled off
+          selectBtn.click();
+          selectBtn.click();
+        }
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          isToggling = false;
+        }, 100);
+      }
+    });
+
+    // Watch for changes to the `style` attribute of the Elements panel itself.
+    observer.observe(elementsPanel, {
+      attributes: true,
+      attributeFilter: ['style']
+    });
+  }, 500);
+  // --- End of FIX ---
 
   const dataTool = eruda.add({
     name: 'Data',
@@ -95,7 +130,6 @@ export function initializeDevTools() {
       
       importBtn.addEventListener('click', () => fileInput.click());
       
-      // FIX: Full import logic is restored here.
       fileInput.addEventListener('change', async () => {
         const file = fileInput.files[0];
         if (!file) return;
@@ -136,7 +170,6 @@ export function initializeDevTools() {
             };
             modal.addFooterButton('Import Selected', importHandler);
             modal.addFooterButton('Cancel', () => modal.destroy());
-
         } catch (e) {
             console.error('Failed to read zip file:', e);
             modal.updateContent(`<strong>Error:</strong> Could not read the zip file.<br>${e.message}`);

@@ -1,3 +1,5 @@
+/* src/css/devtools.css */
+
 #eruda-container {
   flex-shrink: 0;
   background: #1e1e1e;
@@ -30,4 +32,21 @@
   font-size: 20px;
   line-height: 24px;
   pointer-events: none;
+}
+
+/* --- FORCEFUL FIX for Eruda Elements Tab --- */
+
+/* Eruda creates several overlay divs for highlighting. This targets
+   the most common one and forces it to be hidden. The high z-index
+   and !important flag are to ensure this rule wins. */
+.eruda-elements-highlight {
+    display: none !important;
+    z-index: -1 !important;
+}
+
+/* When the element selection tool is *explicitly* activated by the user,
+   Eruda adds a class to the body. We'll use this to show the highlight again. */
+body.eruda-select-active .eruda-elements-highlight {
+    display: block !important;
+    z-index: 99999 !important; /* Must be higher than our modal */
 }

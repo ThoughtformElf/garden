@@ -19,6 +19,6 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    include: ['isomorphic-git', '@isomorphic-git/lightning-fs'],
+    include: ['isomorphic-git', '@isomorphic-git/lightning-fs', 'jszip'],
   },
 });
