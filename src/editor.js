@@ -14,6 +14,7 @@ import debounce from 'lodash/debounce';
 import { Sidebar } from './sidebar.js';
 import { basicDark } from './theme.js';
 import { diffCompartment, createDiffExtension } from './editor-diff.js';
+import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative'; // 1. Import the extension
 
 // Define the shell language using the legacy stream parser
 const shellLanguage = StreamLanguage.define(shell);
@@ -90,6 +91,8 @@ export class Editor {
       extensions: [
         vim(),
         basicSetup,
+        lineNumbersRelative,
+        EditorView.lineWrapping,
         this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
         basicDark,
