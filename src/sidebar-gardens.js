@@ -1,3 +1,5 @@
+// src/sidebar-gardens.js
+
 import { Git } from './git-integration.js';
 
 export const gardenActions = {
@@ -5,6 +7,9 @@ export const gardenActions = {
     try {
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
       const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
+      const dirtyGardensRaw = localStorage.getItem('dirty_gardens');
+      const dirtyGardens = dirtyGardensRaw ? JSON.parse(dirtyGardensRaw) : new Set();
+      
       const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
       
       if (gardens.length === 0) {
@@ -15,11 +20,7 @@ export const gardenActions = {
       let gardenListHTML = '';
       for (const name of gardens.sort()) {
         const displayText = decodeURIComponent(name);
-        
-        // Create a temporary client to check the status of each garden
-        const tempGit = new Git(displayText);
-        const statuses = await tempGit.getStatuses();
-        const isDirty = Array.from(statuses.values()).some(s => s === 'modified');
+        const isDirty = dirtyGardens.includes(displayText);
 
         const href = `${basePath}/${name}`;
         const isActive = this.gitClient.gardenName === displayText;
@@ -32,6 +33,17 @@ export const gardenActions = {
       }
 
       this.contentContainer.innerHTML = `<ul>${gardenListHTML}</ul>`;
+      
+      // Add a click listener to handle the tab switch
+      this.contentContainer.querySelectorAll('[data-garden-name]').forEach(link => {
+          link.addEventListener('click', (e) => {
+              // Only act if we're switching to a new garden
+              if (this.gitClient.gardenName !== e.target.dataset.gardenName) {
+                  sessionStorage.setItem('sidebarActiveTab', 'Files');
+              }
+          });
+      });
+
     } catch (e) {
       console.error('Error rendering garden list:', e);
       this.contentContainer.innerHTML = `<p class="sidebar-error">Could not load gardens.</p>`;
@@ -47,6 +59,10 @@ export const gardenActions = {
       alert(`Garden "${newName}" already exists.`);
       return;
     }
+    
+    // Set the next active tab to 'Files' before redirecting
+    sessionStorage.setItem('sidebarActiveTab', 'Files');
+    
     const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
     window.location.href = `${basePath}/${newName}`;
   },
@@ -78,6 +94,9 @@ export const gardenActions = {
           const content = await sourceGit.readFile(file);
           await destGit.writeFile(file, content);
         }
+        
+        // Set the next active tab to 'Files'
+        sessionStorage.setItem('sidebarActiveTab', 'Files');
         
         this.contentContainer.innerHTML = `<p class="sidebar-info">Duplication complete. Redirecting...</p>`;
 
@@ -121,6 +140,8 @@ export const gardenActions = {
       });
 
       if (this.gitClient.gardenName === name) {
+        // Ensure we switch to the files tab when redirecting to home
+        sessionStorage.setItem('sidebarActiveTab', 'Files');
         const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
         window.location.href = `${basePath}/home`;
       } else {

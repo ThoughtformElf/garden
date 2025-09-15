@@ -1,9 +1,11 @@
+/* src/css/sidebar.css */
+
 @import './git.css';
 
 #sidebar {
   position: relative;
   width: var(--sidebar-width);
-  min-width: 0;
+  min-width: var(--sidebar-width); /* &lt;-- CHANGE THIS LINE */
   border-right: 1px solid #333;
   padding: 0; /* Remove padding to allow tabs to be flush */
   box-sizing: border-box;
@@ -100,6 +102,7 @@
 }
 .sidebar-collapsed #sidebar {
   width: 0;
+  min-width: 0; /* Allow it to be zero only when explicitly collapsed */
   padding: 0;
   border-right: none;
 }

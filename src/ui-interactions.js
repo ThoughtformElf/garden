@@ -58,7 +58,8 @@ function initializeSidebarInteractions() {
     }
     
     if (isDragging) {
-      const newWidth = Math.max(0, Math.min(currentX, window.innerWidth - 100));
+      // Prevent sidebar from becoming too small during a drag
+      const newWidth = Math.max(24, Math.min(currentX, window.innerWidth - 100));
       document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
       container.classList.remove('sidebar-collapsed');
       toggleButton.textContent = '‹';
