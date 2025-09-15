@@ -7,3 +7,7 @@ main, .cm-editor { height: 100%; }
   background-color: rgba(140, 33, 33, 0.4);
   text-decoration: line-through;
 }
+
+.cm-vim-panel input {
+  color: #ccc;
+}
