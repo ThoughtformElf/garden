@@ -37,33 +37,29 @@ export function initializeDevTools() {
     useShadowDom: false,
   });
 
-  // --- FINAL FIX that works every time ---
+  // --- FINAL, STATEFUL FIX ---
   setTimeout(() => {
     const elementsPanel = el.querySelector('.eruda-elements');
     if (!elementsPanel) return;
 
-    let isToggling = false; // Prevents the observer from firing multiple times rapidly
+    let wasVisible = false;
 
     const observer = new MutationObserver(() => {
-      // Check if the panel is now visible and we're not already in the middle of a fix
-      if (elementsPanel.style.display !== 'none' && !isToggling) {
-        isToggling = true;
-        
+      const isVisible = elementsPanel.style.display !== 'none';
+      
+      // Only run the fix when the panel transitions from hidden to visible.
+      if (isVisible && !wasVisible) {
         const selectBtn = document.querySelector('.eruda-control > .eruda-icon-select');
         if (selectBtn) {
-          // Double-click to ensure the state is toggled off
+          // Double-click to ensure the state is toggled off.
           selectBtn.click();
           selectBtn.click();
         }
-        
-        // Reset the flag after a short delay
-        setTimeout(() => {
-          isToggling = false;
-        }, 100);
       }
+      
+      wasVisible = isVisible;
     });
 
-    // Watch for changes to the `style` attribute of the Elements panel itself.
     observer.observe(elementsPanel, {
       attributes: true,
       attributeFilter: ['style']
