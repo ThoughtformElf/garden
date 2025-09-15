@@ -47,11 +47,9 @@ export function initializeDevTools() {
     const observer = new MutationObserver(() => {
       const isVisible = elementsPanel.style.display !== 'none';
       
-      // Only run the fix when the panel transitions from hidden to visible.
       if (isVisible && !wasVisible) {
         const selectBtn = document.querySelector('.eruda-control > .eruda-icon-select');
         if (selectBtn) {
-          // Double-click to ensure the state is toggled off.
           selectBtn.click();
           selectBtn.click();
         }
@@ -112,12 +110,44 @@ export function initializeDevTools() {
         const exportHandler = async () => {
             const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
             modal.destroy();
-            console.log('Starting export...');
+            
+            const progressModal = new Modal({ title: 'Exporting Gardens...' });
+            progressModal.show('<p>Preparing export. Please wait...</p>');
+            
+            let cancelled = false;
+            let fullLog = '';
+
+            // --- NEW: Add Cancel Button ---
+            const cancelButton = progressModal.addFooterButton('Cancel', () => {
+                cancelled = true;
+                progressModal.destroy();
+                console.log('Export cancelled by user.');
+            });
+
             try {
-                await exportGardens(selectedGardens, console.log);
-                console.log('%cExport process initiated.', 'color: #4EC9B0; font-weight: bold;');
+                await exportGardens(selectedGardens, (msg) => {
+                    // If cancelled, throw an error to stop the export loop.
+                    if (cancelled) throw new Error('Export cancelled by user.');
+                    
+                    console.log(msg);
+                    fullLog += msg + '<br>';
+                    progressModal.updateContent(`<div style="font-family: monospace; max-height: 300px; overflow-y: auto;">${fullLog}</div>`);
+                });
+                
+                // This code only runs if the export completes without being cancelled.
+                if (!cancelled) {
+                    progressModal.clearFooter(); // Remove the "Cancel" button on success.
+                    progressModal.updateContent('<p>Export complete! The download will begin shortly.</p>');
+                    setTimeout(() => progressModal.destroy(), 3000);
+                }
             } catch (e) {
-                console.error('Export failed:', e.message);
+                // Only show an error if it wasn't a user-initiated cancellation.
+                if (!cancelled) {
+                    console.error('Export failed:', e.message);
+                    progressModal.clearFooter();
+                    progressModal.updateContent(`<p style="color: #F44747;"><strong>Export Failed</strong><br>${e.message}</p>`);
+                    progressModal.addFooterButton('Close', () => progressModal.destroy());
+                }
             }
         };
         modal.addFooterButton('Export Selected', exportHandler);
