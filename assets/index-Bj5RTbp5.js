@@ -608,7 +608,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
         ${r}
       </div>
     </div>
-  `}function initializeDevTools(){const o=document.getElementById("eruda-container");return o?(eruda.init({container:o,tool:["console","elements","network","resources"],inline:!0,useShadowDom:!1}),setTimeout(()=>{const n=o.querySelector(".eruda-elements");if(!n)return;let r=!1;new MutationObserver(()=>{if(n.style.display!=="none"&&!r){r=!0;const s=document.querySelector(".eruda-control > .eruda-icon-select");s&&(s.click(),s.click()),setTimeout(()=>{r=!1},100)}}).observe(n,{attributes:!0,attributeFilter:["style"]})},500),eruda.add({name:"Data",init(n){this._$el=n,n.html(`
+  `}function initializeDevTools(){const o=document.getElementById("eruda-container");return o?(eruda.init({container:o,tool:["console","elements","network","resources"],inline:!0,useShadowDom:!1}),setTimeout(()=>{const n=o.querySelector(".eruda-elements");if(!n)return;let r=!1;new MutationObserver(()=>{const s=n.style.display!=="none";if(s&&!r){const l=document.querySelector(".eruda-control > .eruda-icon-select");l&&(l.click(),l.click())}r=s}).observe(n,{attributes:!0,attributeFilter:["style"]})},500),eruda.add({name:"Data",init(n){this._$el=n,n.html(`
         <div style="padding: 10px; font-family: Arial, sans-serif; color: #ccc;">
           <h2 style="margin-top:0;">Data Portability</h2>
           <button id="export-btn" class="eruda-button">Export...</button>
