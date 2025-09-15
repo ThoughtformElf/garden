@@ -1,5 +1,3 @@
-// src/editor.js
-
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
@@ -16,10 +14,10 @@ import { xml } from '@codemirror/lang-xml';
 import { yaml } from '@codemirror/lang-yaml';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import debounce from 'lodash/debounce';
-import { Sidebar } from './sidebar.js';
-import { basicDark } from './theme.js';
-import { diffCompartment, createDiffExtension } from './editor-diff.js';
-import { initializeDragAndDrop } from './drag-drop.js';
+import { Sidebar } from '../sidebar/sidebar.js';
+import { basicDark } from '../util/theme.js';
+import { diffCompartment, createDiffExtension } from './diff.js';
+import { initializeDragAndDrop } from '../util/drag-drop.js';
 
 // Define the shell language using the legacy stream parser
 const shellLanguage = StreamLanguage.define(shell);

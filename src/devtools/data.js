@@ -1,6 +1,5 @@
-// src/data-portability.js
 import JSZip from 'jszip';
-import { Git } from './git-integration.js';
+import { Git } from '../util/git-integration.js';
 
 async function listAllFiles(gitClient, dir) {
   const pfs = gitClient.pfs;

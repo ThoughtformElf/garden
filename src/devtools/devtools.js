@@ -1,8 +1,6 @@
-// src/devtools.js
-
 import eruda from 'eruda';
-import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data-portability.js';
-import { Modal } from './modal.js';
+import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
+import { Modal } from '../util/modal.js';
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `

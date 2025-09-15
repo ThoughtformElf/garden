@@ -1,10 +1,10 @@
 // src/index.js
 import { Buffer } from 'buffer';
 window.Buffer = Buffer; // Polyfill for isomorphic-git
-import { Editor } from './editor.js';
-import { Git } from './git-integration.js';
-import { initializeAppInteractions } from './ui-interactions.js';
-import { initializeDevTools } from './devtools.js'; // Import the new module
+import { Editor } from './editor/editor.js';
+import { Git } from './util/git-integration.js';
+import { initializeAppInteractions } from './sidebar/ui-interactions.js';
+import { initializeDevTools } from './devtools/devtools.js'; // Import the new module
 
 // --- Main Application Logic ---
 

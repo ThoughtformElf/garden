@@ -1,9 +1,7 @@
-// src/sidebar.js
-
-import { ContextMenu } from './context-menu.js';
-import { fileActions } from './sidebar-files.js';
-import { gardenActions } from './sidebar-gardens.js';
-import { gitActions } from './sidebar-git.js';
+import { ContextMenu } from '../util/context-menu.js';
+import { fileActions } from './files.js';
+import { gardenActions } from './gardens.js';
+import { gitActions } from './git.js';
 
 export class Sidebar {
   constructor({ target, gitClient, editor }) {

@@ -1,6 +1,4 @@
-// src/sidebar-gardens.js
-
-import { Git } from './git-integration.js';
+import { Git } from '../util/git-integration.js';
 
 export const gardenActions = {
   async renderGardens() {

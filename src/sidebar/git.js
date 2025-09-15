@@ -1,5 +1,3 @@
-// src/sidebar-git.js
-
 export const gitActions = {
   async renderGitView() {
     try {

@@ -1,5 +1,3 @@
-// src/sidebar-files.js
-
 export const fileActions = {
   // FIX: This function now correctly receives the full status matrix as an argument.
   async renderFiles(statusMatrix) {
