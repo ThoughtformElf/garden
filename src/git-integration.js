@@ -1,3 +1,5 @@
+// src/git-integration.js
+
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 
@@ -200,14 +202,25 @@ export class Git {
 
   async writeFile(filepath, content) {
     try {
-      const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
-      if (dirname) {
-        await this.pfs.mkdir(dirname, { recursive: true });
-      }
       await this.pfs.writeFile(filepath, content, 'utf8');
       this.markGardenAsDirty(true);
     } catch (e) {
-      console.error(`Error writing file ${filepath}:`, e);
+      // If the error is that the directory doesn't exist, create it and retry.
+      if (e.code === 'ENOENT') {
+        try {
+          const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
+          if (dirname) {
+            await this.pfs.mkdir(dirname, { recursive: true });
+            // Retry writing the file after creating the directory
+            await this.pfs.writeFile(filepath, content, 'utf8');
+            this.markGardenAsDirty(true);
+          }
+        } catch (mkdirError) {
+          console.error(`Error creating directory for ${filepath}:`, mkdirError);
+        }
+      } else {
+        console.error(`Error writing file ${filepath}:`, e);
+      }
     }
   }
 
