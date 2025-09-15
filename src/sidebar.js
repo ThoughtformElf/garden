@@ -1,3 +1,5 @@
+// src/sidebar.js
+
 import { ContextMenu } from './context-menu.js';
 import { fileActions } from './sidebar-files.js';
 import { gardenActions } from './sidebar-gardens.js';
@@ -41,6 +43,34 @@ export class Sidebar {
     this.setupContextMenus();
     await this.refresh();
     console.log('Sidebar initialized.');
+  }
+
+  /**
+   * Ensures a directory path exists by creating each segment.
+   * @param {string} path - The full directory path to ensure.
+   */
+  async ensureDir(path) {
+    const parts = path.split('/').filter(p => p);
+    let currentPath = '';
+    for (const part of parts) {
+      currentPath += `/${part}`;
+      try {
+        await this.gitClient.pfs.stat(currentPath);
+      } catch (e) {
+        if (e.code === 'ENOENT') {
+          try {
+            await this.gitClient.pfs.mkdir(currentPath);
+          } catch (mkdirError) {
+            // Ignore EEXIST in case of a race condition
+            if (mkdirError.code !== 'EEXIST') {
+              throw mkdirError;
+            }
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
   }
 
   setupContextMenus() {

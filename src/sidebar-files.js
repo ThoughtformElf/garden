@@ -1,3 +1,5 @@
+// src/sidebar-files.js
+
 export const fileActions = {
   // FIX: This function now correctly receives the full status matrix as an argument.
   async renderFiles(statusMatrix) {
@@ -52,12 +54,21 @@ export const fileActions = {
 
   async handleRename(oldPath) {
     const oldName = oldPath.substring(oldPath.lastIndexOf('/') + 1);
-    const newName = prompt('Enter new file name:', oldName);
-    if (!newName || newName === oldName) return;
-    const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
-    const newPath = `${dir}/${newName}`;
+    const newName = prompt('Enter new file name:', oldPath.substring(1)); // Suggest the full path
+    if (!newName || newName === oldPath.substring(1)) return;
+
+    const newPath = `/${newName}`;
+    
     try {
+      // Ensure the destination directory exists before renaming
+      const dirname = newPath.substring(0, newPath.lastIndexOf('/'));
+      if (dirname) {
+        await this.ensureDir(dirname);
+      }
+
       await this.gitClient.pfs.rename(oldPath, newPath);
+      
+      // If we were viewing the renamed file, update the URL hash
       if (decodeURIComponent(window.location.hash) === `#${oldPath}`) {
         window.location.hash = `#${newPath}`;
       } else {
@@ -65,7 +76,7 @@ export const fileActions = {
       }
     } catch (e) {
       console.error(`Error renaming file:`, e);
-      alert('Failed to rename file.');
+      alert('Failed to rename file. Check console for details.');
     }
   },
   

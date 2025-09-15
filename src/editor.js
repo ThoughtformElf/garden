@@ -1,3 +1,5 @@
+// src/editor.js
+
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { vim, Vim } from '@replit/codemirror-vim';
@@ -14,7 +16,7 @@ import debounce from 'lodash/debounce';
 import { Sidebar } from './sidebar.js';
 import { basicDark } from './theme.js';
 import { diffCompartment, createDiffExtension } from './editor-diff.js';
-import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative'; // 1. Import the extension
+import { initializeDragAndDrop } from './drag-drop.js';
 
 // Define the shell language using the legacy stream parser
 const shellLanguage = StreamLanguage.define(shell);
@@ -60,6 +62,9 @@ export class Editor {
     this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
     
+    // Initialize drag-and-drop after sidebar is ready
+    initializeDragAndDrop(this.gitClient, this.sidebar);
+    
     const initialContent = await this.gitClient.readFile(this.filePath);
     
     const loadingIndicator = document.getElementById('loading-indicator');
@@ -83,7 +88,7 @@ export class Editor {
     };
 
     const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-    const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('1rem');
+    const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('.9rem');
     Vim.map('jj', '<Esc>', 'insert');
 
     this.editorView = new EditorView({
@@ -91,8 +96,6 @@ export class Editor {
       extensions: [
         vim(),
         basicSetup,
-        lineNumbersRelative,
-        EditorView.lineWrapping,
         this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
         basicDark,
