@@ -3,6 +3,7 @@
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { vim, Vim } from '@replit/codemirror-vim';
+import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
 import { LanguageDescription, StreamLanguage } from '@codemirror/language';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
@@ -88,7 +89,7 @@ export class Editor {
     };
 
     const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-    const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('.9rem');
+    const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('1rem');
     Vim.map('jj', '<Esc>', 'insert');
 
     this.editorView = new EditorView({
@@ -96,6 +97,8 @@ export class Editor {
       extensions: [
         vim(),
         basicSetup,
+        EditorView.lineWrapping, // Add word wrap
+        lineNumbersRelative,    // Add relative line numbers
         this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
         basicDark,
