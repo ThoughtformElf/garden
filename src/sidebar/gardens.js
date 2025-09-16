@@ -8,8 +8,6 @@ export const gardenActions = {
       const dirtyGardensRaw = localStorage.getItem('dirty_gardens');
       const dirtyGardens = dirtyGardensRaw ? JSON.parse(dirtyGardensRaw) : new Set();
       
-      const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
-      
       if (gardens.length === 0) {
         this.contentContainer.innerHTML = `<p class="sidebar-info">No gardens found. Create one!</p>`;
         return;
@@ -20,7 +18,9 @@ export const gardenActions = {
         const displayText = decodeURIComponent(name);
         const isDirty = dirtyGardens.includes(displayText);
 
-        const href = `${basePath}/${name}`;
+        // FIX: Use a root-relative path. This is simpler and more robust.
+        // We also encode the garden name to handle special characters like spaces.
+        const href = `/${encodeURIComponent(name)}`;
         const isActive = this.gitClient.gardenName === displayText;
         
         const classes = [];
@@ -58,11 +58,10 @@ export const gardenActions = {
       return;
     }
     
-    // Set the next active tab to 'Files' before redirecting
     sessionStorage.setItem('sidebarActiveTab', 'Files');
     
-    const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
-    window.location.href = `${basePath}/${newName}`;
+    // FIX: Navigate using a root-relative path to avoid incorrect redirects.
+    window.location.pathname = `/${encodeURIComponent(newName)}`;
   },
 
   async handleDuplicateGarden(sourceName) {
@@ -93,15 +92,13 @@ export const gardenActions = {
           await destGit.writeFile(file, content);
         }
         
-        // Set the next active tab to 'Files'
         sessionStorage.setItem('sidebarActiveTab', 'Files');
         
         this.contentContainer.innerHTML = `<p class="sidebar-info">Duplication complete. Redirecting...</p>`;
-
+        
+        // FIX: Use location.replace with a root-relative path.
         setTimeout(() => {
-          const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
-          const newUrl = `${window.location.origin}${basePath}/${newName}`;
-          window.location.replace(newUrl);
+          window.location.replace(`/${encodeURIComponent(newName)}`);
         }, 500);
 
       } catch(e) {
@@ -138,10 +135,9 @@ export const gardenActions = {
       });
 
       if (this.gitClient.gardenName === name) {
-        // Ensure we switch to the files tab when redirecting to home
         sessionStorage.setItem('sidebarActiveTab', 'Files');
-        const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
-        window.location.href = `${basePath}/home`;
+        // FIX: Redirect to the home garden using a root-relative path.
+        window.location.pathname = '/home';
       } else {
         await this.refresh();
       }

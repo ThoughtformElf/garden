@@ -7,7 +7,6 @@ import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js'; // Import the new module
 
 // --- Main Application Logic ---
-
 const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/');
 
 let gardenName = window.location.pathname.startsWith(basePath)

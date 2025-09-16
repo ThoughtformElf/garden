@@ -11,3 +11,16 @@ main, .cm-editor { height: 100%; }
 .cm-vim-panel input {
   color: #ccc;
 }
+
+.cm-wikilink {
+  background-color: #3d5a80; /* A pleasant blue background */
+  color: #e0fbfc !important;   /* Light text to stand out on the blue */
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* Add this new style for hashtags */
+.cm-hashtag {
+  background-color: #FFFF00; /* BRIGHT YELLOW */
+  color: #000000 !important;      /* Black text, forced */
+}
