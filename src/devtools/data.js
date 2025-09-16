@@ -92,7 +92,6 @@ export async function importGardensFromZip(file, gardensToImport, log) {
     
     if (gardensToImport.includes(gardenName)) {
       const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
-
       const promise = zipEntry.async('string').then(async (content) => {
         log(`  Importing: ${gardenName}${filePath}`);
         const gitClient = new Git(gardenName);
@@ -157,7 +156,10 @@ export async function deleteGardens(gardensToDelete, log) {
   setTimeout(() => {
     const currentGarden = decodeURIComponent(window.location.pathname.split('/').pop() || 'home');
     if (gardensToDelete.includes(currentGarden) || allGardens.length === 0) {
-        const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/') || '';
+        // --- FIX: This is the corrected base path logic ---
+        const fullPath = new URL(import.meta.url).pathname;
+        const srcIndex = fullPath.lastIndexOf('/src/');
+        const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
         window.location.href = `${window.location.origin}${basePath}/home`;
     } else {
         window.location.reload();

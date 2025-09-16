@@ -8,7 +8,10 @@ import { initializeDevTools } from './devtools/devtools.js'; // Import the new m
 import { CommandPalette } from './util/command-palette.js';
 
 // --- Main Application Logic ---
-const basePath = new URL(import.meta.url).pathname.split('/').slice(0, -2).join('/');
+// --- FIX: Robust base path calculation ---
+const fullPath = new URL(import.meta.url).pathname;
+const srcIndex = fullPath.lastIndexOf('/src/');
+const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
 
 let gardenName = window.location.pathname.startsWith(basePath)
   ? window.location.pathname.substring(basePath.length)
