@@ -24,10 +24,9 @@ main, .cm-editor { height: 100%; }
   color: #000000 !important;
 }
 
-/* --- Add these new styles for checkboxes --- */
 .cm-checkbox-todo {
-  background-color: #4A4A4A; /* Neutral Grey */
-  color: #D3D3D3 !important;
+  background-color: #F44747; /* Neutral Grey */
+  color: #f8b3b3 !important;
 }
 .cm-checkbox-done {
   background-color: #2E7D32; /* Success Green */
@@ -36,4 +35,17 @@ main, .cm-editor { height: 100%; }
 .cm-checkbox-doing {
   background-color: #1976D2; /* Active Blue */
   color: #BBDEFB !important;
+}
+
+.cm-timestamp {
+  color: #F44747 !important; /* Red color, no background */
+  font-weight: bold;
+}
+
+/* --- Add this new style for naked links --- */
+.cm-naked-link {
+  background-color: #5d3d80; /* Purple background */
+  color: #f0e6ff !important;
+  border-radius: 3px;
+  padding: 0 2px;
 }

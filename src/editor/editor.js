@@ -109,16 +109,14 @@ const checkboxPlugin = ViewPlugin.fromClass(
     }
     findCheckboxes(view) {
       const builder = new RangeSetBuilder();
-      // This regex matches '[ ]', '[x]', or '[-]' at the start of a line, allowing for indentation.
       const checkboxRegex = /^\s*(\[([ |x|-])\])/gm;
       for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
         let match;
         while ((match = checkboxRegex.exec(text))) {
-          const content = match[2]; // The character inside the brackets: ' ', 'x', or '-'
-          const start = from + match.index + match[0].indexOf('['); // Start at the '['
-          const end = start + 3; // Length of '[ ]'
-
+          const content = match[2];
+          const start = from + match.index + match[0].indexOf('[');
+          const end = start + 3;
           if (content === ' ') builder.add(start, end, todoDecoration);
           else if (content === 'x') builder.add(start, end, doneDecoration);
           else if (content === '-') builder.add(start, end, doingDecoration);
@@ -129,6 +127,71 @@ const checkboxPlugin = ViewPlugin.fromClass(
   }, { decorations: v => v.decorations }
 );
 // --- END: STABLE CHECKBOX HIGHLIGHTING ---
+
+// --- START: STABLE TIMESTAMP HIGHLIGHTING ---
+const timestampDecoration = Decoration.mark({ class: 'cm-timestamp' });
+const timestampPlugin = ViewPlugin.fromClass(
+  class {
+    decorations;
+    constructor(view) { this.decorations = this.findTimestamps(view); }
+    update(update) {
+      if (update.docChanged || update.viewportChanged) this.decorations = this.findTimestamps(update.view);
+    }
+    findTimestamps(view) {
+      const builder = new RangeSetBuilder();
+      const timestampRegex = /^\s*(?:>\s*)*(\d{4,})\s/gm;
+      for (const { from, to } of view.visibleRanges) {
+        const text = view.state.doc.sliceString(from, to);
+        let match;
+        while ((match = timestampRegex.exec(text))) {
+          const fullMatch = match[0];
+          const timestamp = match[1];
+          const start = from + match.index + fullMatch.indexOf(timestamp);
+          const end = start + timestamp.length;
+          builder.add(start, end, timestampDecoration);
+        }
+      }
+      return builder.finish();
+    }
+  }, { decorations: v => v.decorations }
+);
+// --- END: STABLE TIMESTAMP HIGHLIGHTING ---
+
+// --- START: STABLE NAKED LINK HIGHLIGHTING ---
+const linkDecoration = Decoration.mark({ class: 'cm-naked-link' });
+const linkPlugin = ViewPlugin.fromClass(
+  class {
+    decorations;
+    constructor(view) { this.decorations = this.findLinks(view); }
+    update(update) {
+      if (update.docChanged || update.viewportChanged) this.decorations = this.findLinks(update.view);
+    }
+    findLinks(view) {
+      const builder = new RangeSetBuilder();
+      // This is a robust regex for finding URLs, looking for common protocols or 'www.'
+      const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/g;
+      for (const { from, to } of view.visibleRanges) {
+        const text = view.state.doc.sliceString(from, to);
+        let match;
+        while ((match = linkRegex.exec(text))) {
+          // Rule: Do not highlight if it is already part of a Markdown link, e.g., in [text](url)
+          const line = view.state.doc.lineAt(from + match.index);
+          if (/\[.*\]\(.*\)/.test(line.text)) {
+            // This is a simple check; a more robust one would involve parsing the syntax tree
+            // but this is good enough for a "best guess" approach.
+            continue;
+          }
+          const start = from + match.index;
+          const end = start + match[0].length;
+          builder.add(start, end, linkDecoration);
+        }
+      }
+      return builder.finish();
+    }
+  }, { decorations: v => v.decorations }
+);
+// --- END: STABLE NAKED LINK HIGHLIGHTING ---
+
 
 export class Editor {
   static editors = [];
@@ -190,7 +253,9 @@ export class Editor {
         editorFontSize,
         hashtagPlugin,
         wikilinkPlugin,
-        checkboxPlugin, // Add the new checkbox plugin here
+        checkboxPlugin,
+        timestampPlugin,
+        linkPlugin, // Add the new link plugin
         diffCompartment.of([]),
         ...(this.editorConfig.extensions || [])
       ],
