@@ -13,14 +13,27 @@ main, .cm-editor { height: 100%; }
 }
 
 .cm-wikilink {
-  background-color: #3d5a80; /* A pleasant blue background */
-  color: #e0fbfc !important;   /* Light text to stand out on the blue */
+  background-color: #3d5a80; /* Blue background */
+  color: #e0fbfc !important;
   border-radius: 3px;
   padding: 0 2px;
 }
 
-/* Add this new style for hashtags */
 .cm-hashtag {
-  background-color: #FFFF00; /* BRIGHT YELLOW */
-  color: #000000 !important;      /* Black text, forced */
+  background-color: #FFFF00; /* Bright Yellow */
+  color: #000000 !important;
+}
+
+/* --- Add these new styles for checkboxes --- */
+.cm-checkbox-todo {
+  background-color: #4A4A4A; /* Neutral Grey */
+  color: #D3D3D3 !important;
+}
+.cm-checkbox-done {
+  background-color: #2E7D32; /* Success Green */
+  color: #C8E6C9 !important;
+}
+.cm-checkbox-doing {
+  background-color: #1976D2; /* Active Blue */
+  color: #BBDEFB !important;
 }

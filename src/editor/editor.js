@@ -27,15 +27,12 @@ const programmaticChange = Annotation.define();
 
 // --- START: STABLE HASHTAG HIGHLIGHTING ---
 const hashtagDecoration = Decoration.mark({ class: 'cm-hashtag' });
-
 const hashtagPlugin = ViewPlugin.fromClass(
   class {
     decorations;
     constructor(view) { this.decorations = this.findHashtags(view); }
     update(update) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = this.findHashtags(update.view);
-      }
+      if (update.docChanged || update.viewportChanged) this.decorations = this.findHashtags(update.view);
     }
     findHashtags(view) {
       const builder = new RangeSetBuilder();
@@ -52,8 +49,7 @@ const hashtagPlugin = ViewPlugin.fromClass(
             if (/\s/.test(charBefore) === false) continue;
           }
           const urlRegex = /https?:\/\/[^\s]+/g;
-          let urlMatch;
-          let isInsideUrl = false;
+          let urlMatch, isInsideUrl = false;
           while ((urlMatch = urlRegex.exec(line.text))) {
             const urlStart = line.from + urlMatch.index;
             const urlEnd = urlStart + urlMatch[0].length;
@@ -68,22 +64,18 @@ const hashtagPlugin = ViewPlugin.fromClass(
       }
       return builder.finish();
     }
-  },
-  { decorations: v => v.decorations }
+  }, { decorations: v => v.decorations }
 );
 // --- END: STABLE HASHTAG HIGHLIGHTING ---
 
 // --- START: STABLE WIKILINK HIGHLIGHTING ---
 const wikilinkDecoration = Decoration.mark({ class: 'cm-wikilink' });
-
 const wikilinkPlugin = ViewPlugin.fromClass(
   class {
     decorations;
     constructor(view) { this.decorations = this.findWikilinks(view); }
     update(update) {
-      if (update.docChanged || update.viewportChanged) {
-        this.decorations = this.findWikilinks(update.view);
-      }
+      if (update.docChanged || update.viewportChanged) this.decorations = this.findWikilinks(update.view);
     }
     findWikilinks(view) {
       const builder = new RangeSetBuilder();
@@ -99,10 +91,44 @@ const wikilinkPlugin = ViewPlugin.fromClass(
       }
       return builder.finish();
     }
-  },
-  { decorations: v => v.decorations }
+  }, { decorations: v => v.decorations }
 );
 // --- END: STABLE WIKILINK HIGHLIGHTING ---
+
+// --- START: STABLE CHECKBOX HIGHLIGHTING ---
+const todoDecoration = Decoration.mark({ class: 'cm-checkbox-todo' });
+const doneDecoration = Decoration.mark({ class: 'cm-checkbox-done' });
+const doingDecoration = Decoration.mark({ class: 'cm-checkbox-doing' });
+
+const checkboxPlugin = ViewPlugin.fromClass(
+  class {
+    decorations;
+    constructor(view) { this.decorations = this.findCheckboxes(view); }
+    update(update) {
+      if (update.docChanged || update.viewportChanged) this.decorations = this.findCheckboxes(update.view);
+    }
+    findCheckboxes(view) {
+      const builder = new RangeSetBuilder();
+      // This regex matches '[ ]', '[x]', or '[-]' at the start of a line, allowing for indentation.
+      const checkboxRegex = /^\s*(\[([ |x|-])\])/gm;
+      for (const { from, to } of view.visibleRanges) {
+        const text = view.state.doc.sliceString(from, to);
+        let match;
+        while ((match = checkboxRegex.exec(text))) {
+          const content = match[2]; // The character inside the brackets: ' ', 'x', or '-'
+          const start = from + match.index + match[0].indexOf('['); // Start at the '['
+          const end = start + 3; // Length of '[ ]'
+
+          if (content === ' ') builder.add(start, end, todoDecoration);
+          else if (content === 'x') builder.add(start, end, doneDecoration);
+          else if (content === '-') builder.add(start, end, doingDecoration);
+        }
+      }
+      return builder.finish();
+    }
+  }, { decorations: v => v.decorations }
+);
+// --- END: STABLE CHECKBOX HIGHLIGHTING ---
 
 export class Editor {
   static editors = [];
@@ -113,7 +139,7 @@ export class Editor {
     this.targetSelector = target;
     this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
-    this.gitClient = gitClient; // Ensure gitClient is set on the instance
+    this.gitClient = gitClient;
     this.editorView = null;
     this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
@@ -121,8 +147,6 @@ export class Editor {
     this.languageCompartment = new Compartment();
     this.markdownLanguage = this.createMarkdownLanguage();
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
-
-    // Call init from the constructor, restoring the original flow
     this.init();
   }
 
@@ -132,35 +156,26 @@ export class Editor {
       console.error(`Target container not found: ${this.targetSelector}`);
       return;
     }
-
     await this.gitClient.initRepo();
-
     this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
-
     initializeDragAndDrop(this.gitClient, this.sidebar);
-
     const initialContent = await this.gitClient.readFile(this.filePath);
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) loadingIndicator.remove();
-
     container.style.display = 'block';
-
     const updateListener = EditorView.updateListener.of(update => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
     });
-
     const createFontTheme = (size) => EditorView.theme({
       '&': { fontSize: size },
       '.cm-scroller': { fontFamily: 'monospace' }
     });
-
     const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('1rem');
     Vim.map('jj', '<Esc>', 'insert');
-
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: [
@@ -175,12 +190,12 @@ export class Editor {
         editorFontSize,
         hashtagPlugin,
         wikilinkPlugin,
+        checkboxPlugin, // Add the new checkbox plugin here
         diffCompartment.of([]),
         ...(this.editorConfig.extensions || [])
       ],
       parent: container,
     });
-
     Editor.editors.push(this);
     this.isReady = true;
     this.listenForNavigation();
@@ -216,8 +231,7 @@ export class Editor {
     const filename = filepath.split('/').pop();
     const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
     switch (filename) {
-      case '.gitignore': case '.npmrc': case '.editorconfig': case 'Dockerfile':
-        return shellLanguage;
+      case '.gitignore': case '.npmrc': case '.editorconfig': case 'Dockerfile': return shellLanguage;
     }
     switch (extension) {
       case 'js': return javascript();
@@ -235,9 +249,7 @@ export class Editor {
     window.addEventListener('hashchange', async () => {
       this.hideDiff();
       const newFilePath = this.getFilePath(window.location.hash);
-      if (newFilePath !== this.filePath) {
-        await this.loadFile(newFilePath);
-      }
+      if (newFilePath !== this.filePath) await this.loadFile(newFilePath);
     });
   }
   
@@ -288,8 +300,8 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     if (this.filePath !== this.getFilePath(window.location.hash)) {
-        console.log("In preview mode, not saving changes.");
-        return;
+      console.log("In preview mode, not saving changes.");
+      return;
     }
     console.log(`Saving ${this.filePath}...`);
     await this.gitClient.writeFile(this.filePath, newContent);
