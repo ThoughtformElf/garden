@@ -1,6 +1,9 @@
 import { EditorView } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { tags as t } from '@lezer/highlight';
+import { tags as t, Tag } from '@lezer/highlight';
+
+// Define a custom tag for hashtags
+export const hashtagTag = Tag.define();
 
 // A minimal dark theme for the editor chrome (background, gutters, selection, etc.)
 const baseTheme = EditorView.theme({
@@ -35,6 +38,7 @@ const highlightStyle = HighlightStyle.define([
   { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#4EC9B0' },
   { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#D4D4D4' },
   { tag: [t.meta, t.comment], color: '#6A9955' },
+  { tag: hashtagTag, color: '#C678DD', fontStyle: 'italic' }, // Style for #hashtags
   { tag: t.strong, fontWeight: 'bold' },
   { tag: t.emphasis, fontStyle: 'italic' },
   { tag: t.strikethrough, textDecoration: 'line-through' },

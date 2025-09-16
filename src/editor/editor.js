@@ -1,6 +1,6 @@
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState, Compartment, Annotation } from '@codemirror/state';
-import { keymap } from '@codemirror/view';
+import { EditorState, Compartment, Annotation, RangeSetBuilder } from '@codemirror/state';
+import { keymap, ViewPlugin, Decoration } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
@@ -24,6 +24,89 @@ const shellLanguage = StreamLanguage.define(shell);
 
 // Create a unique annotation type to mark programmatic changes
 const programmaticChange = Annotation.define();
+
+// --- START: STABLE HASHTAG HIGHLIGHTING ---
+
+// Decoration to apply a simple CSS class.
+const hashtagDecoration = Decoration.mark({ class: 'cm-hashtag' });
+
+// This ViewPlugin is a simple scanner. It is stable and will not freeze the browser.
+const hashtagPlugin = ViewPlugin.fromClass(
+  class {
+    decorations;
+
+    constructor(view) {
+      this.decorations = this.findHashtags(view);
+    }
+
+    update(update) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = this.findHashtags(update.view);
+      }
+    }
+
+    findHashtags(view) {
+      const builder = new RangeSetBuilder();
+      // Use a very simple, fast regex to find all potential candidates.
+      const hashtagRegex = /#[\w-]+/g;
+
+      for (const { from, to } of view.visibleRanges) {
+        const text = view.state.doc.sliceString(from, to);
+        let match;
+
+        while ((match = hashtagRegex.exec(text))) {
+          const matchStart = from + match.index;
+          const end = matchStart + match[0].length;
+          const line = view.state.doc.lineAt(matchStart);
+
+          // **RULE 1: Check for preceding characters.**
+          // If the match is not at the very start of the line, check the character
+          // immediately before it. If it's not whitespace, it's invalid (e.g., "word#tag").
+          if (matchStart > line.from) {
+            const charBefore = view.state.doc.sliceString(matchStart - 1, matchStart);
+            if (/\s/.test(charBefore) === false) {
+              continue; // Skip this invalid match.
+            }
+          }
+
+          // **RULE 2: Check if inside a URL.**
+          // This is a simple but effective check. We find all URLs on the line
+          // and see if our hashtag falls within the character range of any URL.
+          const urlRegex = /https?:\/\/[^\s]+/g;
+          let urlMatch;
+          let isInsideUrl = false;
+          while ((urlMatch = urlRegex.exec(line.text))) {
+            const urlStart = line.from + urlMatch.index;
+            const urlEnd = urlStart + urlMatch[0].length;
+            if (matchStart >= urlStart && end <= urlEnd) {
+              isInsideUrl = true;
+              break;
+            }
+          }
+          if (isInsideUrl) {
+            continue; // Skip this match.
+          }
+          
+          // If all rules pass, apply the decoration.
+          builder.add(matchStart, end, hashtagDecoration);
+        }
+      }
+      return builder.finish();
+    }
+  },
+  {
+    decorations: v => v.decorations,
+  }
+);
+
+// Theme defined directly in this file for maximum visibility and control.
+const aggressiveTheme = EditorView.theme({
+    '.cm-hashtag': {
+        backgroundColor: '#FFFF00', // BRIGHT YELLOW
+        color: '#000000 !important',      // Black text, forced
+    }
+});
+// --- END: STABLE HASHTAG HIGHLIGHTING ---
 
 export class Editor {
   static editors = [];
@@ -63,7 +146,6 @@ export class Editor {
     this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
     
-    // Initialize drag-and-drop after sidebar is ready
     initializeDragAndDrop(this.gitClient, this.sidebar);
     
     const initialContent = await this.gitClient.readFile(this.filePath);
@@ -97,13 +179,15 @@ export class Editor {
       extensions: [
         vim(),
         basicSetup,
-        keymap.of([indentWithTab]), // Enable tab indentation
+        keymap.of([indentWithTab]),
         EditorView.lineWrapping,
         lineNumbersRelative,
         this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
         basicDark,
         editorFontSize,
+        hashtagPlugin,      // STABLE scanner plugin
+        aggressiveTheme,    // BRIGHT YELLOW theme
         diffCompartment.of([]),
         ...(this.editorConfig.extensions || [])
       ],
@@ -187,13 +271,11 @@ export class Editor {
       return;
     }
     
-    // Temporarily update the editor's content for preview
     this.editorView.dispatch({
       changes: { from: 0, to: this.editorView.state.doc.length, insert: currentContent },
       annotations: programmaticChange.of(true)
     });
     
-    // Show the diff against the parent commit's content
     this.showDiff(parentContent);
   }
 
@@ -237,7 +319,6 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     
-    // Do not save changes if we are in a historical preview state
     if (this.filePath !== this.getFilePath(window.location.hash)) {
         console.log("In preview mode, not saving changes.");
         return;
