@@ -10,19 +10,42 @@
 
 **Thoughtform Garden** is an experimental, browser-based coding environment that merges a personal knowledge base with a functional IDE. It is an "editor-first OS" that lives entirely in your browser, designed to explore literate programming, cultivate self-improving code, and collaborate with AI agents.
 
-This project is more than a tool; it's an exploration into the **Tao of Digital Gardening**—a practice of intentional, mindful interaction with information. It's a space to turn the chaos of the digital world into a garden of personal gnosis.
+This project is more than a tool; it's an exploration into the **Tao of Digital Gardening**—a practice of intentional, mindful interaction with information. It's a space to turn the chaos of the digital world into a garden of personal gnosis, shepherding streams of tokens into streams of consciousness.
 
-## Core Technologies
-- **[CodeMirror 6](https://codemirror.net/)**: A modern, extensible in-browser code editor.
-- **[isomorphic-git](https://isomorphic-git.org/)**: A pure JavaScript implementation of git, creating a complete version control system in your browser's IndexedDB.
-- **[Eruda](https://eruda.liriliri.io/)**: An embedded developer console for debugging and application management.
-- **[Vite](https://vitejs.dev/)**: A next-generation front-end tool for a fast and lean development experience.
+## Local Development
+
+To run the project on your machine for development:
+
+1.  **Clone the repository:**
+    ```
+    git clone https://github.com/thoughtforms/garden.git
+    cd garden
+    ```
+
+2.  **Install dependencies:**
+    ```
+    npm install
+    ```
+
+3.  **Run the development server:**
+    ```
+    npm run dev
+    ```
+
+This will start a local server at `http://localhost:5173`. The live, stable instance is always available at [**thoughtform.garden**](https://thoughtform.garden), no account registration needed.
 
 ***
 
 ## Getting Started: A Hands-On Guide
 
 Thoughtform Garden is designed to be intuitive. Here are the key workflows.
+
+### The Command Palette: Your Universal Finder
+
+The fastest way to navigate is with the Command Palette. It provides a single, unified search across **all files in all of your gardens.**
+
+-   **To Open:** Press `Ctrl+K` (or `Cmd+K` on macOS). You can also right-click (or long-press on mobile) in the sidebar or editor to open it from the context menu.
+-   **To Use:** Simply start typing any part of a file or garden name to instantly filter your results. Press `Enter` to jump directly to the selected file.
 
 ### Multi-Workspace Management
 Your work is organized into "Gardens"—separate, self-contained workspaces.
@@ -45,19 +68,34 @@ Your data is yours. The **Data** tab in the bottom devtools panel gives you full
 
 ***
 
-## The Vision
-This project explores what happens when a development tool is also a malleable, agentic knowledge graph. The system is designed to be a digital sanctuary where ideas (Thoughtforms) can be cultivated, connected, and grown into complex systems by a collective intelligence (an Egregore) of humans and AI.
+## The Philosophy: A Cognitive Core
+This is not just an application; it is a **Cognitive Core**. It is a system designed to become a direct extension of your mind—a version-controlled, locally-hosted, and infinitely malleable environment for thought. By blending a journal, an IDE, and a knowledge graph, Thoughtform Garden facilitates a tight feedback loop between you and your digital self, augmented by AI.
 
-By giving an LLM access to its own source code, version history, and a secure environment for API keys, the Garden becomes a "Test-Time Reinforcement Learning" environment. Instead of updating weights, the agent can update its own context and prompts, enabling a powerful loop of self-improvement and reflection.
+## The Agentic Loop: Human + AI = AGI
+The ultimate vision is to create a symbiotic partnership where the boundaries between user and AI blur. By giving an LLM access to its own source code, the complete version history of the garden, and a secure environment for API keys, the system becomes a "Test-Time Reinforcement Learning" environment. Instead of updating weights, the agent can update its own context and prompts, enabling a powerful loop of self-improvement and reflection. This collaboration—the human providing intent and the AI providing generative execution—is a practical step toward an emergent, functional AGI.
 
-## Roadmap
+---
+
+## Roadmap: From Editor to Egregore
+
 The current editor is the foundation. The future is focused on building a fully ambient, multi-modal computing experience.
 
--   **Code Execution**: Allow code written in the editor to be executed in a sandboxed environment, turning the garden into a true development playground.
--   **Remote Sync & Collaboration**: Implement `git push/pull` with a secure authentication layer to sync gardens between devices and enable collaboration.
--   **Environment Variables**: Add a dedicated UI for managing secrets like API keys, enabling LLM integration and other external services.
--   **Theming & Customization**: Refactor styles to use CSS variables for easy theme switching and personalization.
--   **Device Swarms**: Use WebRTC or WebSockets to create ad-hoc, multi-device computing clusters, turning old phones and tablets into dedicated agent hosts.
--   **Universal Renderer**: Implement `?repo=` URL support to clone and render any git repository, turning the Garden into a universal lens for knowledge bases.
--   **Visual & Multimodal Editing**: Move beyond text to include node-based graph editors and viewers for different media types.
+#### Phase 1: Quality of Life
+- **Command Palette**: A universal finder for files across all gardens.
+- **Keyboard Shortcuts**: Customizable keymaps for core actions and navigation.
+- **Enhanced Theming**: Refactor styles to use CSS variables for easy theme switching and personalization.
 
+#### Phase 2: The OS Layer
+- **Code Execution**: Allow code written in the editor to be executed in a sandboxed environment.
+- **URL-Based Commands**: Implement `?repo=` support to clone and render any git repository, turning the Garden into a universal lens for knowledge.
+- **Environment Variables**: Add a dedicated UI for managing secrets like API keys.
+
+#### Phase 3: The Agentic Leap
+- **Remote Sync & Collaboration**: Implement `git push/pull` with a secure authentication layer to sync gardens between devices.
+- **LLM Integration**: Build a dedicated interface for chatting with an AI that has full context of the current garden.
+- **Device Swarms**: Use WebRTC or WebSockets to create ad-hoc, multi-device computing clusters.
+
+#### Phase 4: Full Embodiment
+- **Visual & Multimodal Editing**: Move beyond text to include node-based graph editors and viewers.
+- **Sensor Integration**: Connect to browser sensors (camera, microphone) for hands-free interaction.
+- **Robotic Embodiment**: Create pathways to stream context to and from physical robots, augmenting reality with your digital gnosis.
