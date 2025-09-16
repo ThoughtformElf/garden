@@ -1,0 +1,86 @@
+/* src/css/command-palette.css */
+.cp-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+  opacity: 1;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.cp-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cp-container {
+  background: #282c34;
+  border: 1px solid #444;
+  border-radius: 8px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+  width: 90%;
+  max-width: 600px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-input {
+  width: 100%;
+  padding: 12px 15px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #444;
+  color: #ccc;
+  font-size: 16px;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.cp-input:focus {
+  outline: none;
+  border-bottom-color: #4EC9B0;
+}
+
+.cp-results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.cp-result-item, .cp-no-results {
+  padding: 10px 15px;
+  font-family: monospace;
+  font-size: 14px;
+  color: #ccc;
+  cursor: pointer;
+  border-bottom: 1px solid #333;
+}
+
+.cp-result-item:last-child {
+  border-bottom: none;
+}
+
+.cp-result-item.active {
+  background-color: #444;
+  color: #fff;
+}
+
+.cp-result-item:hover {
+  background-color: #3e4451;
+}
+
+.cp-no-results {
+  font-style: italic;
+  color: #888;
+  cursor: default;
+}
