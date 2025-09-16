@@ -7,8 +7,8 @@ export class ContextMenu {
   /**
    * @param {Object} options Configuration for the context menu.
    * @param {string} options.targetSelector A CSS selector for the main container where the menu can be triggered.
-   * @param {Array<{label: string, action: function}>} options.items An array of menu item objects for when a specific item is clicked.
-   * @param {Array<{label: string, action: function}>} [options.containerItems] Optional array of items for when the container background is clicked.
+   * @param {Array<{label: string, action: function}|{type: 'separator'}>} options.items An array of menu item objects.
+   * @param {Array<{label: string, action: function}|{type: 'separator'}>} [options.containerItems] Optional array for container background clicks.
    * @param {string} [options.itemSelector] A CSS selector for specific items within the target that trigger the main `items` list.
    * @param {string} [options.dataAttribute] The data attribute to find on a specific item (e.g., 'data-filepath').
    */
@@ -89,6 +89,14 @@ export class ContextMenu {
       : null;
 
     menuItems.forEach(item => {
+      // --- NEW: Handle separators ---
+      if (item.type === 'separator') {
+        const separator = document.createElement('div');
+        separator.className = 'context-menu-separator';
+        this.menuElement.appendChild(separator);
+        return;
+      }
+      
       const button = document.createElement('button');
       button.className = 'context-menu-item';
       button.textContent = item.label;

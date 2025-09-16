@@ -27,3 +27,10 @@
   background-color: #3e4451;
   color: #fff;
 }
+
+/* --- NEW: Style for the separator --- */
+.context-menu-separator {
+  height: 1px;
+  background-color: #444;
+  margin: 5px 0;
+}

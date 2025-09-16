@@ -5,13 +5,13 @@
 #sidebar {
   position: relative;
   width: var(--sidebar-width);
-  min-width: var(--sidebar-width); /* &lt;-- CHANGE THIS LINE */
+  min-width: var(--sidebar-width);
   border-right: 1px solid #333;
-  padding: 0; /* Remove padding to allow tabs to be flush */
+  padding: 0;
   box-sizing: border-box;
   background-color: #222;
   display: flex;
-  flex-direction: column; /* Stack tabs and content */
+  flex-direction: column;
 }
 
 .sidebar-tabs {
@@ -26,19 +26,20 @@
   border: none;
   color: #888;
   cursor: pointer;
-  font-size: 14px;
+  /* --- THE ONLY CHANGE: Use rem to allow it to scale --- */
+  font-size: 1rem;
   border-bottom: 2px solid transparent;
 }
 .sidebar-tab.active {
   color: #eee;
-  border-bottom-color: #E5C07B; /* Use an accent color */
+  border-bottom-color: #E5C07B;
 }
 .sidebar-tab:hover:not(.active) {
   background-color: #333;
 }
 
 .sidebar-content {
-  padding: 10px; /* Add padding back to the content area */
+  padding: 10px;
   overflow-y: auto;
   flex-grow: 1;
 }
@@ -102,22 +103,20 @@
 }
 .sidebar-collapsed #sidebar {
   width: 0;
-  min-width: 0; /* Allow it to be zero only when explicitly collapsed */
+  min-width: 0;
   padding: 0;
   border-right: none;
 }
-/* Style for the "Files" tab when the repo has modified files */
 .sidebar-tab.dirty {
   position: relative;
 }
-/* A small indicator dot, similar to VS Code's dirty file icon */
 .sidebar-tab.dirty::after {
   content: '';
   position: absolute;
-  top: 8px; /* Adjust for vertical alignment */
-  right: 8px; /* Adjust for horizontal alignment */
+  top: 8px;
+  right: 8px;
   width: 8px;
   height: 8px;
-  background-color: #E5C07B; /* Use your existing accent color */
+  background-color: #E5C07B;
   border-radius: 50%;
 }

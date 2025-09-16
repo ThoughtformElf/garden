@@ -1,4 +1,5 @@
-// src/ui-interactions.js
+// src/sidebar/ui-interactions.js
+import { ContextMenu } from '../util/context-menu.js';
 
 /**
  * Initializes all UI interaction handlers for the application.
@@ -6,7 +7,10 @@
 export function initializeAppInteractions() {
   initializeSidebarInteractions();
   initializeErudaResizer();
+  // REMOVED: initializeEditorContextMenu();
 }
+
+// REMOVED: The initializeEditorContextMenu function has been removed.
 
 /**
  * Initializes sidebar resizing and collapsing functionality.
@@ -26,7 +30,6 @@ function initializeSidebarInteractions() {
 
   let dragStartX = 0;
   let isDragging = false;
-
   const toggleCollapse = () => {
     const isCollapsed = container.classList.contains('sidebar-collapsed');
     if (isCollapsed) {
@@ -93,7 +96,7 @@ function initializeSidebarInteractions() {
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
-    document.addEventListener('mousemove', sidebarHandleMove);
+    document.addEventListener('mousemove', sidebarHandleMove, { passive: false });
     document.addEventListener('touchmove', sidebarHandleMove, { passive: false });
     document.addEventListener('mouseup', sidebarEndResize);
     document.addEventListener('touchend', sidebarEndResize);
@@ -152,7 +155,6 @@ function initializeErudaResizer() {
       localStorage.setItem('erudaCollapsed', 'true');
     }
   };
-
   const erudaHandleMove = (e) => {
     if (e.type === 'touchmove') e.preventDefault();
     const currentY = e.clientY || (e.touches && e.touches[0].clientY);

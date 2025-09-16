@@ -72,6 +72,12 @@ export class Sidebar {
   }
 
   setupContextMenus() {
+    // Shared command palette menu item
+    const commandPaletteItem = [
+      { type: 'separator' },
+      { label: 'Command Palette', action: () => window.thoughtform.commandPalette.open() }
+    ];
+
     new ContextMenu({
       targetSelector: '.sidebar-content.files-view',
       itemSelector: '[data-filepath]',
@@ -80,9 +86,13 @@ export class Sidebar {
         { label: 'New File', action: () => this.handleNewFile() },
         { label: 'Rename', action: (filepath) => this.handleRename(filepath) },
         { label: 'Duplicate', action: (filepath) => this.handleDuplicate(filepath) },
-        { label: 'Delete', action: (filepath) => this.handleDelete(filepath) }
+        { label: 'Delete', action: (filepath) => this.handleDelete(filepath) },
+        ...commandPaletteItem
       ],
-      containerItems: [{ label: 'New File', action: () => this.handleNewFile() }]
+      containerItems: [
+        { label: 'New File', action: () => this.handleNewFile() },
+        ...commandPaletteItem
+      ]
     });
 
     new ContextMenu({
@@ -92,9 +102,13 @@ export class Sidebar {
       items: [
         { label: 'New Garden', action: () => this.handleNewGarden() },
         { label: 'Duplicate', action: (name) => this.handleDuplicateGarden(name) },
-        { label: 'Delete', action: (name) => this.handleDeleteGarden(name) }
+        { label: 'Delete', action: (name) => this.handleDeleteGarden(name) },
+        ...commandPaletteItem
       ],
-      containerItems: [{ label: 'New Garden', action: () => this.handleNewGarden() }]
+      containerItems: [
+        { label: 'New Garden', action: () => this.handleNewGarden() },
+        ...commandPaletteItem
+      ]
     });
   }
 
@@ -104,7 +118,6 @@ export class Sidebar {
       <button class="sidebar-tab" data-tab="Gardens">Gardens</button>
       <button class="sidebar-tab" data-tab="Git">Git</button>
     `;
-
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
       button.addEventListener('click', (e) => {
         const newTab = e.target.dataset.tab;
@@ -155,6 +168,7 @@ export class Sidebar {
         if (item === '.git') continue;
         const path = `${dir === '/' ? '' : dir}/${item}`;
         try {
+          // --- FIX: Corrected the typo from pfs.pfs.stat to pfs.stat ---
           const stat = await pfs.stat(path);
           if (stat.isDirectory()) {
             fileList = fileList.concat(await this.listFiles(gitClient, path));

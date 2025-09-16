@@ -156,7 +156,6 @@ const timestampPlugin = ViewPlugin.fromClass(
   }, { decorations: v => v.decorations }
 );
 // --- END: STABLE TIMESTAMP HIGHLIGHTING ---
-
 // --- START: STABLE NAKED LINK HIGHLIGHTING ---
 const linkDecoration = Decoration.mark({ class: 'cm-naked-link' });
 const linkPlugin = ViewPlugin.fromClass(
@@ -191,8 +190,6 @@ const linkPlugin = ViewPlugin.fromClass(
   }, { decorations: v => v.decorations }
 );
 // --- END: STABLE NAKED LINK HIGHLIGHTING ---
-
-
 export class Editor {
   static editors = [];
 
@@ -232,12 +229,8 @@ export class Editor {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
     });
-    const createFontTheme = (size) => EditorView.theme({
-      '&': { fontSize: size },
-      '.cm-scroller': { fontFamily: 'monospace' }
-    });
-    const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-    const editorFontSize = isMobile ? createFontTheme('1.5rem') : createFontTheme('1rem');
+
+    // --- REMOVED: JS-based font-size logic ---
     Vim.map('jj', '<Esc>', 'insert');
     this.editorView = new EditorView({
       doc: initialContent,
@@ -250,7 +243,6 @@ export class Editor {
         this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
         updateListener,
         basicDark,
-        editorFontSize,
         hashtagPlugin,
         wikilinkPlugin,
         checkboxPlugin,
@@ -333,7 +325,6 @@ export class Editor {
     });
     this.showDiff(parentContent);
   }
-
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
     this.hideDiff();
