@@ -1,69 +1,60 @@
 .sidebar-content.git-view {
-  padding: 0; /* Remove padding to allow sections to be flush */
+  padding: 0;
 }
-
 .git-view-container {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
-
 .git-commit-area {
   padding: 10px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--color-dark-L3);
   flex-shrink: 0;
 }
-
 .git-commit-area textarea {
   width: 100%;
   box-sizing: border-box;
-  background-color: #1a1a1a;
-  color: #ccc;
-  border: 1px solid #444;
+  background-color: var(--color-dark-L0);
+  color: var(--color-light-L0);
+  border: 1px solid var(--color-dark-L5);
   border-radius: 3px;
   padding: 8px;
   font-family: monospace;
   resize: vertical;
   margin-bottom: 8px;
 }
-
 .git-commit-area button {
   width: 100%;
   padding: 8px;
-  background-color: #4EC9B0;
-  color: #111;
+  background-color: var(--color-accent-teal);
+  color: var(--color-dark-text);
   border: none;
   border-radius: 3px;
   cursor: pointer;
   font-weight: bold;
 }
-
 .git-commit-area button:disabled {
-  background-color: #333;
-  color: #666;
+  background-color: var(--color-dark-L3);
+  color: var(--color-light-L1);
   cursor: not-allowed;
 }
-
 .git-file-section {
   padding: 0 10px;
   overflow-y: auto;
 }
-
 .git-section-header {
   font-size: 12px;
   font-weight: bold;
   text-transform: uppercase;
-  color: #888;
+  color: var(--color-light-L1);
   margin: 15px 0 5px 0;
   font-family: Arial, sans-serif;
 }
-
 .git-file-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
-
 .git-file-item {
   display: flex;
   align-items: center;
@@ -73,78 +64,65 @@
   font-size: 13px;
   border-radius: 3px;
 }
-
 .git-file-item.active {
-  background-color: #444;
+  background-color: var(--color-dark-L5);
 }
-
 .git-file-item:hover {
-  background-color: #333;
+  background-color: var(--color-dark-L3);
 }
-
 .git-file-item:hover .git-file-actions {
   opacity: 1;
 }
-
 .git-file-path {
-  color: #ccc;
+  color: var(--color-light-L0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex-grow: 1;
   cursor: pointer;
 }
-
 .git-file-actions {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  opacity: 0; /* Hide actions by default */
+  opacity: 0;
   transition: opacity 0.15s ease-in-out;
 }
-
 .git-action-button {
   background: none;
   border: none;
-  color: #aaa;
+  color: var(--color-light-L1);
   cursor: pointer;
   font-size: 16px;
   padding: 0 5px;
   font-family: monospace;
   font-weight: bold;
 }
-
 .git-action-button:hover {
-  color: #eee;
+  color: var(--color-light-L0);
 }
-
 .no-changes {
   font-family: monospace;
-  color: #666;
+  color: var(--color-light-L1);
   font-style: italic;
   font-size: 13px;
   padding: 4px;
   display: block;
 }
-
-/* --- History Section Styles --- */
 .git-history-section {
   padding: 0 10px 10px;
   overflow-y: auto;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--color-dark-L3);
   margin-top: 10px;
 }
-
 .git-history-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
-
 .git-history-item {
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--color-dark-L2);
 }
-
 .git-history-header {
   display: flex;
   justify-content: space-between;
@@ -153,49 +131,42 @@
   cursor: pointer;
   border-radius: 3px;
 }
-
 .git-history-header:hover {
-  background-color: #333;
+  background-color: var(--color-dark-L3);
 }
-
 .git-history-message {
-  color: #ccc;
+  color: var(--color-light-L0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
   font-family: monospace;
 }
-
 .git-history-oid {
-  color: #888;
+  color: var(--color-light-L1);
   flex-shrink: 0;
   margin-left: 10px;
   font-size: 13px;
   font-family: monospace;
 }
-
 .git-history-details {
-  background-color: #1c1c1c;
+  background-color: var(--color-dark-L0);
   padding: 10px;
   font-size: 12px;
-  color: #aaa;
+  color: var(--color-light-L1);
 }
-
 .commit-meta {
   margin-bottom: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px dashed #333;
+  border-bottom: 1px dashed var(--color-dark-L3);
 }
-
 .history-file-list .history-file-path {
   padding: 4px;
   border-radius: 3px;
   cursor: pointer;
 }
-
 .history-file-list .history-file-path:hover,
 .history-file-list .history-file-path.active {
-  background-color: #444;
-  color: #eee;
+  background-color: var(--color-dark-L5);
+  color: var(--color-light-L0);
 }

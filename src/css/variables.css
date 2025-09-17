@@ -1,0 +1,54 @@
+/* src/css/variables.css */
+:root {
+  /* --- Greyscale & Core Text --- */
+  --color-dark-L0: #1a1a1a;  /* Deepest background (e.g., commit textarea) */
+  --color-dark-L1: #222222;  /* Primary background */
+  --color-dark-L2: #282c34;  /* Secondary background (modals, popups) */
+  --color-dark-L3: #333333;  /* Borders, inactive UI */
+  --color-dark-L4: #3e4451;  /* Hovered elements */
+  --color-dark-L5: #444444;  /* Active elements, secondary borders */
+  --color-light-L0: #cccccc; /* Primary text */
+  --color-light-L1: #888888; /* Secondary, muted text */
+  --color-light-L2: #ffffff; /* Brightest text */
+  --color-dark-text: #111111;/* For use on light-colored buttons */
+  --color-black: #000000;
+
+  /* --- Accent Palette --- */
+  --color-accent-teal: #4ec9b0;
+  --color-accent-teal-hover: #5fdcc4;
+  --color-accent-yellow: #e5c07b;
+  --color-accent-red: #f44747;
+  --color-accent-red-hover: #ff5a5a;
+  --color-accent-green: #2e7d32;
+  --color-accent-blue: #1976d2;
+  --color-accent-purple: #5d3d80;
+  --color-accent-cyan: #9cdcfe;
+
+  /* --- Transparent Overlays --- */
+  --color-overlay: rgba(0, 0, 0, 0.7);
+  --color-shadow: rgba(0, 0, 0, 0.5);
+
+  /* --- Editor-Specific Syntax Highlighting --- */
+  --color-syntax-diff-add-bg: rgba(15, 88, 39, 0.4);
+  --color-syntax-diff-del-bg: rgba(140, 33, 33, 0.4);
+  
+  --color-syntax-hashtag-bg: #ffff00;
+  --color-syntax-hashtag-text: var(--color-black);
+
+  --color-syntax-wikilink-bg: #3d5a80;
+  --color-syntax-wikilink-text: #e0fbfc;
+
+  --color-syntax-link-bg: var(--color-accent-purple);
+  --color-syntax-link-text: #f0e6ff;
+  
+  --color-syntax-checkbox-done-bg: var(--color-accent-green);
+  --color-syntax-checkbox-done-text: #c8e6c9;
+
+  --color-syntax-checkbox-doing-bg: var(--color-accent-blue);
+  --color-syntax-checkbox-doing-text: #bbdefb;
+  
+  --color-syntax-checkbox-todo-bg: var(--color-accent-red);
+  --color-syntax-checkbox-todo-text: #f8b3b3;
+
+  --color-syntax-blockquote-text: #98c379;
+}

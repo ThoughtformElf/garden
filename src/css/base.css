@@ -11,7 +11,7 @@ html, body {
   font-family: Arial, sans-serif;
   font-size: var(--base-font-size);
   overflow: hidden;
-  background-color: #222;
+  background-color: var(--color-dark-L1);
 }
 .app-container {
   display: flex;
@@ -24,36 +24,29 @@ html, body {
   height: calc(100% - 24px); 
   overflow: hidden;
 }
-
 main {
   flex-grow: 1;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #222;
+  background-color: var(--color-dark-L1);
   flex-direction: column;
-  padding-bottom: 0.8rem; /* Space for token counter */
+  padding-bottom: 0.8rem;
 }
 #loading-indicator {
-  color: #ccc;
+  color: var(--color-light-L0);
   font-family: monospace;
   text-align: center;
 }
 #loading-indicator p { margin: 0.5em; }
-
 .cm-editor {
   font-size: 1rem;
 }
-
-/* --- THE ONLY RESPONSIVE RULE --- */
 @media (orientation: portrait) and (max-aspect-ratio: 4/5) and (pointer: coarse) {
   :root {
-    /* Make all text larger in portrait mode on touch devices */
     --base-font-size: 28px;
   }
-  
-  /* Make the sidebar resizer handle wider and more tappable */
   #resizer {
     flex-basis: 44px !important;
   }

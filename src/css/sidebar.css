@@ -1,41 +1,36 @@
-/* src/css/sidebar.css */
-
 @import './git.css';
-
 #sidebar {
   position: relative;
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  border-right: 1px solid #333;
+  border-right: 1px solid var(--color-dark-L3);
   padding: 0;
   box-sizing: border-box;
-  background-color: #222;
+  background-color: var(--color-dark-L1);
   display: flex;
   flex-direction: column;
 }
-
 .sidebar-tabs {
   display: flex;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--color-dark-L3);
   flex-shrink: 0;
 }
 .sidebar-tab {
   flex-grow: 1;
   padding: 8px 10px;
-  background-color: #222;
+  background-color: var(--color-dark-L1);
   border: none;
-  color: #888;
+  color: var(--color-light-L1);
   cursor: pointer;
   border-bottom: 2px solid transparent;
 }
 .sidebar-tab.active {
-  color: #eee;
-  border-bottom-color: #E5C07B;
+  color: var(--color-light-L0);
+  border-bottom-color: var(--color-accent-yellow);
 }
 .sidebar-tab:hover:not(.active) {
-  background-color: #333;
+  background-color: var(--color-dark-L3);
 }
-
 .sidebar-content {
   padding: 10px;
   overflow-y: auto;
@@ -55,29 +50,28 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #ccc;
+  color: var(--color-light-L0);
 }
-.sidebar-content li a.status-modified { color: #E5C07B; }
-.sidebar-content li a.status-unmodified { color: #ccc; }
-.sidebar-content li a.active { background-color: #444; }
-.sidebar-content li a:hover { background-color: #333; }
+.sidebar-content li a.status-modified { color: var(--color-accent-yellow); }
+.sidebar-content li a.status-unmodified { color: var(--color-light-L0); }
+.sidebar-content li a.active { background-color: var(--color-dark-L5); }
+.sidebar-content li a:hover { background-color: var(--color-dark-L3); }
 .sidebar-error, .sidebar-info {
-  color: #888;
+  color: var(--color-light-L1);
   padding: 10px;
   font-style: italic;
   font-family: monospace;
 }
-
 #resizer {
   flex: 0 0 24px;
   cursor: pointer;
-  background-color: #333;
+  background-color: var(--color-dark-L3);
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-#resizer:hover { background-color: #555; }
+#resizer:hover { background-color: var(--color-dark-L4); }
 #resize-overlay {
   position: fixed;
   top: 0;
@@ -89,7 +83,7 @@
 }
 #sidebar-toggle-icon {
   background: transparent;
-  color: #ccc;
+  color: var(--color-light-L0);
   border: none;
   cursor: pointer;
   width: 100%;
@@ -114,6 +108,6 @@
   right: 8px;
   width: 8px;
   height: 8px;
-  background-color: #E5C07B;
+  background-color: var(--color-accent-yellow);
   border-radius: 50%;
 }

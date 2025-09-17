@@ -1,10 +1,9 @@
-/* Token counter status bar styles */
 .token-status-bar {
-  background-color: #2a2a2a;
-  border-top: 1px solid #444;
+  background-color: var(--color-dark-L2);
+  border-top: 1px solid var(--color-dark-L5);
   padding: .25rem 1.25rem;
   font-family: 'Courier New', monospace;
-  color: #ccc;
+  color: var(--color-light-L0);
   z-index: 100;
   display: flex;
   justify-content: flex-end;
@@ -13,23 +12,18 @@
   box-sizing: border-box;
   width: 100%;
 }
-
 .token-count {
-  color: #9cdcfe;
+  color: var(--color-accent-cyan);
   font-weight: 500;
   user-select: none;
 }
-
-/* Responsive adjustments */
 @media (orientation: portrait) and (max-aspect-ratio: 4/5) {
   .token-status-bar {
     padding: 8px 16px;
     min-height: 1.5rem;
   }
 }
-
-/* Dark theme integration */
 .token-status-bar:hover .token-count {
-  color: #fff;
+  color: var(--color-light-L2);
   transition: color 0.2s ease;
 }

@@ -2,59 +2,49 @@ main, .cm-editor {
   height: 100%;
   width: 100%;
 }
-.cm-editor { background-color: #222; }
-
+.cm-editor { background-color: var(--color-dark-L1); }
 .cm-diff-inserted {
-  background-color: rgba(15, 88, 39, 0.4);
+  background-color: var(--color-syntax-diff-add-bg);
 }
 .cm-diff-deleted {
-  background-color: rgba(140, 33, 33, 0.4);
+  background-color: var(--color-syntax-diff-del-bg);
   text-decoration: line-through;
 }
 .cm-vim-panel input {
-  color: #ccc;
+  color: var(--color-light-L0);
 }
-
 .cm-wikilink {
-  background-color: #3d5a80; /* Blue background */
-  color: #e0fbfc !important;
+  background-color: var(--color-syntax-wikilink-bg);
+  color: var(--color-syntax-wikilink-text) !important;
   border-radius: 3px;
   padding: 0 2px;
 }
-
 .cm-hashtag {
-  background-color: #FFFF00; /* Bright Yellow */
-  color: #000000 !important;
+  background-color: var(--color-syntax-hashtag-bg);
+  color: var(--color-syntax-hashtag-text) !important;
 }
-
 .cm-checkbox-todo {
-  background-color: #F44747; /* Neutral Grey */
-  color: #f8b3b3 !important;
+  background-color: var(--color-syntax-checkbox-todo-bg);
+  color: var(--color-syntax-checkbox-todo-text) !important;
 }
-
 .cm-checkbox-done {
-  background-color: #2E7D32; /* Success Green */
-  color: #C8E6C9 !important;
+  background-color: var(--color-syntax-checkbox-done-bg);
+  color: var(--color-syntax-checkbox-done-text) !important;
 }
-
 .cm-checkbox-doing {
-  background-color: #1976D2; /* Active Blue */
-  color: #BBDEFB !important;
+  background-color: var(--color-syntax-checkbox-doing-bg);
+  color: var(--color-syntax-checkbox-doing-text) !important;
 }
-
 .cm-timestamp {
-  color: #F44747 !important; /* Red color, no background */
+  color: var(--color-accent-red) !important;
   font-weight: bold;
 }
-
 .cm-naked-link {
-  background-color: #5d3d80; /* Purple background */
-  color: #f0e6ff !important;
+  background-color: var(--color-syntax-link-bg);
+  color: var(--color-syntax-link-text) !important;
   border-radius: 3px;
   padding: 0 2px;
 }
-
-/* --- Add this new style for blockquotes --- */
 .cm-blockquote {
-  color: #98c379 !important; /* A pleasant green, suitable for text */
+  color: var(--color-syntax-blockquote-text) !important;
 }
