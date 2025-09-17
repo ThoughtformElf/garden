@@ -1,0 +1,46 @@
+<context project structure>
+.
+├── favicon.png
+├── index.html
+├── LLM.txt
+├── package.json
+├── package-lock.json
+├── README.md
+├── src
+│   ├── css
+│   │   ├── base.css
+│   │   ├── command-palette.css
+│   │   ├── context-menu.css
+│   │   ├── devtools.css
+│   │   ├── drag-drop.css
+│   │   ├── editor.css
+│   │   ├── git.css
+│   │   ├── modal.css
+│   │   ├── sidebar.css
+│   │   ├── status-bar.css
+│   │   └── style.css
+│   ├── devtools
+│   │   ├── data.js
+│   │   └── devtools.js
+│   ├── editor
+│   │   ├── diff.js
+│   │   ├── editor.js
+│   │   └── status-bar.js
+│   ├── index.js
+│   ├── sidebar
+│   │   ├── files.js
+│   │   ├── gardens.js
+│   │   ├── git.js
+│   │   ├── sidebar.js
+│   │   └── ui-interactions.js
+│   └── util
+│       ├── command-palette.js
+│       ├── context-menu.js
+│       ├── drag-drop.js
+│       ├── git-integration.js
+│       ├── modal.js
+│       └── theme.js
+└── vite.config.js
+
+7 directories, 35 files
+</content>

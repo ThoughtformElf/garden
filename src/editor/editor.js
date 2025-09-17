@@ -17,6 +17,7 @@ import debounce from 'lodash/debounce';
 import { Sidebar } from '../sidebar/sidebar.js';
 import { basicDark } from '../util/theme.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
+import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
 
 // Define the shell language using the legacy stream parser
@@ -156,6 +157,7 @@ const timestampPlugin = ViewPlugin.fromClass(
   }, { decorations: v => v.decorations }
 );
 // --- END: STABLE TIMESTAMP HIGHLIGHTING ---
+
 // --- START: STABLE NAKED LINK HIGHLIGHTING ---
 const linkDecoration = Decoration.mark({ class: 'cm-naked-link' });
 const linkPlugin = ViewPlugin.fromClass(
@@ -167,17 +169,13 @@ const linkPlugin = ViewPlugin.fromClass(
     }
     findLinks(view) {
       const builder = new RangeSetBuilder();
-      // This is a robust regex for finding URLs, looking for common protocols or 'www.'
       const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/g;
       for (const { from, to } of view.visibleRanges) {
         const text = view.state.doc.sliceString(from, to);
         let match;
         while ((match = linkRegex.exec(text))) {
-          // Rule: Do not highlight if it is already part of a Markdown link, e.g., in [text](url)
           const line = view.state.doc.lineAt(from + match.index);
           if (/\[.*\]\(.*\)/.test(line.text)) {
-            // This is a simple check; a more robust one would involve parsing the syntax tree
-            // but this is good enough for a "best guess" approach.
             continue;
           }
           const start = from + match.index;
@@ -190,6 +188,7 @@ const linkPlugin = ViewPlugin.fromClass(
   }, { decorations: v => v.decorations }
 );
 // --- END: STABLE NAKED LINK HIGHLIGHTING ---
+
 export class Editor {
   static editors = [];
 
@@ -205,6 +204,7 @@ export class Editor {
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
     this.languageCompartment = new Compartment();
+    this.tokenCounterCompartment = new Compartment(); // <-- ADD THIS
     this.markdownLanguage = this.createMarkdownLanguage();
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
     this.init();
@@ -224,14 +224,15 @@ export class Editor {
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) loadingIndicator.remove();
     container.style.display = 'block';
+    
     const updateListener = EditorView.updateListener.of(update => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
     });
 
-    // --- REMOVED: JS-based font-size logic ---
     Vim.map('jj', '<Esc>', 'insert');
+    
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: [
@@ -247,12 +248,14 @@ export class Editor {
         wikilinkPlugin,
         checkboxPlugin,
         timestampPlugin,
-        linkPlugin, // Add the new link plugin
+        linkPlugin,
         diffCompartment.of([]),
+        this.tokenCounterCompartment.of(createTokenCounterExtension()), // <-- ADD THIS
         ...(this.editorConfig.extensions || [])
       ],
       parent: container,
     });
+    
     Editor.editors.push(this);
     this.isReady = true;
     this.listenForNavigation();
@@ -325,6 +328,7 @@ export class Editor {
     });
     this.showDiff(parentContent);
   }
+
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
     this.hideDiff();

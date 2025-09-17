@@ -1,0 +1,40 @@
+/* Token counter status bar styles */
+.token-status-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #2a2a2a;
+  border-top: 1px solid #444;
+  padding: 4px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #ccc;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 24px;
+  box-sizing: border-box;
+}
+
+.token-count {
+  color: #9cdcfe;
+  font-weight: 500;
+  user-select: none;
+}
+
+/* Responsive adjustments */
+@media (orientation: portrait) and (max-aspect-ratio: 4/5) {
+  .token-status-bar {
+    font-size: 16px;
+    padding: 8px 16px;
+    min-height: 32px;
+  }
+}
+
+/* Dark theme integration */
+.token-status-bar:hover .token-count {
+  color: #fff;
+  transition: color 0.2s ease;
+}

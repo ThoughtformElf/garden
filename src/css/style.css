@@ -6,3 +6,4 @@
 @import './modal.css';
 @import './drag-drop.css';
 @import './command-palette.css';
+@import './token-counter.css'; /* Add this line */
