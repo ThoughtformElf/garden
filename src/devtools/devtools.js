@@ -35,16 +35,13 @@ export function initializeDevTools() {
     useShadowDom: false,
   });
 
-  // --- FINAL, STATEFUL FIX ---
+  // --- Fix for Eruda elements panel inspection ---
   setTimeout(() => {
     const elementsPanel = el.querySelector('.eruda-elements');
     if (!elementsPanel) return;
-
     let wasVisible = false;
-
     const observer = new MutationObserver(() => {
       const isVisible = elementsPanel.style.display !== 'none';
-      
       if (isVisible && !wasVisible) {
         const selectBtn = document.querySelector('.eruda-control > .eruda-icon-select');
         if (selectBtn) {
@@ -52,14 +49,9 @@ export function initializeDevTools() {
           selectBtn.click();
         }
       }
-      
       wasVisible = isVisible;
     });
-
-    observer.observe(elementsPanel, {
-      attributes: true,
-      attributeFilter: ['style']
-    });
+    observer.observe(elementsPanel, { attributes: true, attributeFilter: ['style'] });
   }, 500);
   // --- End of FIX ---
 
@@ -99,47 +91,44 @@ export function initializeDevTools() {
         const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
         
         const modal = new Modal({ title: 'Select Gardens to Export' });
-        modal.show(createSelectionUI('Choose which gardens to include in the export:', gardens));
+        modal.updateContent(createSelectionUI('Choose which gardens to include in the export:', gardens));
         
         const contentEl = modal.content;
         contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
         contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
-
+        
         const exportHandler = async () => {
             const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
             modal.destroy();
             
             const progressModal = new Modal({ title: 'Exporting Gardens...' });
-            progressModal.show('<p>Preparing export. Please wait...</p>');
+            progressModal.updateContent('<p>Preparing export. Please wait...</p>');
             
             let cancelled = false;
             let fullLog = '';
 
-            // --- NEW: Add Cancel Button ---
             const cancelButton = progressModal.addFooterButton('Cancel', () => {
                 cancelled = true;
                 progressModal.destroy();
                 console.log('Export cancelled by user.');
             });
 
+            progressModal.show(); // Show progress modal immediately
+
             try {
                 await exportGardens(selectedGardens, (msg) => {
-                    // If cancelled, throw an error to stop the export loop.
                     if (cancelled) throw new Error('Export cancelled by user.');
-                    
                     console.log(msg);
                     fullLog += msg + '<br>';
                     progressModal.updateContent(`<div style="font-family: monospace; max-height: 300px; overflow-y: auto;">${fullLog}</div>`);
                 });
                 
-                // This code only runs if the export completes without being cancelled.
                 if (!cancelled) {
-                    progressModal.clearFooter(); // Remove the "Cancel" button on success.
+                    progressModal.clearFooter();
                     progressModal.updateContent('<p>Export complete! The download will begin shortly.</p>');
                     setTimeout(() => progressModal.destroy(), 3000);
                 }
             } catch (e) {
-                // Only show an error if it wasn't a user-initiated cancellation.
                 if (!cancelled) {
                     console.error('Export failed:', e.message);
                     progressModal.clearFooter();
@@ -148,8 +137,10 @@ export function initializeDevTools() {
                 }
             }
         };
+        
         modal.addFooterButton('Export Selected', exportHandler);
         modal.addFooterButton('Cancel', () => modal.destroy());
+        modal.show(); // Now show the selection modal
       });
       
       importBtn.addEventListener('click', () => fileInput.click());
@@ -159,7 +150,8 @@ export function initializeDevTools() {
         if (!file) return;
 
         const modal = new Modal({ title: 'Select Gardens to Import' });
-        modal.show('Scanning zip file...');
+        modal.updateContent('Scanning zip file...');
+        modal.show();
         
         try {
             const gardensInZip = await getGardensFromZip(file);
@@ -174,7 +166,7 @@ export function initializeDevTools() {
             const contentEl = modal.content;
             contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
             contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
-
+            
             const importHandler = async () => {
                 const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
                 modal.clearFooter();
@@ -192,6 +184,7 @@ export function initializeDevTools() {
                     modal.addFooterButton('Close', () => modal.destroy());
                 }
             };
+            
             modal.addFooterButton('Import Selected', importHandler);
             modal.addFooterButton('Cancel', () => modal.destroy());
         } catch (e) {
@@ -202,18 +195,18 @@ export function initializeDevTools() {
             fileInput.value = '';
         }
       });
-
+      
       clearDataBtn.addEventListener('click', () => {
         const gardensRaw = localStorage.getItem('thoughtform_gardens');
         const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
 
         const modal = new Modal({ title: 'Clear Garden Data' });
-        modal.show(createSelectionUI('Select gardens to permanently delete:', gardens, false));
-
+        modal.updateContent(createSelectionUI('Select gardens to permanently delete:', gardens, false));
+        
         const contentEl = modal.content;
         contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
         contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
-
+        
         const deleteHandler = async () => {
             const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
             modal.clearFooter();
@@ -232,14 +225,15 @@ export function initializeDevTools() {
                 closeBtn.classList.add('destructive');
             }
         };
+
         const deleteBtn = modal.addFooterButton('Delete Selected', deleteHandler);
         deleteBtn.classList.add('destructive');
         modal.addFooterButton('Cancel', () => modal.destroy());
+        modal.show(); // Show modal after content and listeners are ready
       });
     },
     show() { this._$el.show(); },
     hide() { this._$el.hide(); },
   });
-
   return dataTool;
 }
