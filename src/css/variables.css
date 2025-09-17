@@ -23,16 +23,16 @@
   --base-syntax-add-bg:       rgba(15, 88, 39, 0.4);
   --base-syntax-del-bg:       rgba(140, 33, 33, 0.4);
   --base-syntax-highlight-bg: var(--base-accent-emphasis);
-  --base-syntax-wikilink-bg:  var(--base-accent-action);
-  --base-syntax-wikilink-text:color-mix(in srgb, var(--base-accent-action), black 80%);
-  --base-syntax-link-bg:      var(--base-accent-highlight);
+  --base-syntax-wikilink-bg:  var(--base-accent-info);
+  --base-syntax-wikilink-text:color-mix(in srgb, var(--base-accent-info), black 80%);
+  --base-syntax-link-bg:      var(--base-accent-action);
   --base-syntax-link-text:    color-mix(in srgb, var(--base-accent-action), black 80%);
   --base-syntax-done-bg:      var(--base-accent-action);
   --base-syntax-done-text:    color-mix(in srgb, var(--base-accent-action), black 80%);
   --base-syntax-doing-bg:     var(--base-accent-info);
   --base-syntax-doing-text:   color-mix(in srgb, var(--base-accent-info), black 80%);
   --base-syntax-todo-text:    color-mix(in srgb, var(--base-accent-destructive), black 80%);
-  --base-syntax-quote-text:   var(--base-syntax-wikilink-bg);
+  --base-syntax-quote-text:   var(--base-syntax-link-bg);
   
   /* --- Overlays & Shadows --- */
   --base-overlay:             rgba(0, 0, 0, 0.7);

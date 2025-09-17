@@ -12,8 +12,8 @@
 .cm-emphasis { font-style: italic; }
 .cm-strikethrough { text-decoration: line-through; }
 .cm-link     {
-  background: var(--base-syntax-doing-bg);
-  color: var(--base-syntax-doing-text);
+  background: var(--base-syntax-link-bg);
+  color: var(--base-syntax-link-text);
   text-decoration: none;
 }
 .cm-heading  { font-weight: bold; color: var(--base-accent-info); }
@@ -71,5 +71,15 @@ main, .cm-editor {
   color: var(--color-syntax-link-text);
   border-radius: 3px;
   padding: 0 2px;
+  font-style: italic;
+}
+.cm-naked-link .cm-operator {
+  background: var(--color-syntax-link-bg);
+  color: var(--color-syntax-link-text);
+  text-decoration: none;
+}
+.cm-link.cm-operator {
+  font-style: italic;
+  text-decoration: none;
 }
 .cm-blockquote { color: var(--color-syntax-blockquote-text); }
