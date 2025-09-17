@@ -10,7 +10,7 @@
   --base-text-muted:          #3d996b; /* For secondary text */
   --base-text-primary:        #ddd; /* For primary text */
   --base-white:               #ffffff;
-  --base-black:               #111111;
+  --base-black:               #000;
 
   /* --- Functional Accents --- */
   --base-accent-emphasis:     #eb9b27; /* For highlighted text, status indicators */

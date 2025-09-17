@@ -67,7 +67,7 @@
   align-items: center;
   justify-content: center;
 }
-#resizer:hover { background-color: var(--color-background-hover); }
+#resizer:hover { background-color: var(--base-accent-destructive); }
 #resize-overlay {
   position: fixed;
   top: 0; left: 0;
