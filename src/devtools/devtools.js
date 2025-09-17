@@ -59,25 +59,28 @@ export function initializeDevTools() {
     name: 'Data',
     init($el) {
       this._$el = $el;
+      // @todo move this to stylesheet
       $el.html(`
-        <div style="padding: 10px; font-family: Arial, sans-serif; color: #ccc;">
+        <div style="padding: 10px; font-family: Arial, sans-serif; color: var(--color-text-primary);">
           <h2 style="margin-top:0;">Data Portability</h2>
           <button id="export-btn" class="eruda-button">Export...</button>
           <button id="import-btn" class="eruda-button">Import...</button>
           <input type="file" id="import-file-input" accept=".zip" style="display: none;">
-          
-          <hr style="border: none; border-top: 1px solid #444; margin: 25px 0;">
-          <h3 style="color: #F44747;">Danger Zone</h3>
-          <button id="clear-data-btn" class="eruda-button destructive">Clear Data...</button>
+
+          <hr style="border: none; border-top: 1px solid var(--color-border-secondary); margin: 25px 0;">
+          <h3 style="color: var(--base-accent-destructive);">Danger Zone</h3>
+          <p>
+            <button id="clear-data-btn" class="eruda-button destructive">Clear Data...</button>
+          </p>
         </div>
         <style>
           .eruda-button { 
-            padding: 8px 12px; background-color: #4EC9B0; color: #111; 
+            padding: 8px 12px; background-color: var(--base-accent-action); color: var(--base-black); 
             border: none; border-radius: 3px; cursor: pointer; font-weight: bold;
           }
-          .eruda-button:hover { background-color: #5FDCC4; }
-          .eruda-button.destructive { background-color: #F44747; color: #fff; }
-          .eruda-button.destructive:hover { background-color: #FF5A5A; }
+          .eruda-button:hover { background-color: color-mix(in srgb, var(--base-accent-action), white); }
+          .eruda-button.destructive { background-color: var(--base-accent-destructive); color: var(--base-white); }
+          .eruda-button.destructive:hover { background-color: var(--base-accent-destructive); }
         </style>
       `);
       

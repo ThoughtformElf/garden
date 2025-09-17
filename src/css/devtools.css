@@ -73,8 +73,10 @@ html #eruda-console .eruda-control .eruda-active {
   background: var(--base-accent-destructive) !important;
 }
 
+
+/* Console tab */
 html .eruda-container .luna-console {
-  background: var(--base-black);
+  background: var(--base-dark);
 }
 html #eruda-console .eruda-js-input,
 html #eruda-console .eruda-js-input textarea {
@@ -87,10 +89,16 @@ html #eruda-console .eruda-js-input .eruda-icon-arrow-right {
 html #eruda-console .eruda-js-input {
   border-top: 1px solid var(--color-border-secondary);
 }
+html .eruda-container .luna-console-log-item .luna-console-count {
+  background: var(--base-accent-info);
+  color: var(--base-dark);
+  font-weight: bold;
+}
 
+/* Elements tab */
 html #eruda-elements .eruda-elements,
 html #eruda-elements .eruda-detail {
-  background: var(--base-black);
+  background: var(--base-dark);
 }
 html #eruda-elements .eruda-control,
 html #eruda-elements .eruda-section h2,
@@ -121,7 +129,6 @@ html .eruda-container table {
   color: var(--base-white);
 }
 
-
 html .eruda-container .luna-dom-viewer .luna-dom-viewer-html-tag, html .eruda-container .luna-dom-viewer .luna-dom-viewer-tag-name,
 html .eruda-attribute-name-color {
   color: var(--base-accent-info);
@@ -146,4 +153,91 @@ html .eruda-container .luna-box-model {
 
 html #eruda-elements .eruda-section {
   color: var(--color-text-primary);
+}
+
+/* Network tab */
+html #eruda-network .eruda-control {
+  background: var(--base-dark);
+  border-bottom: none;
+}
+html #eruda-network .eruda-control .eruda-icon-record.eruda-recording {
+  color: var(--base-accent-destructive);
+  text-shadow: 0 0 4px var(--base-accent-destructive);
+}
+html .eruda-container .luna-data-grid th {
+  background: var(--base-interactive);
+}
+html .eruda-container .luna-data-grid td, html .eruda-container .luna-data-grid th {
+  border-color: var(--color-border-secondary);
+}
+html .luna-data-grid-data-container {
+  background: var(--base-dark);
+}
+
+/* Resources tab */
+html .eruda-dev-tools .eruda-tools {
+  background: var(--base-dark);
+}
+html #eruda-resources .eruda-section.eruda-cookie .eruda-title, html #eruda-resources .eruda-section.eruda-local-storage .eruda-title, #eruda-resources .eruda-section.eruda-session-storage .eruda-title,
+html #eruda-resources .eruda-title  {
+  background: var(--base-dark);
+  border-bottom: none;
+  color: var(--color-text-primary);
+}
+html .eruda-container .luna-data-grid .luna-data-grid-data-container tr:nth-child(even) {
+  background: var(--base-dark);
+  border-bottom: 1px solid var(--base-text-muted) !important;
+}
+html #eruda-resources .eruda-section,
+html #eruda-resources .eruda-image-list li,
+html .eruda-container .luna-data-grid,
+html #eruda-resources .eruda-section.eruda-cookie .eruda-title, html #eruda-resources .eruda-section.eruda-local-storage .eruda-title, html #eruda-resources .eruda-section.eruda-session-storage .eruda-title {
+  border-color: var(--color-border-secondary);
+}
+html #eruda-resources .eruda-link-list {
+  color: var(--color-text-primary);
+}
+html #eruda-resources .eruda-link-list li a {
+  color: var(--base-accent-info) !important;
+}
+html .eruda-container .luna-data-grid .luna-data-grid-data-container .luna-data-grid-node.luna-data-grid-selectable:hover, html .eruda-container .luna-data-grid .luna-data-grid-data-container .luna-data-grid-node.luna-data-grid-selected {
+  background: var(--base-accent-destructive);
+}
+
+/* buttons */
+html .eruda-button {
+  background: var(--base-accent-action);
+  color: var(--base-black);
+}
+html .eruda-button.destructive {
+  background: var(--base-accent-destructive);
+  color: var(--base-white);
+}
+
+/* Settings tab */
+html .eruda-container .luna-setting {
+  background: var(--base-dark);
+  color: var(--color-text-primary);
+}
+html .eruda-container .luna-setting-item-checkbox input:checked {
+  background: var(--base-accent-destructive);
+  border: none;
+}
+html .eruda-container .luna-setting-item-checkbox input,
+html .eruda-container .luna-setting-item-checkbox input:hover {
+  border-color: var(--base-accent-destructive);
+}
+html .eruda-container .luna-setting-item.luna-setting-selected, html .eruda-container .luna-setting-item:hover {
+  background: var(--base-interactive);
+  color: var(--base-white);
+}
+html .eruda-container .luna-setting-item-button button {
+  background: var(--base-accent-destructive);
+  color: var(--base-white);
+  border: none;
+}
+html .eruda-container .luna-setting-item-select .luna-setting-select select {
+  background: var(--base-dark);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-secondary);
 }
