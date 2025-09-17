@@ -1,9 +1,5 @@
 /* Token counter status bar styles */
 .token-status-bar {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
   background-color: #2a2a2a;
   border-top: 1px solid #444;
   padding: 4px 12px;
@@ -16,6 +12,7 @@
   align-items: center;
   min-height: 24px;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .token-count {

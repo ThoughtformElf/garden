@@ -56,7 +56,7 @@ export class Editor {
     const initialContent = await this.gitClient.readFile(this.filePath);
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) loadingIndicator.remove();
-    container.style.display = 'block';
+    container.style.display = 'flex';
 
     const updateListener = EditorView.updateListener.of(update => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {

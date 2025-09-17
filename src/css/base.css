@@ -2,6 +2,9 @@
   --sidebar-width: 250px;
   --base-font-size: 14px;
 }
+* {
+  box-sizing: border-box;
+}
 html, body {
   height: 100%;
   margin: 0;
@@ -24,12 +27,13 @@ html, body {
 
 main {
   flex-grow: 1;
-  height: 100%;
   overflow: hidden;
   display: flex;
   justify-content: center;
   align-items: center;
   background-color: #222;
+  flex-direction: column;
+  padding-bottom: 0.8rem; /* Space for token counter */
 }
 #loading-indicator {
   color: #ccc;
@@ -43,9 +47,9 @@ main {
 }
 
 /* --- THE ONLY RESPONSIVE RULE --- */
-@media (orientation: portrait) and (max-aspect-ratio: 4/5) {
+@media (orientation: portrait) and (max-aspect-ratio: 4/5) and (pointer: coarse) {
   :root {
-    /* Make all text larger in portrait mode */
+    /* Make all text larger in portrait mode on touch devices */
     --base-font-size: 28px;
   }
   
