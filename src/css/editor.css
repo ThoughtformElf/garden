@@ -98,3 +98,8 @@ body .cm-vimMode .cm-activeLine,
 html body .cm-activeLineGutter {
   background: color-mix(in srgb, var(--base-accent-emphasis), black 60%) !important;
 }
+
+
+.cm-hr {
+  border: 2px dashed var(--base-accent-emphasis);
+}
