@@ -1,193 +1,22 @@
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState, Compartment, Annotation, RangeSetBuilder } from '@codemirror/state';
-import { keymap, ViewPlugin, Decoration } from '@codemirror/view';
+import { EditorState, Compartment, Annotation } from '@codemirror/state';
+import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
-import { LanguageDescription, StreamLanguage } from '@codemirror/language';
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { javascript } from '@codemirror/lang-javascript';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { json } from '@codemirror/lang-json';
-import { xml } from '@codemirror/lang-xml';
-import { yaml } from '@codemirror/lang-yaml';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
 import debounce from 'lodash/debounce';
+
 import { Sidebar } from '../sidebar/sidebar.js';
 import { basicDark } from '../util/theme.js';
-import { diffCompartment, createDiffExtension } from './diff.js';
-import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
 
-// Define the shell language using the legacy stream parser
-const shellLanguage = StreamLanguage.define(shell);
+import { allHighlightPlugins } from './plugins/index.js';
+import { getLanguageExtension } from './languages.js';
+import { diffCompartment, createDiffExtension } from './diff.js';
+import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 
 // Create a unique annotation type to mark programmatic changes
 const programmaticChange = Annotation.define();
-
-// --- START: STABLE HASHTAG HIGHLIGHTING ---
-const hashtagDecoration = Decoration.mark({ class: 'cm-hashtag' });
-const hashtagPlugin = ViewPlugin.fromClass(
-  class {
-    decorations;
-    constructor(view) { this.decorations = this.findHashtags(view); }
-    update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = this.findHashtags(update.view);
-    }
-    findHashtags(view) {
-      const builder = new RangeSetBuilder();
-      const hashtagRegex = /#[\w-]+/g;
-      for (const { from, to } of view.visibleRanges) {
-        const text = view.state.doc.sliceString(from, to);
-        let match;
-        while ((match = hashtagRegex.exec(text))) {
-          const matchStart = from + match.index;
-          const end = matchStart + match[0].length;
-          const line = view.state.doc.lineAt(matchStart);
-          if (matchStart > line.from) {
-            const charBefore = view.state.doc.sliceString(matchStart - 1, matchStart);
-            if (/\s/.test(charBefore) === false) continue;
-          }
-          const urlRegex = /https?:\/\/[^\s]+/g;
-          let urlMatch, isInsideUrl = false;
-          while ((urlMatch = urlRegex.exec(line.text))) {
-            const urlStart = line.from + urlMatch.index;
-            const urlEnd = urlStart + urlMatch[0].length;
-            if (matchStart >= urlStart && end <= urlEnd) {
-              isInsideUrl = true;
-              break;
-            }
-          }
-          if (isInsideUrl) continue;
-          builder.add(matchStart, end, hashtagDecoration);
-        }
-      }
-      return builder.finish();
-    }
-  }, { decorations: v => v.decorations }
-);
-// --- END: STABLE HASHTAG HIGHLIGHTING ---
-
-// --- START: STABLE WIKILINK HIGHLIGHTING ---
-const wikilinkDecoration = Decoration.mark({ class: 'cm-wikilink' });
-const wikilinkPlugin = ViewPlugin.fromClass(
-  class {
-    decorations;
-    constructor(view) { this.decorations = this.findWikilinks(view); }
-    update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = this.findWikilinks(update.view);
-    }
-    findWikilinks(view) {
-      const builder = new RangeSetBuilder();
-      const wikilinkRegex = /\[\[([^\[\]]+?)\]\]/g;
-      for (const { from, to } of view.visibleRanges) {
-        const text = view.state.doc.sliceString(from, to);
-        let match;
-        while ((match = wikilinkRegex.exec(text))) {
-          const start = from + match.index;
-          const end = start + match[0].length;
-          builder.add(start, end, wikilinkDecoration);
-        }
-      }
-      return builder.finish();
-    }
-  }, { decorations: v => v.decorations }
-);
-// --- END: STABLE WIKILINK HIGHLIGHTING ---
-
-// --- START: STABLE CHECKBOX HIGHLIGHTING ---
-const todoDecoration = Decoration.mark({ class: 'cm-checkbox-todo' });
-const doneDecoration = Decoration.mark({ class: 'cm-checkbox-done' });
-const doingDecoration = Decoration.mark({ class: 'cm-checkbox-doing' });
-
-const checkboxPlugin = ViewPlugin.fromClass(
-  class {
-    decorations;
-    constructor(view) { this.decorations = this.findCheckboxes(view); }
-    update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = this.findCheckboxes(update.view);
-    }
-    findCheckboxes(view) {
-      const builder = new RangeSetBuilder();
-      const checkboxRegex = /^\s*(\[([ |x|-])\])/gm;
-      for (const { from, to } of view.visibleRanges) {
-        const text = view.state.doc.sliceString(from, to);
-        let match;
-        while ((match = checkboxRegex.exec(text))) {
-          const content = match[2];
-          const start = from + match.index + match[0].indexOf('[');
-          const end = start + 3;
-          if (content === ' ') builder.add(start, end, todoDecoration);
-          else if (content === 'x') builder.add(start, end, doneDecoration);
-          else if (content === '-') builder.add(start, end, doingDecoration);
-        }
-      }
-      return builder.finish();
-    }
-  }, { decorations: v => v.decorations }
-);
-// --- END: STABLE CHECKBOX HIGHLIGHTING ---
-
-// --- START: STABLE TIMESTAMP HIGHLIGHTING ---
-const timestampDecoration = Decoration.mark({ class: 'cm-timestamp' });
-const timestampPlugin = ViewPlugin.fromClass(
-  class {
-    decorations;
-    constructor(view) { this.decorations = this.findTimestamps(view); }
-    update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = this.findTimestamps(update.view);
-    }
-    findTimestamps(view) {
-      const builder = new RangeSetBuilder();
-      const timestampRegex = /^\s*(?:>\s*)*(\d{4,})\s/gm;
-      for (const { from, to } of view.visibleRanges) {
-        const text = view.state.doc.sliceString(from, to);
-        let match;
-        while ((match = timestampRegex.exec(text))) {
-          const fullMatch = match[0];
-          const timestamp = match[1];
-          const start = from + match.index + fullMatch.indexOf(timestamp);
-          const end = start + timestamp.length;
-          builder.add(start, end, timestampDecoration);
-        }
-      }
-      return builder.finish();
-    }
-  }, { decorations: v => v.decorations }
-);
-// --- END: STABLE TIMESTAMP HIGHLIGHTING ---
-
-// --- START: STABLE NAKED LINK HIGHLIGHTING ---
-const linkDecoration = Decoration.mark({ class: 'cm-naked-link' });
-const linkPlugin = ViewPlugin.fromClass(
-  class {
-    decorations;
-    constructor(view) { this.decorations = this.findLinks(view); }
-    update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = this.findLinks(update.view);
-    }
-    findLinks(view) {
-      const builder = new RangeSetBuilder();
-      const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/g;
-      for (const { from, to } of view.visibleRanges) {
-        const text = view.state.doc.sliceString(from, to);
-        let match;
-        while ((match = linkRegex.exec(text))) {
-          const line = view.state.doc.lineAt(from + match.index);
-          if (/\[.*\]\(.*\)/.test(line.text)) {
-            continue;
-          }
-          const start = from + match.index;
-          const end = start + match[0].length;
-          builder.add(start, end, linkDecoration);
-        }
-      }
-      return builder.finish();
-    }
-  }, { decorations: v => v.decorations }
-);
-// --- END: STABLE NAKED LINK HIGHLIGHTING ---
 
 export class Editor {
   static editors = [];
@@ -195,6 +24,7 @@ export class Editor {
   constructor({ url, target = 'body > main', editorConfig = {}, gitClient } = {}) {
     if (!gitClient) throw new Error('Editor requires a gitClient instance.');
     if (!window.location.hash) window.location.hash = '#/README';
+
     this.targetSelector = target;
     this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
@@ -203,9 +33,10 @@ export class Editor {
     this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
+
     this.languageCompartment = new Compartment();
-    this.tokenCounterCompartment = new Compartment(); // <-- ADD THIS
-    this.markdownLanguage = this.createMarkdownLanguage();
+    this.tokenCounterCompartment = new Compartment();
+
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
     this.init();
   }
@@ -216,15 +47,17 @@ export class Editor {
       console.error(`Target container not found: ${this.targetSelector}`);
       return;
     }
+
     await this.gitClient.initRepo();
     this.sidebar = new Sidebar({ target: '#sidebar', gitClient: this.gitClient, editor: this });
     await this.sidebar.init();
     initializeDragAndDrop(this.gitClient, this.sidebar);
+
     const initialContent = await this.gitClient.readFile(this.filePath);
     const loadingIndicator = document.getElementById('loading-indicator');
     if (loadingIndicator) loadingIndicator.remove();
     container.style.display = 'block';
-    
+
     const updateListener = EditorView.updateListener.of(update => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
@@ -232,7 +65,7 @@ export class Editor {
     });
 
     Vim.map('jj', '<Esc>', 'insert');
-    
+
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: [
@@ -241,21 +74,17 @@ export class Editor {
         keymap.of([indentWithTab]),
         EditorView.lineWrapping,
         lineNumbersRelative,
-        this.languageCompartment.of(this.getLanguageExtension(this.filePath)),
-        updateListener,
         basicDark,
-        hashtagPlugin,
-        wikilinkPlugin,
-        checkboxPlugin,
-        timestampPlugin,
-        linkPlugin,
+        this.languageCompartment.of(getLanguageExtension(this.filePath)),
+        updateListener,
+        ...allHighlightPlugins, // <-- All highlighters added here
         diffCompartment.of([]),
-        this.tokenCounterCompartment.of(createTokenCounterExtension()), // <-- ADD THIS
-        ...(this.editorConfig.extensions || [])
+        this.tokenCounterCompartment.of(createTokenCounterExtension()),
+        ...(this.editorConfig.extensions || []),
       ],
       parent: container,
     });
-    
+
     Editor.editors.push(this);
     this.isReady = true;
     this.listenForNavigation();
@@ -264,7 +93,7 @@ export class Editor {
 
   async showDiff(originalContent) {
     if (originalContent === null) {
-      console.error("Cannot show diff, original content is null.");
+      console.error('Cannot show diff, original content is null.');
       this.hideDiff();
       return;
     }
@@ -276,35 +105,6 @@ export class Editor {
     this.editorView.dispatch({ effects: diffCompartment.reconfigure([]) });
   }
 
-  createMarkdownLanguage() {
-    return markdown({
-      base: markdownLanguage,
-      codeLanguages: [
-        LanguageDescription.of({ name: 'javascript', load: () => Promise.resolve(javascript()) }),
-        LanguageDescription.of({ name: 'html', load: () => Promise.resolve(html()) }),
-        LanguageDescription.of({ name: 'css', load: () => Promise.resolve(css()) })
-      ]
-    });
-  }
-
-  getLanguageExtension(filepath) {
-    const filename = filepath.split('/').pop();
-    const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
-    switch (filename) {
-      case '.gitignore': case '.npmrc': case '.editorconfig': case 'Dockerfile': return shellLanguage;
-    }
-    switch (extension) {
-      case 'js': return javascript();
-      case 'css': return css();
-      case 'html': return html();
-      case 'json': return json();
-      case 'xml': return xml();
-      case 'yaml': case 'yml': return yaml();
-      case 'sh': case 'bash': case 'zsh': return shellLanguage;
-      default: return this.markdownLanguage;
-    }
-  }
-
   listenForNavigation() {
     window.addEventListener('hashchange', async () => {
       this.hideDiff();
@@ -312,11 +112,11 @@ export class Editor {
       if (newFilePath !== this.filePath) await this.loadFile(newFilePath);
     });
   }
-  
+
   async previewHistoricalFile(filepath, oid, parentOid) {
     const [currentContent, parentContent] = await Promise.all([
       this.gitClient.readBlobFromCommit(oid, filepath),
-      this.gitClient.readBlobFromCommit(parentOid, filepath)
+      this.gitClient.readBlobFromCommit(parentOid, filepath),
     ]);
     if (currentContent === null || parentContent === null) {
       alert('Could not load historical diff for this file.');
@@ -324,7 +124,7 @@ export class Editor {
     }
     this.editorView.dispatch({
       changes: { from: 0, to: this.editorView.state.doc.length, insert: currentContent },
-      annotations: programmaticChange.of(true)
+      annotations: programmaticChange.of(true),
     });
     this.showDiff(parentContent);
   }
@@ -334,12 +134,12 @@ export class Editor {
     this.hideDiff();
     const newContent = await this.gitClient.readFile(filepath);
     this.filePath = filepath;
-    const newLanguage = this.getLanguageExtension(filepath);
+    const newLanguage = getLanguageExtension(filepath);
     this.editorView.dispatch({ effects: this.languageCompartment.reconfigure(newLanguage) });
     const currentDoc = this.editorView.state.doc;
     this.editorView.dispatch({
       changes: { from: 0, to: currentDoc.length, insert: newContent },
-      annotations: programmaticChange.of(true)
+      annotations: programmaticChange.of(true),
     });
     if (this.sidebar) await this.sidebar.refresh();
     this.editorView.focus();
@@ -352,7 +152,7 @@ export class Editor {
     const currentDoc = this.editorView.state.doc;
     this.editorView.dispatch({
       changes: { from: 0, to: currentDoc.length, insert: newContent },
-      annotations: programmaticChange.of(true)
+      annotations: programmaticChange.of(true),
     });
     this.hideDiff();
   }
@@ -360,7 +160,7 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     if (this.filePath !== this.getFilePath(window.location.hash)) {
-      console.log("In preview mode, not saving changes.");
+      console.log('In preview mode, not saving changes.');
       return;
     }
     console.log(`Saving ${this.filePath}...`);
