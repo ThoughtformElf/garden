@@ -1,5 +1,4 @@
-// src/drag-drop.js
-
+// src/util/drag-drop.js
 import JSZip from 'jszip';
 import { Modal } from './modal.js';
 
@@ -54,7 +53,6 @@ export function initializeDragAndDrop(gitClient, sidebar) {
   const processEntries = async (entries) => {
     const filesToProcess = [];
     const zipFiles = [];
-
     const traverseFileTree = async (entry, path) => {
       if (entry.isFile) {
         const file = await new Promise((resolve) => entry.file(resolve));
@@ -67,8 +65,8 @@ export function initializeDragAndDrop(gitClient, sidebar) {
         }
       } else if (entry.isDirectory) {
         const dirReader = entry.createReader();
-        const entries = await new Promise((resolve) => dirReader.readEntries(resolve));
-        for (const subEntry of entries) {
+        const subEntries = await new Promise((resolve) => dirReader.readEntries(resolve));
+        for (const subEntry of subEntries) {
           await traverseFileTree(subEntry, `${path}/${entry.name}`);
         }
       }
@@ -101,7 +99,7 @@ export function initializeDragAndDrop(gitClient, sidebar) {
   const handleZipFile = (file) => {
     return new Promise((resolve) => {
       const modal = new Modal({ title: `Import Zip File: ${file.name}` });
-      modal.show(
+      modal.updateContent(
         `<p>How would you like to import this .zip file?</p>`
       );
       
@@ -117,7 +115,6 @@ export function initializeDragAndDrop(gitClient, sidebar) {
         modal.destroy();
         resolve();
       });
-
       modal.addFooterButton('Import as Single .zip File', async () => {
         modal.updateContent('<p>Importing file...</p>');
         modal.clearFooter();
@@ -130,11 +127,12 @@ export function initializeDragAndDrop(gitClient, sidebar) {
         modal.destroy();
         resolve();
       });
-
       modal.addFooterButton('Cancel', () => {
         modal.destroy();
         resolve();
       });
+
+      modal.show();
     });
   };
 
@@ -159,12 +157,10 @@ export function initializeDragAndDrop(gitClient, sidebar) {
   window.addEventListener('drop', async (e) => {
     e.preventDefault();
     hideOverlay(); // Immediately hide the drop zone overlay.
-
     const items = e.dataTransfer.items;
     if (!items || items.length === 0) {
       return;
     }
-
     const entries = Array.from(items)
       .map(item => item.webkitGetAsEntry())
       .filter(Boolean);
@@ -172,15 +168,12 @@ export function initializeDragAndDrop(gitClient, sidebar) {
     if (entries.length > 0) {
       console.log(`[DragDrop] Processing ${entries.length} dropped item(s).`);
       
-      // We no longer show the "Importing..." overlay here.
-      // The logic is now inside processEntries.
-
       try {
         await processEntries(entries);
         console.log('[DragDrop] All items processed.');
       } catch (err) {
         console.error('[DragDrop] An error occurred during import:', err);
-        alert('An error occurred while importing. Please check the console.');
+        await sidebar.showAlert({ title: 'Import Error', message: 'An error occurred while importing. Please check the console.' });
       } finally {
         // Refresh sidebar and hide any remaining overlay
         await sidebar.refresh();

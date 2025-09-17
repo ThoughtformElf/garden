@@ -1,3 +1,4 @@
+// src/editor/editor.js
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
@@ -119,7 +120,10 @@ export class Editor {
       this.gitClient.readBlobFromCommit(parentOid, filepath),
     ]);
     if (currentContent === null || parentContent === null) {
-      alert('Could not load historical diff for this file.');
+      await this.sidebar.showAlert({
+          title: 'Error',
+          message: 'Could not load historical diff for this file.'
+      });
       return;
     }
     this.editorView.dispatch({

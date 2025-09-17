@@ -1,10 +1,11 @@
+// src/sidebar/files.js
+import { Modal } from '../util/modal.js';
+
 export const fileActions = {
-  // FIX: This function now correctly receives the full status matrix as an argument.
   async renderFiles(statusMatrix) {
     try {
       const files = await this.listFiles(this.gitClient, '/');
       const statuses = new Map();
-      // Create a simple map of filepath -> status for easy lookup
       for (const [filepath, head, workdir] of statusMatrix) {
           if (head !== workdir) {
               statuses.set(`/${filepath}`, 'modified');
@@ -15,7 +16,7 @@ export const fileActions = {
       
       const fileListHTML = files.sort().map(file => {
         const href = `#${file}`;
-        const status = statuses.get(file) || 'unmodified'; // This will now work.
+        const status = statuses.get(file) || 'unmodified';
         const displayText = file.startsWith('/') ? file.substring(1) : file;
         
         const classes = [`status-${status}`];
@@ -33,40 +34,43 @@ export const fileActions = {
   },
 
   async handleNewFile() {
-    const newName = prompt('Enter new file name:');
+    const newName = await Modal.prompt({
+      title: 'New File',
+      label: 'Enter new file name:',
+    });
     if (!newName) return;
     const newPath = `/${newName}`;
     try {
       await this.gitClient.pfs.stat(newPath);
-      alert(`File "${newName}" already exists.`);
+      await this.showAlert({ title: 'File Exists', message: `File "${newName}" already exists.` });
     } catch (e) {
       if (e.code === 'ENOENT') {
         await this.gitClient.writeFile(newPath, '');
         window.location.hash = `#${newPath}`;
       } else {
         console.error('Error checking for file:', e);
-        alert('An error occurred while creating the file.');
+        await this.showAlert({ title: 'Error', message: 'An error occurred while creating the file.' });
       }
     }
   },
 
   async handleRename(oldPath) {
-    const oldName = oldPath.substring(oldPath.lastIndexOf('/') + 1);
-    const newName = prompt('Enter new file name:', oldPath.substring(1)); // Suggest the full path
+    const newName = await Modal.prompt({
+        title: 'Rename File',
+        label: `Enter new name for ${oldPath.substring(1)}:`,
+        defaultValue: oldPath.substring(1)
+    });
     if (!newName || newName === oldPath.substring(1)) return;
 
     const newPath = `/${newName}`;
     
     try {
-      // Ensure the destination directory exists before renaming
       const dirname = newPath.substring(0, newPath.lastIndexOf('/'));
       if (dirname) {
         await this.ensureDir(dirname);
       }
-
       await this.gitClient.pfs.rename(oldPath, newPath);
       
-      // If we were viewing the renamed file, update the URL hash
       if (decodeURIComponent(window.location.hash) === `#${oldPath}`) {
         window.location.hash = `#${newPath}`;
       } else {
@@ -74,7 +78,7 @@ export const fileActions = {
       }
     } catch (e) {
       console.error(`Error renaming file:`, e);
-      alert('Failed to rename file. Check console for details.');
+      await this.showAlert({ title: 'Error', message: 'Failed to rename file. Check console for details.' });
     }
   },
   
@@ -91,7 +95,12 @@ export const fileActions = {
     } else {
         defaultName = `${originalFilename} (copy)`;
     }
-    const newFilename = prompt('Enter name for duplicated file:', defaultName);
+    
+    const newFilename = await Modal.prompt({
+        title: 'Duplicate File',
+        label: 'Enter name for duplicated file:',
+        defaultValue: defaultName
+    });
     if (!newFilename) return;
     const newPath = `${directory}/${newFilename}`;
     try {
@@ -100,12 +109,18 @@ export const fileActions = {
       await this.refresh();
     } catch (e) {
       console.error('Error duplicating file:', e);
-      alert('Failed to duplicate file.');
+      await this.showAlert({ title: 'Error', message: 'Failed to duplicate file.' });
     }
   },
 
   async handleDelete(filepath) {
-    if (confirm(`Are you sure you want to delete "${filepath}"?`)) {
+    const confirmed = await this.showConfirm({
+      title: 'Delete File',
+      message: `Are you sure you want to permanently delete "${filepath}"? This cannot be undone.`,
+      okText: 'Delete',
+      destructive: true
+    });
+    if (confirmed) {
       try {
         const wasViewingDeletedFile = decodeURIComponent(window.location.hash) === `#${filepath}`;
         await this.gitClient.pfs.unlink(filepath);
@@ -117,7 +132,7 @@ export const fileActions = {
         }
       } catch (e) {
         console.error(`Error deleting file:`, e);
-        alert('Failed to delete file.');
+        await this.showAlert({ title: 'Error', message: 'Failed to delete file.' });
       }
     }
   }

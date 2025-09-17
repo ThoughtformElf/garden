@@ -1,4 +1,7 @@
-main, .cm-editor { height: 100%; }
+main, .cm-editor {
+  height: 100%;
+  width: 100%;
+}
 .cm-editor { background-color: #222; }
 .cm-diff-inserted {
   background-color: rgba(15, 88, 39, 0.4);

@@ -1,7 +1,9 @@
+// src/sidebar/sidebar.js
 import { ContextMenu } from '../util/context-menu.js';
 import { fileActions } from './files.js';
 import { gardenActions } from './gardens.js';
 import { gitActions } from './git.js';
+import { Modal } from '../util/modal.js';
 
 export class Sidebar {
   constructor({ target, gitClient, editor }) {
@@ -43,10 +45,28 @@ export class Sidebar {
     console.log('Sidebar initialized.');
   }
 
-  /**
-   * Ensures a directory path exists by creating each segment.
-   * @param {string} path - The full directory path to ensure.
-   */
+  async showAlert({ title = 'Notice', message }) {
+    return new Promise(resolve => {
+        const modal = new Modal({ title });
+        modal.updateContent(`<p>${message}</p>`);
+        modal.addFooterButton('OK', () => {
+            modal.destroy();
+            resolve();
+        });
+        modal.show();
+    });
+  }
+  
+  async showConfirm({ title, message, okText = 'OK', destructive = false }) {
+    return Modal.confirm({
+      title,
+      message,
+      okText,
+      destructive,
+      cancelText: 'Cancel'
+    });
+  }
+
   async ensureDir(path) {
     const parts = path.split('/').filter(p => p);
     let currentPath = '';
@@ -59,7 +79,6 @@ export class Sidebar {
           try {
             await this.gitClient.pfs.mkdir(currentPath);
           } catch (mkdirError) {
-            // Ignore EEXIST in case of a race condition
             if (mkdirError.code !== 'EEXIST') {
               throw mkdirError;
             }
@@ -72,7 +91,6 @@ export class Sidebar {
   }
 
   setupContextMenus() {
-    // Shared command palette menu item
     const commandPaletteItem = [
       { type: 'separator' },
       { label: 'Command Palette', action: () => window.thoughtform.commandPalette.open() }
@@ -125,7 +143,6 @@ export class Sidebar {
         this.activeTab = newTab;
         sessionStorage.setItem('sidebarActiveTab', this.activeTab);
 
-        // If we are leaving the Git tab, restore the editor to the current file.
         if (oldTab === 'Git' && newTab !== 'Git') {
             const currentFile = this.editor.getFilePath(window.location.hash);
             this.editor.loadFile(currentFile);
@@ -141,9 +158,8 @@ export class Sidebar {
       button.classList.toggle('active', button.dataset.tab === this.activeTab);
     });
     
-    this.contentContainer.classList.toggle('files-view', this.activeTab === 'Files');
-    this.contentContainer.classList.toggle('gardens-view', this.activeTab === 'Gardens');
-    this.contentContainer.classList.toggle('git-view', this.activeTab === 'Git');
+    this.contentContainer.className = 'sidebar-content';
+    this.contentContainer.classList.add(`${this.activeTab.toLowerCase()}-view`);
 
     const statuses = await this.gitClient.getStatuses();
 
@@ -168,7 +184,6 @@ export class Sidebar {
         if (item === '.git') continue;
         const path = `${dir === '/' ? '' : dir}/${item}`;
         try {
-          // --- FIX: Corrected the typo from pfs.pfs.stat to pfs.stat ---
           const stat = await pfs.stat(path);
           if (stat.isDirectory()) {
             fileList = fileList.concat(await this.listFiles(gitClient, path));

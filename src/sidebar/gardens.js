@@ -1,4 +1,6 @@
+// src/sidebar/gardens.js
 import { Git } from '../util/git-integration.js';
+import { Modal } from '../util/modal.js';
 
 export const gardenActions = {
   async renderGardens() {
@@ -6,7 +8,7 @@ export const gardenActions = {
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
       const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
       const dirtyGardensRaw = localStorage.getItem('dirty_gardens');
-      const dirtyGardens = dirtyGardensRaw ? JSON.parse(dirtyGardensRaw) : new Set();
+      const dirtyGardens = dirtyGardensRaw ? new Set(JSON.parse(dirtyGardensRaw || '[]')) : new Set();
       
       if (gardens.length === 0) {
         this.contentContainer.innerHTML = `<p class="sidebar-info">No gardens found. Create one!</p>`;
@@ -16,10 +18,7 @@ export const gardenActions = {
       let gardenListHTML = '';
       for (const name of gardens.sort()) {
         const displayText = decodeURIComponent(name);
-        const isDirty = dirtyGardens.includes(displayText);
-
-        // FIX: Use a root-relative path. This is simpler and more robust.
-        // We also encode the garden name to handle special characters like spaces.
+        const isDirty = dirtyGardens.has(displayText);
         const href = `/${encodeURIComponent(name)}`;
         const isActive = this.gitClient.gardenName === displayText;
         
@@ -32,10 +31,8 @@ export const gardenActions = {
 
       this.contentContainer.innerHTML = `<ul>${gardenListHTML}</ul>`;
       
-      // Add a click listener to handle the tab switch
       this.contentContainer.querySelectorAll('[data-garden-name]').forEach(link => {
           link.addEventListener('click', (e) => {
-              // Only act if we're switching to a new garden
               if (this.gitClient.gardenName !== e.target.dataset.gardenName) {
                   sessionStorage.setItem('sidebarActiveTab', 'Files');
               }
@@ -48,19 +45,21 @@ export const gardenActions = {
     }
   },
 
-  handleNewGarden() {
-    const newName = prompt('Enter new garden name:');
+  async handleNewGarden() {
+    const newName = await Modal.prompt({
+        title: 'New Garden',
+        label: 'Enter new garden name:'
+    });
     if (!newName || !newName.trim()) return;
+
     const gardensRaw = localStorage.getItem('thoughtform_gardens');
     const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
     if (gardens.includes(newName)) {
-      alert(`Garden "${newName}" already exists.`);
+      await this.showAlert({ title: 'Garden Exists', message: `Garden "${newName}" already exists.` });
       return;
     }
     
     sessionStorage.setItem('sidebarActiveTab', 'Files');
-    
-    // FIX: Navigate using a root-relative path to avoid incorrect redirects.
     window.location.pathname = `/${encodeURIComponent(newName)}`;
   },
 
@@ -69,7 +68,11 @@ export const gardenActions = {
     
     const decodedSourceName = decodeURIComponent(sourceName);
     const defaultName = `${decodedSourceName} (copy)`;
-    const newName = prompt('Enter name for new garden:', defaultName);
+    const newName = await Modal.prompt({
+        title: 'Duplicate Garden',
+        label: 'Enter name for new garden:',
+        defaultValue: defaultName
+    });
 
     if (!newName || !newName.trim() || newName === sourceName) return;
 
@@ -93,17 +96,15 @@ export const gardenActions = {
         }
         
         sessionStorage.setItem('sidebarActiveTab', 'Files');
-        
         this.contentContainer.innerHTML = `<p class="sidebar-info">Duplication complete. Redirecting...</p>`;
         
-        // FIX: Use location.replace with a root-relative path.
         setTimeout(() => {
           window.location.replace(`/${encodeURIComponent(newName)}`);
         }, 500);
 
       } catch(e) {
         console.error('Error duplicating garden:', e);
-        alert('Failed to duplicate garden. Check console for details.');
+        await this.showAlert({ title: 'Error', message: 'Failed to duplicate garden. Check console for details.' });
         this.contentContainer.innerHTML = originalContent;
       }
     }, 100);
@@ -112,10 +113,18 @@ export const gardenActions = {
   async handleDeleteGarden(name) {
     if (!name) return;
     if (name === 'home') {
-      alert('The default "home" garden cannot be deleted.');
+      await this.showAlert({ title: 'Action Not Allowed', message: 'The default "home" garden cannot be deleted.' });
       return;
     }
-    if (!confirm(`ARE YOU SURE you want to permanently delete the garden "${name}"?\nThis cannot be undone.`)) return;
+    
+    const confirmed = await this.showConfirm({
+        title: 'Delete Garden',
+        message: `ARE YOU SURE you want to permanently delete the garden "${name}"? This cannot be undone.`,
+        okText: 'Delete',
+        destructive: true
+    });
+
+    if (!confirmed) return;
 
     try {
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
@@ -129,14 +138,16 @@ export const gardenActions = {
         deleteRequest.onsuccess = () => resolve();
         deleteRequest.onerror = (event) => reject(event.target.error);
         deleteRequest.onblocked = () => {
-            alert("Could not delete the database because it's still in use. Please refresh the page and try again.");
+            this.showAlert({
+                title: 'Deletion Blocked',
+                message: "Could not delete the database because it's still in use. Please refresh the page and try again."
+            });
             reject(new Error('Deletion blocked'));
         };
       });
 
       if (this.gitClient.gardenName === name) {
         sessionStorage.setItem('sidebarActiveTab', 'Files');
-        // FIX: Redirect to the home garden using a root-relative path.
         window.location.pathname = '/home';
       } else {
         await this.refresh();
@@ -144,7 +155,9 @@ export const gardenActions = {
 
     } catch(e) {
       console.error('Error deleting garden:', e);
-      alert('Failed to delete garden.');
+      if (e.message !== 'Deletion blocked') {
+        await this.showAlert({ title: 'Error', message: 'Failed to delete garden.' });
+      }
     }
   }
 };

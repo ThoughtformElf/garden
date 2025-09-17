@@ -1,3 +1,4 @@
+// src/sidebar/git.js
 export const gitActions = {
   async renderGitView() {
     try {
@@ -5,10 +6,8 @@ export const gitActions = {
         this.gitClient.getStatuses(),
         this.gitClient.log()
       ]);
-
       const stagedFiles = [];
       const unstagedFiles = [];
-
       for (const [filepath, head, workdir, stage] of statusMatrix) {
         const path = `/${filepath}`;
         if (head !== workdir || head !== stage) {
@@ -19,20 +18,16 @@ export const gitActions = {
           }
         }
       }
-
       const commitAreaHTML = `
         <div class="git-commit-area">
           <textarea id="git-commit-message" placeholder="Commit message..." rows="3"></textarea>
           <button id="git-commit-button" disabled>Commit</button>
         </div>
       `;
-
       const unstagedFilesHTML = this.renderFileSection('Changes', unstagedFiles, false);
       const stagedFilesHTML = this.renderFileSection('Staged Changes', stagedFiles, true);
       const historyHTML = this.renderHistorySection(commits);
-
       const oldMessage = this.contentContainer.querySelector('#git-commit-message')?.value || '';
-
       this.contentContainer.innerHTML = `
         <div class="git-view-container">
           ${commitAreaHTML}
@@ -46,7 +41,6 @@ export const gitActions = {
       if (newMessageInput) {
           newMessageInput.value = oldMessage;
       }
-
       this.addGitViewListeners();
       this.updateCommitButtonState();
     } catch (e) {
@@ -54,7 +48,6 @@ export const gitActions = {
       this.contentContainer.innerHTML = `<p class="sidebar-error">Could not load Git status.</p>`;
     }
   },
-
   renderFileSection(title, files, isStaged) {
     const actionButton = isStaged
       ? `<button class="git-action-button unstage" title="Unstage Changes">-</button>`
@@ -66,7 +59,6 @@ export const gitActions = {
         const displayText = file.filepath.startsWith('/') ? file.filepath.substring(1) : file.filepath;
         const isActive = this.editor.filePath === file.filepath;
         const activeClass = isActive ? 'active' : '';
-
         return `
           <li class="git-file-item ${activeClass}" data-filepath="${file.filepath}">
             <span class="git-file-path">${displayText}</span>
@@ -82,7 +74,6 @@ export const gitActions = {
     }
     
     const sectionClass = isStaged ? 'git-staged-section' : '';
-
     return `
       <div class="git-file-section ${sectionClass}">
         <h3 class="git-section-header">${title} (${files.length})</h3>
@@ -92,7 +83,6 @@ export const gitActions = {
       </div>
     `;
   },
-  
   renderHistorySection(commits) {
     let historyListHTML = '';
     if (commits.length > 0) {
@@ -102,7 +92,6 @@ export const gitActions = {
             const author = commit.commit.author.name;
             const date = new Date(commit.commit.author.timestamp * 1000).toLocaleString();
             const parentOid = commit.commit.parent[0] || '';
-
             return `
               <li class="git-history-item" data-oid="${commit.oid}" data-parent-oid="${parentOid}" data-author="${author}" data-date="${date}">
                 <div class="git-history-header">
@@ -116,7 +105,6 @@ export const gitActions = {
     } else {
         historyListHTML = '<li><span class="no-changes">No commit history.</span></li>';
     }
-
     return `
         <div class="git-history-section">
             <h3 class="git-section-header">History</h3>
@@ -126,18 +114,15 @@ export const gitActions = {
         </div>
     `;
   },
-  
   updateCommitButtonState() {
       const commitMessage = this.contentContainer.querySelector('#git-commit-message');
       const commitButton = this.contentContainer.querySelector('#git-commit-button');
       if (!commitMessage || !commitButton) return;
-
       const hasStagedFiles = this.contentContainer.querySelector('.git-staged-section .git-file-item') !== null;
       const hasMessage = commitMessage.value.trim().length > 0;
       
       commitButton.disabled = !(hasStagedFiles && hasMessage);
   },
-
   addGitViewListeners() {
     const commitMessage = this.contentContainer.querySelector('#git-commit-message');
     if (commitMessage && !commitMessage.dataset.listenerAttached) {
@@ -152,10 +137,8 @@ export const gitActions = {
             const target = e.target;
             const fileItem = target.closest('.git-file-item');
             const historyItem = target.closest('.git-history-item');
-
             if (fileItem) {
               const filepath = fileItem.dataset.filepath;
-
               if (target.matches('.git-file-path')) {
                   if (this.editor.filePath !== filepath) {
                       await this.editor.loadFile(filepath);
@@ -164,7 +147,13 @@ export const gitActions = {
               } else if (target.matches('.git-action-button')) {
                   e.stopPropagation();
                   if (target.classList.contains('discard')) {
-                      if (confirm(`Are you sure you want to discard all changes to "${filepath}"?\nThis cannot be undone.`)) {
+                      const confirmed = await this.showConfirm({
+                          title: 'Discard Changes',
+                          message: `Are you sure you want to discard all changes to "${filepath}"? This cannot be undone.`,
+                          okText: 'Discard',
+                          destructive: true
+                      });
+                      if (confirmed) {
                           await this.gitClient.discard(filepath);
                           if (this.editor.filePath === filepath) {
                               await this.editor.forceReloadFile(filepath);
@@ -194,7 +183,6 @@ export const gitActions = {
                   
                   const author = historyItem.dataset.author;
                   const date = historyItem.dataset.date;
-
                   const filesHTML = changedFiles.map(file => {
                     const path = typeof file === 'string' ? file : file.path;
                     return `<div class="history-file-path" data-path="${path}">${path.substring(1)}</div>`;
@@ -215,7 +203,6 @@ export const gitActions = {
                 viewContainer.querySelectorAll('.history-file-path.active').forEach(el => el.classList.remove('active'));
                 // Add active class to the clicked file
                 target.classList.add('active');
-
                 const historyItemForFile = target.closest('.git-history-item');
                 const filepath = target.dataset.path;
                 const oid = historyItemForFile.dataset.oid;
@@ -225,7 +212,6 @@ export const gitActions = {
             }
         });
     }
-
     const commitButton = this.contentContainer.querySelector('#git-commit-button');
     if (commitButton && !commitButton.dataset.listenerAttached) {
         commitButton.dataset.listenerAttached = 'true';
@@ -242,7 +228,7 @@ export const gitActions = {
                 await this.refresh();
             } catch (err) {
                 console.error('Commit failed:', err);
-                alert('Commit failed. See console for details.');
+                await this.showAlert({ title: 'Commit Failed', message: 'The commit failed. Please see the console for more details.' });
                 this.updateCommitButtonState();
                 commitButton.textContent = 'Commit';
             }

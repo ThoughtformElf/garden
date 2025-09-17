@@ -1,4 +1,4 @@
-// src/modal.js
+// src/util/modal.js
 export class Modal {
   constructor({ title = 'Notice' } = {}) {
     this.overlay = document.createElement('div');
@@ -13,6 +13,7 @@ export class Modal {
 
     this.content = document.createElement('div');
     this.content.className = 'modal-content';
+    this.content.innerHTML = 'Loading...'; // Default content
     
     this.footer = document.createElement('div');
     this.footer.className = 'modal-footer';
@@ -25,8 +26,7 @@ export class Modal {
     document.body.appendChild(this.overlay);
   }
 
-  show(contentHTML = 'Loading...') {
-    this.updateContent(contentHTML);
+  show() {
     this.overlay.classList.remove('hidden');
   }
 
@@ -45,16 +45,84 @@ export class Modal {
   }
   
   addFooterButton(text, onClick) {
-    this.footer.style.display = 'block';
+    this.footer.style.display = 'flex';
     const button = document.createElement('button');
     button.textContent = text;
     button.addEventListener('click', onClick);
     this.footer.appendChild(button);
-    return button; // Return the button element
+    return button;
   }
   
   clearFooter() {
       this.footer.innerHTML = '';
       this.footer.style.display = 'none';
+  }
+
+  static prompt({ title, label, defaultValue = '' }) {
+    return new Promise((resolve) => {
+      const modal = new Modal({ title });
+
+      const inputId = `modal-input-${Date.now()}`;
+      const content = `
+        <div class="modal-prompt" style="display: flex; flex-direction: column; gap: 10px;">
+          <label for="${inputId}">${label}</label>
+          <input type="text" id="${inputId}" value="${defaultValue}" style="padding: 8px; background: #1e1e1e; color: #ccc; border: 1px solid #555; border-radius: 3px;">
+        </div>
+      `;
+      modal.updateContent(content);
+
+      const input = modal.content.querySelector(`#${inputId}`);
+      
+      const submit = () => {
+        resolve(input.value);
+        modal.destroy();
+      };
+      
+      const cancel = () => {
+        resolve(null);
+        modal.destroy();
+      };
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submit();
+        } else if (e.key === 'Escape') {
+          cancel();
+        }
+      });
+      
+      modal.addFooterButton('OK', submit);
+      modal.addFooterButton('Cancel', cancel);
+
+      modal.show();
+      input.focus();
+      input.select();
+    });
+  }
+
+  static confirm({ title, message, okText = 'OK', cancelText = 'Cancel', destructive = false }) {
+    return new Promise((resolve) => {
+      const modal = new Modal({ title });
+      modal.updateContent(`<p>${message}</p>`);
+
+      const submit = () => {
+        resolve(true);
+        modal.destroy();
+      };
+      
+      const cancel = () => {
+        resolve(false);
+        modal.destroy();
+      };
+
+      const okButton = modal.addFooterButton(okText, submit);
+      if (destructive) {
+        okButton.classList.add('destructive');
+      }
+      modal.addFooterButton(cancelText, cancel);
+      
+      modal.show();
+    });
   }
 }

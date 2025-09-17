@@ -42,9 +42,9 @@
 }
 
 .modal-content {
-  padding: 15px;
+  padding: 1.25rem;
   font-family: monospace;
-  font-size: 14px;
+  font-size: 1rem;
   line-height: 1.6;
   overflow-y: auto;
   word-break: break-all;
