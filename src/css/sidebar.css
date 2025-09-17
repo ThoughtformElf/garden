@@ -12,7 +12,6 @@
 }
 .sidebar-tabs {
   display: flex;
-  border-bottom: 1px solid var(--color-border-secondary);
   flex-shrink: 0;
 }
 .sidebar-tab {
@@ -26,7 +25,7 @@
 }
 .sidebar-tab.active {
   color: var(--color-text-primary);
-  border-bottom-color: var(--color-accent-status-indicator);
+  border-bottom-color: var(--base-accent-destructive);
 }
 .sidebar-tab:hover:not(.active) { background-color: var(--color-border-secondary); }
 .sidebar-content {
@@ -49,7 +48,7 @@
   text-overflow: ellipsis;
   color: var(--color-text-primary);
 }
-.sidebar-content li a.status-modified { color: var(--color-text-accent); }
+.sidebar-content li a.status-modified { color: var(--base-accent-destructive); }
 .sidebar-content li a.status-unmodified { color: var(--color-text-primary); }
 .sidebar-content li a.active { background-color: var(--color-background-active); }
 .sidebar-content li a:hover { background-color: var(--color-border-secondary); }

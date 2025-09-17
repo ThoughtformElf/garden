@@ -5,18 +5,18 @@
      ========================================================================== */
 
   /* --- Grayscale --- */
-  --base-dark:                #050f0e; /* For all backgrounds */
-  --base-interactive:         #07443b; /* For borders, hovers, active states */
-  --base-text-muted:          #3d996b; /* For secondary text */
-  --base-text-primary:        #ddd; /* For primary text */
+  --base-dark:                #222222; /* For all backgrounds */
+  --base-interactive:         #444444; /* For borders, hovers, active states */
+  --base-text-muted:          #888888; /* For secondary text */
+  --base-text-primary:        #cccccc; /* For primary text */
   --base-white:               #ffffff;
   --base-black:               #111111;
 
   /* --- Functional Accents --- */
-  --base-accent-emphasis:     #eb9b27; /* For highlighted text, status indicators */
-  --base-accent-info:         #4dc3f5; /* For informational text like links */
-  --base-accent-action:       #12ffbc; /* For primary buttons and interactive borders */
-  --base-accent-destructive:  #ff1342; /* For destructive action buttons */
+  --base-accent-emphasis:     #e5c07b; /* For highlighted text, status indicators */
+  --base-accent-info:         #1976d2; /* For informational text like links */
+  --base-accent-action:       #4ec9b0; /* For primary buttons and interactive borders */
+  --base-accent-destructive:  #f44747; /* For destructive action buttons */
   --base-accent-highlight:    #5d3d80; /* For code blocks and highlighted backgrounds */
   
   /* --- Syntax Accents --- */

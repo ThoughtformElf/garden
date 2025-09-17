@@ -17,7 +17,7 @@
   text-decoration: none;
   font-weight: bold;
 }
-.cm-heading  { font-weight: bold; color: var(--base-accent-info); }
+.cm-heading  { font-weight: bold; color: var(--base-accent-destructive); }
 .cm-atom     { color: var(--base-accent-action); }
 .cm-invalid  { color: var(--base-accent-destructive); }
 
@@ -65,7 +65,7 @@ main, .cm-editor {
   color: var(--color-syntax-checkbox-doing-text);
 }
 .cm-timestamp {
-  color: var(--color-syntax-timestamp-text);
+  color: var(--base-accent-info);
   font-weight: bold;
 }
 .cm-naked-link {

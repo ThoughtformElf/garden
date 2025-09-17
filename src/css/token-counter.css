@@ -13,8 +13,8 @@
   width: 100%;
 }
 .token-count {
-  color: var(--color-text-link);
-  font-weight: 500;
+  color: var(--base-accent-destructive);
+  font-weight: bold;
   user-select: none;
 }
 @media (orientation: portrait) and (max-aspect-ratio: 4/5) {
