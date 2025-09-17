@@ -3,6 +3,7 @@ import { wikilinkPlugin } from './wikilinks.js';
 import { checkboxPlugin } from './checkboxes.js';
 import { timestampPlugin } from './timestamps.js';
 import { linkPlugin } from './links.js';
+import { blockquotePlugin } from './blockquotes.js';
 
 export const allHighlightPlugins = [
   hashtagPlugin,
@@ -10,4 +11,5 @@ export const allHighlightPlugins = [
   checkboxPlugin,
   timestampPlugin,
   linkPlugin,
+  blockquotePlugin,
 ];

@@ -3,6 +3,7 @@ main, .cm-editor {
   width: 100%;
 }
 .cm-editor { background-color: #222; }
+
 .cm-diff-inserted {
   background-color: rgba(15, 88, 39, 0.4);
 }
@@ -10,7 +11,6 @@ main, .cm-editor {
   background-color: rgba(140, 33, 33, 0.4);
   text-decoration: line-through;
 }
-
 .cm-vim-panel input {
   color: #ccc;
 }
@@ -31,10 +31,12 @@ main, .cm-editor {
   background-color: #F44747; /* Neutral Grey */
   color: #f8b3b3 !important;
 }
+
 .cm-checkbox-done {
   background-color: #2E7D32; /* Success Green */
   color: #C8E6C9 !important;
 }
+
 .cm-checkbox-doing {
   background-color: #1976D2; /* Active Blue */
   color: #BBDEFB !important;
@@ -45,10 +47,14 @@ main, .cm-editor {
   font-weight: bold;
 }
 
-/* --- Add this new style for naked links --- */
 .cm-naked-link {
   background-color: #5d3d80; /* Purple background */
   color: #f0e6ff !important;
   border-radius: 3px;
   padding: 0 2px;
+}
+
+/* --- Add this new style for blockquotes --- */
+.cm-blockquote {
+  color: #98c379 !important; /* A pleasant green, suitable for text */
 }
