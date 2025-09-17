@@ -10,32 +10,30 @@
 #eruda-resizer {
   height: 24px;
   cursor: pointer;
-  background-color: var(--color-dark-L3);
+  background-color: var(--color-border-secondary);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
 }
-#eruda-resizer:hover {
-  background-color: #555; /* A slightly lighter grey, can be aliased if needed */
-}
+#eruda-resizer:hover { background-color: #555; }
 #eruda-toggle {
   width: 22px;
   height: 100%;
   background: transparent;
   border: none;
-  color: var(--color-light-L0);
+  color: var(--color-text-primary);
   cursor: pointer;
   font-size: 20px;
   line-height: 24px;
   pointer-events: none;
 }
 .eruda-elements-highlight {
-    display: none !important;
-    z-index: -1 !important;
+  display: none !important;
+  z-index: -1 !important;
 }
 body.eruda-select-active .eruda-elements-highlight {
-    display: block !important;
-    z-index: 99999 !important;
+  display: block !important;
+  z-index: 99999 !important;
 }

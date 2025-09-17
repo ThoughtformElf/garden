@@ -2,16 +2,14 @@
   --sidebar-width: 250px;
   --base-font-size: 14px;
 }
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 html, body {
   height: 100%;
   margin: 0;
   font-family: Arial, sans-serif;
   font-size: var(--base-font-size);
   overflow: hidden;
-  background-color: var(--color-dark-L1);
+  background-color: var(--color-background-primary);
 }
 .app-container {
   display: flex;
@@ -30,24 +28,19 @@ main {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: var(--color-dark-L1);
+  background-color: var(--color-background-primary);
   flex-direction: column;
   padding-bottom: 0.8rem;
+  padding-top: 0.4rem;
 }
 #loading-indicator {
-  color: var(--color-light-L0);
+  color: var(--color-text-primary);
   font-family: monospace;
   text-align: center;
 }
 #loading-indicator p { margin: 0.5em; }
-.cm-editor {
-  font-size: 1rem;
-}
+.cm-editor { font-size: 1rem; }
 @media (orientation: portrait) and (max-aspect-ratio: 4/5) and (pointer: coarse) {
-  :root {
-    --base-font-size: 28px;
-  }
-  #resizer {
-    flex-basis: 44px !important;
-  }
+  :root { --base-font-size: 28px; }
+  #resizer { flex-basis: 44px !important; }
 }

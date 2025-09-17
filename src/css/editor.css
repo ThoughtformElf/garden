@@ -1,50 +1,75 @@
+.cm-keyword  { color: var(--base-accent-emphasis); }
+.cm-name     { color: var(--base-accent-info); }
+.cm-string   { color: var(--base-accent-emphasis); }
+.cm-function { color: var(--base-accent-action); }
+.cm-constant { color: var(--base-accent-action); }
+.cm-definition { color: var(--base-text-primary); }
+.cm-type     { color: var(--base-accent-action); }
+.cm-operator { color: var(--base-text-primary); }
+.cm-comment  { color: var(--base-text-muted); }
+.cm-hashtag  { color: var(--base-accent-highlight); font-style: italic; }
+.cm-strong   { font-weight: bold; }
+.cm-emphasis { font-style: italic; }
+.cm-strikethrough { text-decoration: line-through; }
+.cm-link     {
+  background: var(--base-syntax-doing-bg);
+  color: var(--base-syntax-doing-text);
+  text-decoration: none;
+}
+.cm-heading  { font-weight: bold; color: var(--base-accent-info); }
+.cm-atom     { color: var(--base-accent-action); }
+.cm-invalid  { color: var(--base-accent-destructive); }
+
 main, .cm-editor {
   height: 100%;
   width: 100%;
 }
-.cm-editor { background-color: var(--color-dark-L1); }
-.cm-diff-inserted {
-  background-color: var(--color-syntax-diff-add-bg);
-}
+.cm-editor { background-color: var(--color-background-primary); }
+.cm-diff-inserted { background-color: var(--color-syntax-diff-add-bg); }
 .cm-diff-deleted {
   background-color: var(--color-syntax-diff-del-bg);
   text-decoration: line-through;
 }
-.cm-vim-panel input {
-  color: var(--color-light-L0);
-}
+.cm-vim-panel input { color: var(--color-text-primary); }
 .cm-wikilink {
   background-color: var(--color-syntax-wikilink-bg);
-  color: var(--color-syntax-wikilink-text) !important;
+  color: var(--color-syntax-wikilink-text);
   border-radius: 3px;
   padding: 0 2px;
 }
+.cm-wikilink .cm-link {
+  background: var(--color-syntax-wikilink-bg);
+  color: var(--color-syntax-wikilink-text);
+  text-decoration: none;
+}
 .cm-hashtag {
   background-color: var(--color-syntax-hashtag-bg);
-  color: var(--color-syntax-hashtag-text) !important;
+  color: var(--color-syntax-hashtag-text);
 }
 .cm-checkbox-todo {
   background-color: var(--color-syntax-checkbox-todo-bg);
-  color: var(--color-syntax-checkbox-todo-text) !important;
+  color: var(--color-syntax-checkbox-todo-text);
 }
 .cm-checkbox-done {
   background-color: var(--color-syntax-checkbox-done-bg);
-  color: var(--color-syntax-checkbox-done-text) !important;
+  color: var(--color-syntax-checkbox-done-text);
+}
+.cm-checkbox-done .cm-link {
+  color: var(--color-syntax-checkbox-done-text);
+  text-decoration: none;
 }
 .cm-checkbox-doing {
   background-color: var(--color-syntax-checkbox-doing-bg);
-  color: var(--color-syntax-checkbox-doing-text) !important;
+  color: var(--color-syntax-checkbox-doing-text);
 }
 .cm-timestamp {
-  color: var(--color-accent-red) !important;
+  color: var(--color-syntax-timestamp-text);
   font-weight: bold;
 }
 .cm-naked-link {
   background-color: var(--color-syntax-link-bg);
-  color: var(--color-syntax-link-text) !important;
+  color: var(--color-syntax-link-text);
   border-radius: 3px;
   padding: 0 2px;
 }
-.cm-blockquote {
-  color: var(--color-syntax-blockquote-text) !important;
-}
+.cm-blockquote { color: var(--color-syntax-blockquote-text); }

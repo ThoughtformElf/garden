@@ -1,54 +1,96 @@
 /* src/css/variables.css */
 :root {
-  /* --- Greyscale & Core Text --- */
-  --color-dark-L0: #1a1a1a;  /* Deepest background (e.g., commit textarea) */
-  --color-dark-L1: #222222;  /* Primary background */
-  --color-dark-L2: #282c34;  /* Secondary background (modals, popups) */
-  --color-dark-L3: #333333;  /* Borders, inactive UI */
-  --color-dark-L4: #3e4451;  /* Hovered elements */
-  --color-dark-L5: #444444;  /* Active elements, secondary borders */
-  --color-light-L0: #cccccc; /* Primary text */
-  --color-light-L1: #888888; /* Secondary, muted text */
-  --color-light-L2: #ffffff; /* Brightest text */
-  --color-dark-text: #111111;/* For use on light-colored buttons */
-  --color-black: #000000;
+  /* ==========================================================================
+     Base Palette - The single source of truth for all colors.
+     ========================================================================== */
 
-  /* --- Accent Palette --- */
-  --color-accent-teal: #4ec9b0;
-  --color-accent-teal-hover: #5fdcc4;
-  --color-accent-yellow: #e5c07b;
-  --color-accent-red: #f44747;
-  --color-accent-red-hover: #ff5a5a;
-  --color-accent-green: #2e7d32;
-  --color-accent-blue: #1976d2;
-  --color-accent-purple: #5d3d80;
-  --color-accent-cyan: #9cdcfe;
+  /* --- Grayscale --- */
+  --base-dark:                #222222; /* For all backgrounds */
+  --base-interactive:         #444444; /* For borders, hovers, active states */
+  --base-text-muted:          #888888; /* For secondary text */
+  --base-text-primary:        #cccccc; /* For primary text */
+  --base-white:               #ffffff;
+  --base-black:               #111111;
 
-  /* --- Transparent Overlays --- */
-  --color-overlay: rgba(0, 0, 0, 0.7);
-  --color-shadow: rgba(0, 0, 0, 0.5);
-
-  /* --- Editor-Specific Syntax Highlighting --- */
-  --color-syntax-diff-add-bg: rgba(15, 88, 39, 0.4);
-  --color-syntax-diff-del-bg: rgba(140, 33, 33, 0.4);
+  /* --- Functional Accents --- */
+  --base-accent-emphasis:     #e5c07b; /* For highlighted text, status indicators */
+  --base-accent-info:         #1976d2; /* For informational text like links */
+  --base-accent-action:       #4ec9b0; /* For primary buttons and interactive borders */
+  --base-accent-destructive:  #f44747; /* For destructive action buttons */
+  --base-accent-highlight:    #5d3d80; /* For code blocks and highlighted backgrounds */
   
-  --color-syntax-hashtag-bg: #ffff00;
-  --color-syntax-hashtag-text: var(--color-black);
-
-  --color-syntax-wikilink-bg: #3d5a80;
-  --color-syntax-wikilink-text: #e0fbfc;
-
-  --color-syntax-link-bg: var(--color-accent-purple);
-  --color-syntax-link-text: #f0e6ff;
+  /* --- Syntax Accents --- */
+  --base-syntax-add-bg:       rgba(15, 88, 39, 0.4);
+  --base-syntax-del-bg:       rgba(140, 33, 33, 0.4);
+  --base-syntax-highlight-bg: var(--base-accent-emphasis);
+  --base-syntax-wikilink-bg:  var(--base-accent-action);
+  --base-syntax-wikilink-text:color-mix(in srgb, var(--base-accent-action), black 80%);
+  --base-syntax-link-bg:      var(--base-accent-highlight);
+  --base-syntax-link-text:    color-mix(in srgb, var(--base-accent-action), black 80%);
+  --base-syntax-done-bg:      var(--base-accent-action);
+  --base-syntax-done-text:    color-mix(in srgb, var(--base-accent-action), black 80%);
+  --base-syntax-doing-bg:     var(--base-accent-info);
+  --base-syntax-doing-text:   color-mix(in srgb, var(--base-accent-info), black 80%);
+  --base-syntax-todo-text:    color-mix(in srgb, var(--base-accent-destructive), black 80%);
+  --base-syntax-quote-text:   var(--base-syntax-wikilink-bg);
   
-  --color-syntax-checkbox-done-bg: var(--color-accent-green);
-  --color-syntax-checkbox-done-text: #c8e6c9;
+  /* --- Overlays & Shadows --- */
+  --base-overlay:             rgba(0, 0, 0, 0.7);
+  --base-shadow:              rgba(0, 0, 0, 0.5);
 
-  --color-syntax-checkbox-doing-bg: var(--color-accent-blue);
-  --color-syntax-checkbox-doing-text: #bbdefb;
+
+  /* ==========================================================================
+     Core Palette - Mapped to the semantic base palette.
+     ========================================================================== */
+
+  /* --- Backgrounds --- */
+  --color-background-primary:     var(--base-dark);
+  --color-background-secondary:   var(--base-dark);
+  --color-background-tertiary:    var(--base-dark);
+  --color-background-hover:       var(--base-interactive);
+  --color-background-active:      var(--base-interactive);
+  --color-background-overlay:     var(--base-overlay);
   
-  --color-syntax-checkbox-todo-bg: var(--color-accent-red);
-  --color-syntax-checkbox-todo-text: #f8b3b3;
+  /* --- Text --- */
+  --color-text-primary:           var(--base-text-primary);
+  --color-text-secondary:         var(--base-text-muted);
+  --color-text-accent:            var(--base-accent-emphasis);
+  --color-text-link:              var(--base-accent-info);
+  --color-text-on-accent:         var(--base-black);
+  --color-text-on-destructive:    var(--base-white);
+  --color-text-bright:            var(--base-white);
 
-  --color-syntax-blockquote-text: #98c379;
+  /* --- Borders & Dividers --- */
+  --color-border-primary:         var(--base-interactive);
+  --color-border-secondary:       var(--base-interactive);
+  --color-border-interactive:     var(--base-accent-action);
+
+  /* --- Actions & Status --- */
+  --color-action-primary-bg:      var(--base-accent-action);
+  --color-action-primary-hover:   color-mix(in srgb, var(--base-accent-action), white 10%);
+  --color-action-destructive-bg:  var(--base-accent-destructive);
+  --color-action-destructive-hover: color-mix(in srgb, var(--base-accent-destructive), white 10%);
+  --color-accent-status-indicator:var(--base-accent-emphasis);
+  --color-shadow:                 var(--base-shadow);
+
+
+  /* ==========================================================================
+     Syntax Highlighting - Now fully mapped to the base palette.
+     ========================================================================== */
+  --color-syntax-diff-add-bg:         var(--base-syntax-add-bg);
+  --color-syntax-diff-del-bg:         var(--base-syntax-del-bg);
+  --color-syntax-hashtag-bg:          var(--base-syntax-highlight-bg);
+  --color-syntax-hashtag-text:        var(--base-black);
+  --color-syntax-wikilink-bg:         var(--base-syntax-wikilink-bg);
+  --color-syntax-wikilink-text:       var(--base-syntax-wikilink-text);
+  --color-syntax-link-bg:             var(--base-syntax-link-bg);
+  --color-syntax-link-text:           var(--base-syntax-link-text);
+  --color-syntax-checkbox-done-bg:    var(--base-syntax-done-bg);
+  --color-syntax-checkbox-done-text:  var(--base-syntax-done-text);
+  --color-syntax-checkbox-doing-bg:   var(--base-syntax-doing-bg);
+  --color-syntax-checkbox-doing-text: var(--base-syntax-doing-text);
+  --color-syntax-checkbox-todo-bg:    var(--color-action-destructive-bg);
+  --color-syntax-checkbox-todo-text:  var(--base-syntax-todo-text);
+  --color-syntax-blockquote-text:     var(--base-syntax-quote-text);
+  --color-syntax-timestamp-text:      var(--color-action-destructive-bg);
 }

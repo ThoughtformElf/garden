@@ -3,34 +3,32 @@
   position: relative;
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
-  border-right: 1px solid var(--color-dark-L3);
+  border-right: 1px solid var(--color-border-secondary);
   padding: 0;
   box-sizing: border-box;
-  background-color: var(--color-dark-L1);
+  background-color: var(--color-background-primary);
   display: flex;
   flex-direction: column;
 }
 .sidebar-tabs {
   display: flex;
-  border-bottom: 1px solid var(--color-dark-L3);
+  border-bottom: 1px solid var(--color-border-secondary);
   flex-shrink: 0;
 }
 .sidebar-tab {
   flex-grow: 1;
   padding: 8px 10px;
-  background-color: var(--color-dark-L1);
+  background-color: var(--color-background-primary);
   border: none;
-  color: var(--color-light-L1);
+  color: var(--color-text-secondary);
   cursor: pointer;
   border-bottom: 2px solid transparent;
 }
 .sidebar-tab.active {
-  color: var(--color-light-L0);
-  border-bottom-color: var(--color-accent-yellow);
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent-status-indicator);
 }
-.sidebar-tab:hover:not(.active) {
-  background-color: var(--color-dark-L3);
-}
+.sidebar-tab:hover:not(.active) { background-color: var(--color-border-secondary); }
 .sidebar-content {
   padding: 10px;
   overflow-y: auto;
@@ -38,8 +36,7 @@
 }
 .sidebar-content ul {
   list-style: none;
-  padding: 0;
-  margin: 0;
+  padding: 0; margin: 0;
   font-family: monospace;
 }
 .sidebar-content li a {
@@ -50,14 +47,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--color-light-L0);
+  color: var(--color-text-primary);
 }
-.sidebar-content li a.status-modified { color: var(--color-accent-yellow); }
-.sidebar-content li a.status-unmodified { color: var(--color-light-L0); }
-.sidebar-content li a.active { background-color: var(--color-dark-L5); }
-.sidebar-content li a:hover { background-color: var(--color-dark-L3); }
+.sidebar-content li a.status-modified { color: var(--color-text-accent); }
+.sidebar-content li a.status-unmodified { color: var(--color-text-primary); }
+.sidebar-content li a.active { background-color: var(--color-background-active); }
+.sidebar-content li a:hover { background-color: var(--color-border-secondary); }
 .sidebar-error, .sidebar-info {
-  color: var(--color-light-L1);
+  color: var(--color-text-secondary);
   padding: 10px;
   font-style: italic;
   font-family: monospace;
@@ -65,29 +62,26 @@
 #resizer {
   flex: 0 0 24px;
   cursor: pointer;
-  background-color: var(--color-dark-L3);
+  background-color: var(--color-border-secondary);
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-#resizer:hover { background-color: var(--color-dark-L4); }
+#resizer:hover { background-color: var(--color-background-hover); }
 #resize-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
   z-index: 9998;
   display: none;
 }
 #sidebar-toggle-icon {
   background: transparent;
-  color: var(--color-light-L0);
+  color: var(--color-text-primary);
   border: none;
   cursor: pointer;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   line-height: 1.5rem;
   padding: 0;
   pointer-events: none;
@@ -98,16 +92,12 @@
   padding: 0;
   border-right: none;
 }
-.sidebar-tab.dirty {
-  position: relative;
-}
+.sidebar-tab.dirty { position: relative; }
 .sidebar-tab.dirty::after {
   content: '';
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--color-accent-yellow);
+  top: 8px; right: 8px;
+  width: 8px; height: 8px;
+  background-color: var(--color-accent-status-indicator);
   border-radius: 50%;
 }

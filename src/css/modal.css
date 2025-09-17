@@ -1,10 +1,8 @@
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: var(--color-overlay);
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background-color: var(--color-background-overlay);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -17,9 +15,9 @@
   pointer-events: none;
 }
 .modal-container {
-  background: var(--color-dark-L2);
-  color: var(--color-light-L0);
-  border: 1px solid var(--color-dark-L5);
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-primary);
   border-radius: 8px;
   box-shadow: 0 5px 20px var(--color-shadow);
   min-width: 300px;
@@ -27,14 +25,13 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  flex-grow: 0;
-  flex-shrink: 1;
+  flex-grow: 0; flex-shrink: 1;
 }
 .modal-header {
   padding: 10px 15px;
   font-size: 18px;
   font-weight: bold;
-  border-bottom: 1px solid var(--color-dark-L5);
+  border-bottom: 1px solid var(--color-border-primary);
 }
 .modal-content {
   padding: 1.25rem;
@@ -46,27 +43,23 @@
 }
 .modal-footer {
   padding: 10px;
-  border-top: 1px solid var(--color-dark-L5);
+  border-top: 1px solid var(--color-border-primary);
   text-align: right;
-  background-color: var(--color-dark-L1);
+  background-color: var(--color-background-primary);
 }
 .modal-footer button {
   padding: 8px 15px;
-  background-color: var(--color-accent-teal);
-  color: var(--color-dark-text);
+  background-color: var(--color-action-primary-bg);
+  color: var(--color-text-on-accent);
   border: none;
   border-radius: 3px;
   cursor: pointer;
   font-weight: bold;
   margin-left: 10px;
 }
-.modal-footer button:hover {
-  background-color: var(--color-accent-teal-hover);
-}
+.modal-footer button:hover { background-color: var(--color-action-primary-hover); }
 .modal-footer button.destructive {
-  background-color: var(--color-accent-red);
-  color: var(--color-light-L2);
+  background-color: var(--color-action-destructive-bg);
+  color: var(--color-text-on-destructive);
 }
-.modal-footer button.destructive:hover {
-  background-color: var(--color-accent-red-hover);
-}
+.modal-footer button.destructive:hover { background-color: var(--color-action-destructive-hover); }
