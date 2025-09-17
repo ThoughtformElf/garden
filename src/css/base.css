@@ -2,6 +2,20 @@
   --sidebar-width: 250px;
   --base-font-size: 14px;
 }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--base-accent-destructive) transparent; /* thumb color, track color */
+}
+*::-webkit-scrollbar-track {
+  background: transparent; /* color of the tracking area */
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--base-accent-destructive); /* color of the scroll thumb */
+  border-radius: 0px;       /* removes round corners */
+}
+
+
 * { box-sizing: border-box; }
 html, body {
   height: 100%;
@@ -44,3 +58,4 @@ main {
   :root { --base-font-size: 28px; }
   #resizer { flex-basis: 44px !important; }
 }
+

@@ -89,3 +89,12 @@ main, .cm-editor {
   font-weight: normal;
 }
 .cm-blockquote { color: var(--color-syntax-blockquote-text); }
+
+body .cm-activeLine,
+body .cm-selectionBackground {
+  background: var(--base-interactive) !important;
+}
+body .cm-vimMode .cm-activeLine,
+html body .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--base-accent-emphasis), black 60%) !important;
+}

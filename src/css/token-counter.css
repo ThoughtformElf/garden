@@ -23,7 +23,3 @@
     min-height: 1.5rem;
   }
 }
-.token-status-bar:hover .token-count {
-  color: var(--color-text-bright);
-  transition: color 0.2s ease;
-}
