@@ -15,6 +15,7 @@
   background: var(--base-syntax-link-bg);
   color: var(--base-syntax-link-text);
   text-decoration: none;
+  font-weight: bold;
 }
 .cm-heading  { font-weight: bold; color: var(--base-accent-info); }
 .cm-atom     { color: var(--base-accent-action); }
@@ -57,6 +58,7 @@ main, .cm-editor {
 .cm-checkbox-done .cm-link {
   color: var(--color-syntax-checkbox-done-text);
   text-decoration: none;
+  font-weight: normal;
 }
 .cm-checkbox-doing {
   background-color: var(--color-syntax-checkbox-doing-bg);
@@ -81,5 +83,9 @@ main, .cm-editor {
 .cm-link.cm-operator {
   font-style: italic;
   text-decoration: none;
+  font-weight: normal;
+}
+.cm-link.cm-string {
+  font-weight: normal;
 }
 .cm-blockquote { color: var(--color-syntax-blockquote-text); }
