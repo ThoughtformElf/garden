@@ -64,9 +64,9 @@ export class Modal {
 
       const inputId = `modal-input-${Date.now()}`;
       const content = `
-        <div class="modal-prompt" style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="modal-prompt">
           <label for="${inputId}">${label}</label>
-          <input type="text" id="${inputId}" value="${defaultValue}" style="padding: 8px; background: #1e1e1e; color: #ccc; border: 1px solid #555; border-radius: 3px;">
+          <input type="text" id="${inputId}" value="${defaultValue}">
         </div>
       `;
       modal.updateContent(content);

@@ -1,3 +1,7 @@
+body .luna-tab-item {
+  font-size: 1rem;
+}
+
 #eruda-container {
   flex-shrink: 0;
   background: #1e1e1e; /* Specific Eruda theme color */
@@ -25,8 +29,8 @@
   border: none;
   color: var(--color-text-primary);
   cursor: pointer;
-  font-size: 20px;
-  line-height: 24px;
+  font-size: 1rem;
+  line-height: 1.25rem;
   pointer-events: none;
 }
 .eruda-elements-highlight {
@@ -37,6 +41,28 @@ body.eruda-select-active .eruda-elements-highlight {
   display: block !important;
   z-index: 99999 !important;
 }
+
+#eruda-Data > div {
+  padding: 1rem;
+}
+#eruda-Data h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+hr {
+  border: none;
+  border-top: 1px solid var(--color-border-secondary);
+  margin: 25px 0;
+}
+
+/* button */
+button, .eruda-button { 
+  padding: 0.5rem; background-color: var(--base-accent-action); color: var(--base-black); 
+  border: none; cursor: pointer; font-weight: bold;
+}
+.eruda-button:hover { background-color: color-mix(in srgb, var(--base-accent-action), white); }
+.eruda-button.destructive { background-color: var(--base-accent-destructive); color: var(--base-white); }
+.eruda-button.destructive:hover { background-color: var(--base-accent-destructive); }
 
 
 html .eruda-container .luna-tab {

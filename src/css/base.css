@@ -4,15 +4,13 @@
 }
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--base-accent-destructive) transparent; /* thumb color, track color */
+  scrollbar-color: var(--base-accent-destructive) transparent;
 }
 *::-webkit-scrollbar-track {
-  background: transparent; /* color of the tracking area */
+  background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: var(--base-accent-destructive); /* color of the scroll thumb */
-  border-radius: 0px;       /* removes round corners */
+  background-color: var(--base-accent-destructive);
 }
 
 
@@ -25,6 +23,11 @@ html, body {
   overflow: hidden;
   background-color: var(--color-background-primary);
 }
+p {
+  margin: 0;
+  margin-bottom: 1rem;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;
@@ -59,3 +62,14 @@ main {
   #resizer { flex-basis: 44px !important; }
 }
 
+input[type="text"] {
+  outline: none;
+  background: var(--base-dark);
+  font-size: 1rem;
+  padding: 0.5rem;
+  border: 2px solid var(--base-accent-action);
+  color: var(--color-text-primary);
+}
+input[type="text"]:focus {
+  border-color: var(--base-accent-destructive);
+}

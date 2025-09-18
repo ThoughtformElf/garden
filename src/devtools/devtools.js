@@ -4,20 +4,20 @@ import { Modal } from '../util/modal.js';
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `
-    <label style="display: block; margin: 8px 0; font-family: monospace; cursor: pointer;">
-      <input type="checkbox" class="garden-select-checkbox" value="${item}" ${allChecked ? 'checked' : ''} style="margin-right: 8px; vertical-align: middle;">
-      <span style="vertical-align: middle;">${item}</span>
+    <label>
+      <input type="checkbox" class="garden-select-checkbox" value="${item}" ${allChecked ? 'checked' : ''}>
+      <span>${item}</span>
     </label>
   `).join('');
 
   return `
-    <div style="font-family: Arial, sans-serif;">
-      <p style="margin-top: 0;">${title}</p>
-      <div style="margin-bottom: 10px;">
-        <button type="button" class="select-all-btn" style="margin-right: 5px;">Select All</button>
+    <div>
+      <p>${title}</p>
+      <div>
+        <button type="button" class="select-all-btn">Select All</button>
         <button type="button" class="select-none-btn">Deselect All</button>
       </div>
-      <div class="garden-selection-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #444; padding: 10px; border-radius: 3px;">
+      <div class="garden-selection-list">
         ${itemCheckboxes}
       </div>
     </div>
@@ -59,29 +59,20 @@ export function initializeDevTools() {
     name: 'Data',
     init($el) {
       this._$el = $el;
-      // @todo move this to stylesheet
       $el.html(`
-        <div style="padding: 10px; font-family: Arial, sans-serif; color: var(--color-text-primary);">
-          <h2 style="margin-top:0;">Data Portability</h2>
+        <div>
+          <h2>Data Portability</h2>
           <button id="export-btn" class="eruda-button">Export...</button>
           <button id="import-btn" class="eruda-button">Import...</button>
           <input type="file" id="import-file-input" accept=".zip" style="display: none;">
 
-          <hr style="border: none; border-top: 1px solid var(--color-border-secondary); margin: 25px 0;">
-          <h3 style="color: var(--base-accent-destructive);">Danger Zone</h3>
+          <hr>
+
+          <h2>Danger Zone</h2>
           <p>
             <button id="clear-data-btn" class="eruda-button destructive">Clear Data...</button>
           </p>
         </div>
-        <style>
-          .eruda-button { 
-            padding: 8px 12px; background-color: var(--base-accent-action); color: var(--base-black); 
-            border: none; border-radius: 3px; cursor: pointer; font-weight: bold;
-          }
-          .eruda-button:hover { background-color: color-mix(in srgb, var(--base-accent-action), white); }
-          .eruda-button.destructive { background-color: var(--base-accent-destructive); color: var(--base-white); }
-          .eruda-button.destructive:hover { background-color: var(--base-accent-destructive); }
-        </style>
       `);
       
       const exportBtn = $el.find('#export-btn')[0];
