@@ -367,3 +367,43 @@ html #eruda-network .eruda-network .eruda-control .eruda-icon-copy {
 html #eruda-network .eruda-network .eruda-control .eruda-icon-filter {
   right: 2.5rem;
 }
+
+html #eruda-resources .eruda-title .eruda-btn,
+html #eruda-elements .eruda-section h2 .eruda-btn {
+  margin-left: 1rem;
+  margin-right: 0.5rem;
+}
+html #eruda-resources .eruda-title {
+  padding: 1rem 0.5rem ;
+}
+html .eruda-container .luna-data-grid td, html .eruda-container .luna-data-grid th {
+  padding: 0.5rem;
+}
+
+html  #eruda-resources .luna-data-grid-data-container {
+  min-height: 200px !important;
+  height: auto !important;
+  max-height: 500px !important;
+}
+
+html .eruda-button {
+  font-size: 1rem;
+}
+
+html .luna-setting-item .luna-setting-control, html .luna-setting-item .luna-setting-description,
+html .luna-setting-item-select .luna-setting-select select,
+html .luna-setting-item-checkbox input:checked:after,
+html .eruda-container .luna-setting-item-title,
+html .luna-setting-item-button button {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+html .luna-setting-item-button button {
+  padding: 0.5rem 1rem;
+}
+
+html .luna-setting-item-checkbox input {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 1rem;
+}

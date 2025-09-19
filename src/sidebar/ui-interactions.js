@@ -125,30 +125,27 @@ function initializeErudaResizer() {
   const erudaContainer = document.getElementById('eruda-container');
   const erudaResizer = document.getElementById('eruda-resizer');
   let erudaDevTools;
-
   if (!erudaContainer || !erudaResizer) return;
   
   const erudaToggle = document.createElement('button');
   erudaToggle.id = 'eruda-toggle';
   erudaToggle.title = 'Toggle Eruda Panel';
   erudaResizer.appendChild(erudaToggle);
-
   let dragStartY = 0;
   let isDragging = false;
-
   const toggleEruda = () => {
+    // Ensure erudaDevTools is the latest element
+    erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (!erudaDevTools) return;
-    // FIX: Check the actual style property or offsetHeight.
+    
     const isCurrentlyCollapsed = erudaDevTools.style.height === '0px' || erudaDevTools.offsetHeight < 10;
     
     if (isCurrentlyCollapsed) {
-      // Expand to a fixed 250px
-      erudaDevTools.style.height = '250px';
+      const lastHeight = localStorage.getItem('erudaHeight') || '250px';
+      erudaDevTools.style.height = lastHeight;
       erudaToggle.textContent = '▼';
       localStorage.setItem('erudaCollapsed', 'false');
-      localStorage.setItem('erudaHeight', '250px'); // Also save this as the new height
     } else {
-      // Collapse
       localStorage.setItem('erudaHeight', erudaDevTools.style.height);
       erudaDevTools.style.height = '0px';
       erudaToggle.textContent = '▲';
@@ -170,22 +167,23 @@ function initializeErudaResizer() {
     erudaToggle.textContent = '▼';
   };
 
-  const erudaEndResize = (e) => {
+  // UPDATED: Logic to handle both drag and tap
+  const erudaEndResize = () => {
     document.body.style.cursor = 'default';
     document.body.style.userSelect = 'auto';
-
     document.removeEventListener('mousemove', erudaHandleMove);
     document.removeEventListener('touchmove', erudaHandleMove);
     document.removeEventListener('mouseup', erudaEndResize);
     document.removeEventListener('touchend', erudaEndResize);
     
-    // Use setTimeout to ensure the click event fires after this, and can check the `isDragging` flag.
-    setTimeout(() => {
-        if (isDragging) {
-            localStorage.setItem('erudaHeight', erudaDevTools.style.height);
-            localStorage.setItem('erudaCollapsed', 'false');
-        }
-    }, 0);
+    if (isDragging) {
+        // If it was a drag, save the final height
+        localStorage.setItem('erudaHeight', erudaDevTools.style.height);
+        localStorage.setItem('erudaCollapsed', 'false');
+    } else {
+        // If it was not a drag, it was a tap/click, so toggle
+        toggleEruda();
+    }
   };
   
   const erudaStartResize = (e) => {
@@ -197,23 +195,18 @@ function initializeErudaResizer() {
     
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
-
     document.addEventListener('mousemove', erudaHandleMove);
     document.addEventListener('touchmove', erudaHandleMove, { passive: false });
     document.addEventListener('mouseup', erudaEndResize);
     document.addEventListener('touchend', erudaEndResize);
   };
-
   erudaResizer.addEventListener('mousedown', erudaStartResize);
   erudaResizer.addEventListener('touchstart', erudaStartResize, { passive: false });
-  // This listener now correctly fires only on a non-drag click.
-  erudaResizer.addEventListener('click', () => {
-    if (!isDragging) {
-      toggleEruda();
-    }
-  });
 
-  // Restore State
+  // REMOVED: The separate click listener is no longer needed.
+  // erudaResizer.addEventListener('click', ...);
+
+  // Restore State logic remains the same
   const observer = new MutationObserver(() => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (erudaDevTools) {

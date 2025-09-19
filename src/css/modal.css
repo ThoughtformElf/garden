@@ -19,7 +19,7 @@
   color: var(--color-text-primary);
   border: 1px solid var(--base-interactive);
   min-width: 300px;
-  max-width: 500px;
+  max-width: 80%;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
