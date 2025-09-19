@@ -36,22 +36,37 @@ const editor = new Editor({
 });
 
 // --- Initialize Command Palette & API ---
+// We wait for the editor to be fully ready before creating the palette
+// and setting up the master keydown listener.
 const checkEditorReady = setInterval(() => {
   if (editor.isReady) {
     clearInterval(checkEditorReady);
 
     const commandPalette = new CommandPalette({ gitClient, editor });
-    // Expose the palette instance on our global API
     window.thoughtform.commandPalette = commandPalette;
 
+    // --- MASTER KEYDOWN LISTENER ---
+    // This is the single source of truth for the command palette shortcut.
+    // It uses `capture: true` to intercept the event before the browser
+    // or CodeMirror can (e.g., stopping the Print dialog).
     window.addEventListener('keydown', (e) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifierKey = isMac ? e.metaKey : e.ctrlKey;
 
-      if (modifierKey && e.key === 'k') {
+      // Listen for 'p' and check modifier keys.
+      if (modifierKey && e.key.toLowerCase() === 'p') {
+        // We MUST prevent the default action immediately.
         e.preventDefault();
-        commandPalette.open();
+        e.stopPropagation();
+
+        if (e.shiftKey) {
+          // Ctrl+Shift+P -> Execute Mode
+          commandPalette.open('execute');
+        } else {
+          // Ctrl+P -> Search Mode
+          commandPalette.open('search');
+        }
       }
-    });
+    }, { capture: true }); // Use capturing phase.
   }
 }, 100);

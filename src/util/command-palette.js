@@ -1,11 +1,8 @@
 // src/util/command-palette.js
 import { Git } from './git-integration.js';
 
-/**
- * A lightweight, dependency-free command palette for file navigation across all gardens.
- */
 export class CommandPalette {
-  constructor({ gitClient, editor }) {
+  constructor({ gitClient, editor }) { // Simplified constructor
     if (!gitClient || !editor) {
       throw new Error('CommandPalette requires a gitClient and editor instance.');
     }
@@ -16,18 +13,15 @@ export class CommandPalette {
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
-
-    // A session-wide cache for all files across all gardens
+    this.mode = 'search';
     this.crossGardenFileCache = null;
-
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleInput = this.handleInput.bind(this);
     this.handleResultClick = this.handleResultClick.bind(this);
     this.close = this.close.bind(this);
-
     this.createDOMElements();
   }
-
+  
   createDOMElements() {
     this.overlay = document.createElement('div');
     this.overlay.className = 'command-overlay hidden';
@@ -37,16 +31,19 @@ export class CommandPalette {
     this.container.className = 'command-container';
     this.container.addEventListener('click', e => e.stopPropagation());
 
+    this.titleElement = document.createElement('div');
+    this.titleElement.className = 'command-title';
+
     this.input = document.createElement('input');
     this.input.type = 'text';
     this.input.className = 'command-input';
-    this.input.placeholder = 'Find file across all gardens...';
     this.input.addEventListener('input', this.handleInput);
 
     this.resultsList = document.createElement('ul');
     this.resultsList.className = 'command-results-list';
     this.resultsList.addEventListener('click', this.handleResultClick);
 
+    this.container.appendChild(this.titleElement);
     this.container.appendChild(this.input);
     this.container.appendChild(this.resultsList);
     this.overlay.appendChild(this.container);
@@ -58,7 +55,6 @@ export class CommandPalette {
     const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
     const fileIndex = [];
     
-    // This uses Promise.all for fast, parallel file listing
     await Promise.all(gardens.map(async (gardenName) => {
       const tempGitClient = new Git(gardenName);
       const files = await this.editor.sidebar.listFiles(tempGitClient, '/');
@@ -66,7 +62,6 @@ export class CommandPalette {
         fileIndex.push({
           garden: gardenName,
           path: filePath,
-          // Pre-calculate a search string for better performance
           searchString: `${gardenName} ${filePath.substring(1)}`.toLowerCase()
         });
       }
@@ -75,16 +70,25 @@ export class CommandPalette {
     this.crossGardenFileCache = fileIndex;
   }
 
-  async open() {
+  async open(mode = 'search') {
     if (this.isOpen) return;
     this.isOpen = true;
+    this.mode = mode;
+
+    if (this.mode === 'execute') {
+      this.titleElement.textContent = 'Executing a File...';
+      this.input.placeholder = 'Find a .js file to execute...';
+    } else {
+      this.titleElement.textContent = 'Searching Files...';
+      this.input.placeholder = 'Find file across all gardens...';
+    }
 
     this.overlay.classList.remove('hidden');
     this.input.focus();
     
+    // This local listener is only for inside the palette (arrows, enter, escape)
     document.addEventListener('keydown', this.handleKeyDown);
 
-    // If the index hasn't been built this session, build it now.
     if (!this.crossGardenFileCache) {
       const originalPlaceholder = this.input.placeholder;
       this.input.placeholder = 'Indexing all gardens...';
@@ -97,7 +101,6 @@ export class CommandPalette {
       this.input.focus();
     }
     
-    // Initial render with all files
     this.search('');
   }
 
@@ -117,14 +120,18 @@ export class CommandPalette {
   search(query) {
     this.query = query.toLowerCase();
     
+    let sourceFiles = this.crossGardenFileCache;
+
+    if (this.mode === 'execute') {
+        sourceFiles = this.crossGardenFileCache.filter(file => 
+            file.garden === this.gitClient.gardenName && file.path.endsWith('.js')
+        );
+    }
+
     if (!this.query) {
-      // Show files from the current garden first
-      this.results = this.crossGardenFileCache
-        .filter(file => file.garden === this.gitClient.gardenName)
-        .slice(0, 100);
+      this.results = (this.mode === 'execute' ? sourceFiles : sourceFiles.filter(file => file.garden === this.gitClient.gardenName)).slice(0, 100);
     } else {
-      this.results = this.crossGardenFileCache.filter(file => {
-        // This fuzzy search now checks against the pre-built search string
+      this.results = sourceFiles.filter(file => {
         let queryIndex = 0;
         let searchIndex = 0;
         while (queryIndex < this.query.length && searchIndex < file.searchString.length) {
@@ -135,7 +142,6 @@ export class CommandPalette {
         }
         return queryIndex === this.query.length;
       }).sort((a, b) => {
-        // Bonus: Prioritize results from the current garden
         const aIsCurrent = a.garden === this.gitClient.gardenName;
         const bIsCurrent = b.garden === this.gitClient.gardenName;
         if (aIsCurrent && !bIsCurrent) return -1;
@@ -162,7 +168,6 @@ export class CommandPalette {
 
       const pathText = file.path.startsWith('/') ? file.path.substring(1) : file.path;
       
-      // If the file is not in the current garden, show the garden name
       if (file.garden !== this.gitClient.gardenName) {
         li.innerHTML = `<span class="command-path">${pathText}</span> <span class="command-garden">${file.garden}</span>`;
       } else {
@@ -178,25 +183,34 @@ export class CommandPalette {
     });
   }
 
-  selectItem(index) {
+  async selectItem(index) {
     if (index < 0 || index >= this.results.length) return;
 
     const file = this.results[index];
     
-    if (file.garden !== this.gitClient.gardenName) {
-      // Full page navigation to the other garden
-      // --- FIX: This is the corrected base path logic ---
-      const fullPath = new URL(import.meta.url).pathname;
-      const srcIndex = fullPath.lastIndexOf('/src/');
-      const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
-      
-      window.location.href = `${window.location.origin}${basePath}/${encodeURIComponent(file.garden)}#${encodeURIComponent(file.path)}`;
-    } else {
-      // Simple hash change for files in the current garden
-      window.location.hash = `#${encodeURIComponent(file.path)}`;
+    if (this.mode === 'execute') {
+      console.log(`Executing: ${file.path}`);
+      this.close();
+      try {
+        const fileContent = await this.gitClient.readFile(file.path);
+        const executable = new Function(fileContent);
+        const result = executable();
+        console.log(`Execution successful for ${file.path}. Result:`, result);
+      } catch (error) {
+        console.error(`Execution failed for ${file.path}:`, error);
+      }
+    } else { // 'search' mode
+      if (file.garden !== this.gitClient.gardenName) {
+        const fullPath = new URL(import.meta.url).pathname;
+        const srcIndex = fullPath.lastIndexOf('/src/');
+        const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
+        
+        window.location.href = `${window.location.origin}${basePath}/${encodeURIComponent(file.garden)}#${encodeURIComponent(file.path)}`;
+      } else {
+        window.location.hash = `#${encodeURIComponent(file.path)}`;
+      }
+      this.close();
     }
-    
-    this.close();
   }
 
   handleInput(e) {
