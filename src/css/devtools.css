@@ -12,7 +12,7 @@ body .luna-tab-item {
   min-height: 0;
 }
 #eruda-resizer {
-  height: 24px;
+  height: 2rem;
   cursor: pointer;
   background-color: var(--color-border-secondary);
   flex-shrink: 0;
@@ -23,7 +23,7 @@ body .luna-tab-item {
 }
 #eruda-resizer:hover { background-color: var(--base-accent-destructive); }
 #eruda-toggle {
-  width: 22px;
+  width: 2rem;
   height: 100%;
   background: transparent;
   border: none;
@@ -52,7 +52,7 @@ body.eruda-select-active .eruda-elements-highlight {
 hr {
   border: none;
   border-top: 1px solid var(--color-border-secondary);
-  margin: 25px 0;
+  margin: 2rem 0;
 }
 
 /* button */
@@ -81,14 +81,30 @@ html .eruda-container .luna-tab-slider {
   background: var(--base-accent-destructive);
   height: 2px;
 }
+html .luna-tab-tabs {
+  background: var(--base-dark);
+  height: 3rem;
+  line-height: 3rem;
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+html .eruda-dev-tools {
+  padding-top: 3rem !important;
+  border:none;
+}
 html .luna-tab-item {
   color: var(--color-text-secondary);
 }
-html .eruda-dev-tools {
-  border:none;
+html .luna-tab-title {
+  height: 3rem !important;
+  line-height: 3rem !important;
 }
 html .eruda-container .luna-tab-tabs-container {
+  height: 3rem !important;
+  line-height: 3rem !important;
   border-bottom: 1px solid var(--color-border-secondary);
+}
+html .eruda-dev-tools .eruda-tools .eruda-tool {
+  overflow: auto;
 }
 html #eruda-console .eruda-control {
   background: var(--base-dark);
@@ -119,6 +135,8 @@ html .eruda-container .luna-console-log-item .luna-console-count {
   background: var(--base-accent-info);
   color: var(--base-dark);
   font-weight: bold;
+  padding: 0 0.5rem;
+  padding-top: 0.2rem;
 }
 
 /* Elements tab */
@@ -266,4 +284,86 @@ html .eruda-container .luna-setting-item-select .luna-setting-select select {
   background: var(--base-dark);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-secondary);
+}
+
+
+/* overrides */
+#eruda-console .eruda-control [class*=" eruda-icon-"], #eruda-console .eruda-control [class^=eruda-icon-],
+.luna-console {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+}
+#eruda-control {
+  padding-left: 3rem !important;
+}
+.luna-tab-item {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+  height: auto !important;
+}
+#eruda-console {
+  padding-top: 3rem !important;
+}
+html #eruda-console .eruda-control {
+  height: auto;
+  padding-left: 2rem;
+}
+html #eruda-console .eruda-control .eruda-icon-copy {
+  right: 0.5rem;
+  display: inline-block;
+}
+html #eruda-console .eruda-control .eruda-icon-filter {
+  right: 2.5rem;
+}
+.eruda-level {
+  margin-right: 0.5rem !important;
+}
+html #eruda-console .eruda-control .eruda-icon-clear {
+  margin-right: 1rem;
+  display: inline-block;
+}
+html #eruda-console .eruda-control .eruda-level {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  height: auto;
+}
+
+html #eruda-elements .eruda-styles, html .eruda-container a, html .eruda-container abbr, html .eruda-container acronym, html html .eruda-container address, html .eruda-container applet, html .eruda-container article, html .eruda-container aside, html .eruda-container audio, html .eruda-container b, html .eruda-container big, html .eruda-container blockquote, html .eruda-container canvas, html .eruda-container caption, html .eruda-container center, html .eruda-container cite, html .eruda-container code, html .eruda-container dd, html .eruda-container del, html .eruda-container details, html .eruda-container dfn, html .eruda-container dl, html .eruda-container dt, html .eruda-container em, html .eruda-container embed, html .eruda-container fieldset, html .eruda-container figcaption, html .eruda-container figure, html .eruda-container footer, html .eruda-container form, html .eruda-container h1, html .eruda-container h2, html .eruda-container h3, html .eruda-container h4, html .eruda-container h5, html .eruda-container h6, html .eruda-container header, html .eruda-container hgroup, html .eruda-container i, html .eruda-container iframe, html .eruda-container img, html .eruda-container ins, html .eruda-container kbd, html .eruda-container label, html .eruda-container legend, html .eruda-container li, html .eruda-container mark, html .eruda-container menu, html .eruda-container nav, html .eruda-container object, html .eruda-container ol, html .eruda-container output, html .eruda-container p, html .eruda-container pre, html .eruda-container q, html .eruda-container ruby, html .eruda-container s, html .eruda-container samp, html .eruda-container section, html .eruda-container small, html .eruda-container span, html .eruda-container strike, html .eruda-container strong, html .eruda-container sub, html .eruda-container summary, html .eruda-container sup, html .eruda-container table, html .eruda-container tbody, html .eruda-container td, html .eruda-container tfoot, html .eruda-container th, html .eruda-container thead, html .eruda-container time, html .eruda-container tr, html .eruda-container tt, html .eruda-container u, html .eruda-container ul, html .eruda-container var, html .eruda-container video,
+html #eruda-elements .eruda-control [class*=" eruda-icon-"], html #eruda-elements .eruda-control [class^=eruda-icon-],
+html #eruda-elements .eruda-section h2,
+html #eruda-network .eruda-control [class*=" eruda-icon-"], html #eruda-network .eruda-control [class^=eruda-icon-],
+html .luna-data-grid {
+  font-size: 1rem;
+  line-height: 1.25rem;
+}
+html .luna-dom-viewer-icon-caret-down, html .luna-dom-viewer-icon-caret-right {
+  font-size: 1rem !important;
+}
+
+.luna-console-count-container {
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem;
+}
+
+html #eruda-elements .eruda-elements,
+html #eruda-network .eruda-network {
+  padding-top: 2.5rem;
+}
+html #eruda-network .eruda-control .eruda-icon-clear {
+  left: 2rem;
+}
+html .luna-data-grid th .luna-data-grid-icon-caret-down, html .luna-data-grid th .luna-data-grid-icon-caret-up {
+  font-size: 1rem;
+}
+html .luna-data-grid-header-container {
+  height: auto;
+}
+html #eruda-elements .eruda-elements .eruda-control .eruda-icon-delete {
+  right: 2rem;
+}
+html #eruda-network .eruda-network .eruda-control .eruda-icon-copy {
+  right: 0.5rem;
+}
+html #eruda-network .eruda-network .eruda-control .eruda-icon-filter {
+  right: 2.5rem;
 }

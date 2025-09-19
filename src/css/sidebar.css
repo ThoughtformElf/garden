@@ -90,6 +90,7 @@
   min-width: 0;
   padding: 0;
   border-right: none;
+  display: none;
 }
 .sidebar-tab.dirty { position: relative; }
 .sidebar-tab.dirty::after {
