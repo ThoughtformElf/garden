@@ -5,7 +5,7 @@
   height: 100%;
 }
 .git-commit-area {
-  padding: 10px;
+  padding: 1rem;
   border-bottom: 1px solid var(--color-border-secondary);
   flex-shrink: 0;
 }
@@ -14,22 +14,19 @@
   box-sizing: border-box;
   background-color: var(--color-background-tertiary);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border-primary);
-  border-radius: 3px;
-  padding: 8px;
-  font-family: monospace;
+  border: 2px solid var(--color-border-primary);
+  padding: 1rem;
   resize: vertical;
-  margin-bottom: 8px;
+  margin-bottom: 1rem;
+}
+.git-commit-area textarea:focus {
+  outline: none;
+  border-color: var(--base-accent-destructive);
 }
 .git-commit-area button {
   width: 100%;
-  padding: 8px;
-  background-color: var(--color-action-primary-bg);
-  color: var(--color-text-on-accent);
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-weight: bold;
+  background-color: var(--base-accent-destructive);
+  color: var(--color-text-primary)
 }
 .git-commit-area button:disabled {
   background-color: var(--color-border-secondary);
@@ -37,16 +34,15 @@
   cursor: not-allowed;
 }
 .git-file-section {
-  padding: 0 10px;
+  padding: 0 1rem;
   overflow-y: auto;
 }
 .git-section-header {
-  font-size: 12px;
+  font-size: 1rem;
   font-weight: bold;
   text-transform: uppercase;
   color: var(--color-text-secondary);
-  margin: 15px 0 5px 0;
-  font-family: Arial, sans-serif;
+  margin: 1rem 0 1rem 0;
 }
 .git-file-list {
   list-style: none;
@@ -56,16 +52,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 4px;
-  font-family: monospace;
-  font-size: 13px;
-  border-radius: 3px;
+  padding: 0.5rem;
+  font-size: 1rem;
+  color: var(--base-accent-emphasis);
 }
 .git-file-item.active { background-color: var(--color-background-active); }
 .git-file-item:hover { background-color: var(--color-border-secondary); }
 .git-file-item:hover .git-file-actions { opacity: 1; }
 .git-file-path {
-  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -76,33 +70,29 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  opacity: 0;
-  transition: opacity 0.15s ease-in-out;
 }
 .git-action-button {
   background: none;
   border: none;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 16px;
-  padding: 0 5px;
-  font-family: monospace;
+  font-size: 1rem;
+  padding: 0 0.5rem;
   font-weight: bold;
 }
 .git-action-button:hover { color: var(--color-text-primary); }
 .no-changes {
-  font-family: monospace;
   color: var(--color-text-secondary);
   font-style: italic;
-  font-size: 13px;
-  padding: 4px;
+  font-size: 1rem;
+  padding: 0.5rem;
   display: block;
 }
 .git-history-section {
-  padding: 0 10px 10px;
+  padding: 0 1rem 1rem;
   overflow-y: auto;
   border-top: 1px solid var(--color-border-secondary);
-  margin-top: 10px;
+  margin-top: 1rem;
 }
 .git-history-list {
   list-style: none;
@@ -113,9 +103,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 4px;
+  padding: 0.5rem;
   cursor: pointer;
-  border-radius: 3px;
 }
 .git-history-header:hover { background-color: var(--color-border-secondary); }
 .git-history-message {
@@ -123,30 +112,28 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
-  font-family: monospace;
+  font-size: 1rem;
 }
 .git-history-oid {
-  color: var(--color-text-secondary);
+  color: var(--base-accent-destructive);
   flex-shrink: 0;
-  margin-left: 10px;
-  font-size: 13px;
-  font-family: monospace;
+  margin-left: 1rem;
+  font-size: 1rem;
 }
 .git-history-details {
   background-color: var(--color-background-tertiary);
-  padding: 10px;
-  font-size: 12px;
+  padding: 1rem;
+  font-size: 1rem;
+  border: 2px dashed var(--color-border-primary);
   color: var(--color-text-secondary);
 }
 .commit-meta {
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed var(--color-border-secondary);
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px dashed var(--color-border-secondary);
 }
 .history-file-list .history-file-path {
-  padding: 4px;
-  border-radius: 3px;
+  padding: 0.5rem;
   cursor: pointer;
 }
 .history-file-list .history-file-path:hover,

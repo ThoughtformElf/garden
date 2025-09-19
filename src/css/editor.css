@@ -64,6 +64,10 @@ main, .cm-editor {
   background-color: var(--color-syntax-checkbox-doing-bg);
   color: var(--color-syntax-checkbox-doing-text);
 }
+.cm-checkbox-doing .cm-link {
+  background: var(--color-syntax-checkbox-doing-bg);
+  text-decoration: none;
+}
 .cm-timestamp {
   color: var(--base-accent-info);
   font-weight: bold;
@@ -92,7 +96,7 @@ main, .cm-editor {
 
 body .cm-activeLine,
 body .cm-selectionBackground {
-  background: var(--base-interactive) !important;
+  background: color-mix(in srgb, var(--base-accent-destructive), #000000aa 70%) !important;
 }
 body .cm-vimMode .cm-activeLine,
 html body .cm-activeLineGutter {

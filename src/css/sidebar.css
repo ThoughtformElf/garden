@@ -48,7 +48,7 @@
   text-overflow: ellipsis;
   color: var(--color-text-primary);
 }
-.sidebar-content li a.status-modified { color: var(--base-accent-destructive); }
+.sidebar-content li a.status-modified { color: var(--base-accent-emphasis); }
 .sidebar-content li a.status-unmodified { color: var(--color-text-primary); }
 .sidebar-content li a.active { background-color: var(--color-background-active); }
 .sidebar-content li a:hover { background-color: var(--color-border-secondary); }

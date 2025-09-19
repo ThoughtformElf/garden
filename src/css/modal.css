@@ -25,6 +25,9 @@
   flex-direction: column;
   flex-grow: 0; flex-shrink: 1;
 }
+.modal-container input[type="text"] {
+  width: 100%;
+}
 .modal-header {
   padding: 1rem;
   padding-bottom: 0;
