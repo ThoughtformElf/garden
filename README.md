@@ -46,25 +46,26 @@ Thoughtform Garden is now a powerful userscript manager for itself. You can writ
 1.  **Create a script file:** In the file explorer, create a new file, for example, `my-command.js`.
 2.  **Write your script:** Your script has access to two powerful global objects: `editor` and `git`.
 
-    ```
-    // Example: my-command.js
-    // This script will get the content of the current file,
-    // append a timestamp, and save the change as a new commit.
+```js
+// Example: my-command.js
+// This script will get the content of the current file,
+// append a timestamp, and save the change as a new commit.
 
-    // 1. Access the 'editor' object
-    const currentDoc = editor.editorView.state.doc;
-    const newContent = currentDoc.toString() + `\n\nUpdated: ${new Date().toISOString()}`;
+// 1. Access the 'editor' object
+const currentDoc = editor.editorView.state.doc;
+const newContent = currentDoc.toString() + `\n\nUpdated: ${new Date().toISOString()}`;
 
-    // 2. Dispatch a change to the editor view
-    editor.editorView.dispatch({
-      changes: { from: 0, to: currentDoc.length, insert: newContent }
-    });
+// 2. Dispatch a change to the editor view
+editor.editorView.dispatch({
+  changes: { from: 0, to: currentDoc.length, insert: newContent }
+});
 
-    // 3. Access the 'git' object to commit the change
-    await git.commit('Appended update timestamp via script');
+// 3. Access the 'git' object to commit the change
+await git.commit('Appended update timestamp via script');
 
-    console.log('Timestamp appended and committed successfully!');
-    ```
+console.log('Timestamp appended and committed successfully!');
+```
+
 3.  **Run your command:** Press `Ctrl+Shift+P`, type `my-command.js`, and press `Enter`. The script will execute immediately.
 
 ### Multi-Workspace Management

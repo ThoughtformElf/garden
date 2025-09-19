@@ -7,10 +7,7 @@ import { ContextMenu } from '../util/context-menu.js';
 export function initializeAppInteractions() {
   initializeSidebarInteractions();
   initializeErudaResizer();
-  // REMOVED: initializeEditorContextMenu();
 }
-
-// REMOVED: The initializeEditorContextMenu function has been removed.
 
 /**
  * Initializes sidebar resizing and collapsing functionality.
@@ -25,7 +22,7 @@ function initializeSidebarInteractions() {
 
   const toggleButton = document.createElement('button');
   toggleButton.id = 'sidebar-toggle-icon';
-  toggleButton.title = 'Toggle Sidebar';
+  toggleButton.title = 'Toggle Sidebar (Ctrl + [)';
   resizer.appendChild(toggleButton);
 
   let dragStartX = 0;
@@ -51,6 +48,11 @@ function initializeSidebarInteractions() {
       toggleButton.textContent = '›';
     }
   };
+  
+  // Expose the toggle function on the global thoughtform API
+  if (window.thoughtform && window.thoughtform.ui) {
+    window.thoughtform.ui.toggleSidebar = toggleCollapse;
+  }
   
   const sidebarHandleMove = (e) => {
     if (e.type === 'touchmove') e.preventDefault();
@@ -129,7 +131,7 @@ function initializeErudaResizer() {
   
   const erudaToggle = document.createElement('button');
   erudaToggle.id = 'eruda-toggle';
-  erudaToggle.title = 'Toggle Eruda Panel';
+  erudaToggle.title = 'Toggle DevTools (Ctrl + `)';
   erudaResizer.appendChild(erudaToggle);
   let dragStartY = 0;
   let isDragging = false;
@@ -152,6 +154,12 @@ function initializeErudaResizer() {
       localStorage.setItem('erudaCollapsed', 'true');
     }
   };
+
+  // Expose the toggle function on the global thoughtform API
+  if (window.thoughtform && window.thoughtform.ui) {
+    window.thoughtform.ui.toggleDevtools = toggleEruda;
+  }
+  
   const erudaHandleMove = (e) => {
     if (e.type === 'touchmove') e.preventDefault();
     const currentY = e.clientY || (e.touches && e.touches[0].clientY);
@@ -167,7 +175,6 @@ function initializeErudaResizer() {
     erudaToggle.textContent = '▼';
   };
 
-  // UPDATED: Logic to handle both drag and tap
   const erudaEndResize = () => {
     document.body.style.cursor = 'default';
     document.body.style.userSelect = 'auto';
@@ -177,11 +184,9 @@ function initializeErudaResizer() {
     document.removeEventListener('touchend', erudaEndResize);
     
     if (isDragging) {
-        // If it was a drag, save the final height
         localStorage.setItem('erudaHeight', erudaDevTools.style.height);
         localStorage.setItem('erudaCollapsed', 'false');
     } else {
-        // If it was not a drag, it was a tap/click, so toggle
         toggleEruda();
     }
   };
@@ -203,10 +208,7 @@ function initializeErudaResizer() {
   erudaResizer.addEventListener('mousedown', erudaStartResize);
   erudaResizer.addEventListener('touchstart', erudaStartResize, { passive: false });
 
-  // REMOVED: The separate click listener is no longer needed.
-  // erudaResizer.addEventListener('click', ...);
-
-  // Restore State logic remains the same
+  // Restore State logic
   const observer = new MutationObserver(() => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (erudaDevTools) {

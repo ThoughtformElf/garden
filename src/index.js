@@ -8,7 +8,9 @@ import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
 
 // --- Expose a global API for the app ---
-window.thoughtform = {};
+window.thoughtform = {
+  ui: {}, // Create a namespace for UI control functions
+};
 
 // --- Main Application Logic ---
 const fullPath = new URL(import.meta.url).pathname;
@@ -27,10 +29,11 @@ console.log(`Loading garden: "${gardenName}"`);
 
 const gitClient = new Git(gardenName);
 
+// This will populate window.thoughtform.ui with methods
 initializeAppInteractions();
 initializeDevTools();
 
-const editor = new Editor({ 
+const editor = new Editor({
   target: 'main',
   gitClient: gitClient
 });
@@ -46,26 +49,43 @@ const checkEditorReady = setInterval(() => {
     window.thoughtform.commandPalette = commandPalette;
 
     // --- MASTER KEYDOWN LISTENER ---
-    // This is the single source of truth for the command palette shortcut.
-    // It uses `capture: true` to intercept the event before the browser
-    // or CodeMirror can (e.g., stopping the Print dialog).
+    // This is the single source of truth for global keyboard shortcuts.
+    // It uses `capture: true` to intercept events before other listeners.
     window.addEventListener('keydown', (e) => {
+      // Don't interfere with inputs, textareas, etc., unless it's the editor itself.
+      const activeEl = document.activeElement;
+      const isInputFocused = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      if (isInputFocused && !activeEl.classList.contains('cm-content')) {
+        return;
+      }
+
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifierKey = isMac ? e.metaKey : e.ctrlKey;
 
-      // Listen for 'p' and check modifier keys.
-      if (modifierKey && e.key.toLowerCase() === 'p') {
-        // We MUST prevent the default action immediately.
-        e.preventDefault();
-        e.stopPropagation();
+      if (!modifierKey) return;
 
-        if (e.shiftKey) {
-          // Ctrl+Shift+P -> Execute Mode
-          commandPalette.open('execute');
-        } else {
-          // Ctrl+P -> Search Mode
-          commandPalette.open('search');
-        }
+      switch (e.key.toLowerCase()) {
+        case 'p':
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.shiftKey) {
+            commandPalette.open('execute');
+          } else {
+            commandPalette.open('search');
+          }
+          break;
+
+        case '[':
+          e.preventDefault();
+          e.stopPropagation();
+          window.thoughtform.ui.toggleSidebar?.();
+          break;
+
+        case '`':
+          e.preventDefault();
+          e.stopPropagation();
+          window.thoughtform.ui.toggleDevtools?.();
+          break;
       }
     }, { capture: true }); // Use capturing phase.
   }
