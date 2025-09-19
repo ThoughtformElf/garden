@@ -136,9 +136,11 @@ export class Git {
     try {
       const commit = await git.readCommit({ fs: this.fs, dir: '/', oid });
       const parentOid = commit.commit.parent[0];
+      
       if (!parentOid) {
+        // For the initial commit, list all files (which are guaranteed to be blobs)
         const files = await git.listFiles({ fs: this.fs, dir: '/', ref: oid });
-        return files.map(f => ({ path: `/${f}`, type: 'add' }));
+        return files.map(f => `/${f}`);
       }
 
       const files = [];
@@ -148,9 +150,19 @@ export class Git {
         trees: [git.TREE({ ref: parentOid }), git.TREE({ ref: oid })],
         map: async function(filepath, [A, B]) {
           if (filepath === '.') return;
-          const aOid = await A.oid();
-          const bOid = await B.oid();
-          if (aOid !== bOid) {
+
+          const aOid = A ? await A.oid() : null;
+          const bOid = B ? await B.oid() : null;
+          
+          if (aOid === bOid) return; // Unchanged, ignore.
+
+          // THE FIX:
+          // Determine the type of the entry. If B exists, use its type. 
+          // If B doesn't exist (deletion), use A's type.
+          const type = B ? await B.type() : (A ? await A.type() : null);
+
+          // Only include blobs (files) in the final list. Ignore trees (directories).
+          if (type === 'blob') {
             files.push(`/${filepath}`);
           }
         }
