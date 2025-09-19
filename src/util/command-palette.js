@@ -30,21 +30,21 @@ export class CommandPalette {
 
   createDOMElements() {
     this.overlay = document.createElement('div');
-    this.overlay.className = 'cp-overlay hidden';
+    this.overlay.className = 'command-overlay hidden';
     this.overlay.addEventListener('click', this.close);
 
     this.container = document.createElement('div');
-    this.container.className = 'cp-container';
+    this.container.className = 'command-container';
     this.container.addEventListener('click', e => e.stopPropagation());
 
     this.input = document.createElement('input');
     this.input.type = 'text';
-    this.input.className = 'cp-input';
+    this.input.className = 'command-input';
     this.input.placeholder = 'Find file across all gardens...';
     this.input.addEventListener('input', this.handleInput);
 
     this.resultsList = document.createElement('ul');
-    this.resultsList.className = 'cp-results-list';
+    this.resultsList.className = 'command-results-list';
     this.resultsList.addEventListener('click', this.handleResultClick);
 
     this.container.appendChild(this.input);
@@ -151,20 +151,20 @@ export class CommandPalette {
   renderResults() {
     this.resultsList.innerHTML = '';
     if (this.results.length === 0) {
-      this.resultsList.innerHTML = '<li class="cp-no-results">No matches found</li>';
+      this.resultsList.innerHTML = '<li class="command-no-results">No matches found</li>';
       return;
     }
 
     this.results.forEach((file, index) => {
       const li = document.createElement('li');
-      li.className = 'cp-result-item';
+      li.className = 'command-result-item';
       li.dataset.index = index;
 
       const pathText = file.path.startsWith('/') ? file.path.substring(1) : file.path;
       
       // If the file is not in the current garden, show the garden name
       if (file.garden !== this.gitClient.gardenName) {
-        li.innerHTML = `<span class="cp-path">${pathText}</span> <span class="cp-garden">${file.garden}</span>`;
+        li.innerHTML = `<span class="command-path">${pathText}</span> <span class="command-garden">${file.garden}</span>`;
       } else {
         li.textContent = pathText;
       }
@@ -204,7 +204,7 @@ export class CommandPalette {
   }
   
   handleResultClick(e) {
-    const item = e.target.closest('.cp-result-item');
+    const item = e.target.closest('.command-result-item');
     if (item) {
       this.selectItem(parseInt(item.dataset.index, 10));
     }

@@ -1,4 +1,4 @@
-.cp-overlay {
+.command-overlay {
   position: fixed;
   top: 0; left: 0;
   width: 100vw; height: 100vh;
@@ -11,11 +11,11 @@
   opacity: 1;
   transition: opacity 0.2s ease-in-out;
 }
-.cp-overlay.hidden {
+.command-overlay.hidden {
   opacity: 0;
   pointer-events: none;
 }
-.cp-container {
+.command-container {
   background: var(--color-background-secondary);
   border: 1px solid var(--color-border-primary);
   border-radius: 8px;
@@ -26,7 +26,7 @@
   display: flex;
   flex-direction: column;
 }
-.cp-input {
+.command-input {
   width: 100%;
   padding: 12px 15px;
   background: transparent;
@@ -37,18 +37,18 @@
   font-family: Arial, sans-serif;
   box-sizing: border-box;
 }
-.cp-input:disabled { color: var(--color-text-secondary); }
-.cp-input:focus {
+.command-input:disabled { color: var(--color-text-secondary); }
+.command-input:focus {
   outline: none;
   border-bottom-color: var(--color-border-interactive);
 }
-.cp-results-list {
+.command-results-list {
   list-style: none;
   padding: 0; margin: 0;
   overflow-y: auto;
   flex-grow: 1;
 }
-.cp-result-item, .cp-no-results {
+.command-result-item, .command-no-results {
   padding: 10px 15px;
   font-family: monospace;
   font-size: 14px;
@@ -59,26 +59,26 @@
   justify-content: space-between;
   align-items: center;
 }
-.cp-result-item:last-child { border-bottom: none; }
-.cp-result-item.active {
+.command-result-item:last-child { border-bottom: none; }
+.command-result-item.active {
   background-color: var(--color-background-active);
   color: var(--color-text-bright);
 }
-.cp-result-item:hover { background-color: var(--color-background-hover); }
-.cp-no-results {
+.command-result-item:hover { background-color: var(--color-background-hover); }
+.command-no-results {
   font-style: italic;
   color: var(--color-text-secondary);
   cursor: default;
 }
-.cp-path {
+.command-path {
   flex-grow: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cp-garden {
-  color: var(--color-text-secondary);
-  background-color: var(--color-background-hover);
+.command-garden {
+  color: var(--base-text-primary);
+  background-color: var(--base-accent-destructive);
   padding: 2px 6px;
   border-radius: 4px;
   margin-left: 10px;

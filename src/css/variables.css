@@ -20,8 +20,8 @@
   --base-accent-highlight:    #5d3d80; /* For code blocks and highlighted backgrounds */
   
   /* --- Syntax Accents --- */
-  --base-syntax-add-bg:       rgba(15, 88, 39, 0.4);
-  --base-syntax-del-bg:       rgba(140, 33, 33, 0.4);
+  --base-syntax-add-bg:       color-mix(in srgb, var(--base-text-muted), #000000aa 50%);
+  --base-syntax-del-bg:       color-mix(in srgb, var(--base-text-destructive), #000000aa 50%);
   --base-syntax-highlight-bg: var(--base-accent-emphasis);
   --base-syntax-wikilink-bg:  var(--base-accent-info);
   --base-syntax-wikilink-text:color-mix(in srgb, var(--base-accent-info), black 80%);
