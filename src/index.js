@@ -36,16 +36,16 @@ initializeDevTools();
 // --- Global Error Handling ---
 window.onerror = function(message, source, lineno, colno, error) {
   console.error("Caught global error:", message, error);
-  // Force the devtools to be shown when an error occurs
-  window.thoughtform.ui.toggleDevtools?.(true);
+  // Ensure devtools are shown when an error occurs, and force console tab
+  window.thoughtform.ui.toggleDevtools?.(true, 'console');
   // Return false to allow the default browser error handling to continue
   return false;
 };
 
 window.onunhandledrejection = function(event) {
   console.error("Caught unhandled promise rejection:", event.reason);
-  // Force the devtools to be shown
-  window.thoughtform.ui.toggleDevtools?.(true);
+  // Ensure devtools are shown when an error occurs, and force console tab
+  window.thoughtform.ui.toggleDevtools?.(true, 'console');
 };
 // --- End of Error Handling ---
 
@@ -100,9 +100,11 @@ const checkEditorReady = setInterval(() => {
         case '`':
           e.preventDefault();
           e.stopPropagation();
-          window.thoughtform.ui.toggleDevtools?.();
+          // Manually toggle without forcing a specific tab
+          window.thoughtform.ui.toggleDevtools?.(null, null);
           break;
       }
     }, { capture: true }); // Use capturing phase.
   }
 }, 100);
+

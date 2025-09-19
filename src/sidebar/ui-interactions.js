@@ -139,44 +139,30 @@ function initializeErudaResizer() {
   /**
    * Toggles or sets the visibility of the Eruda dev tools panel.
    * @param {boolean|null} [state=null] - `true` to show, `false` to hide, `null` to toggle.
+   * @param {string|null} [targetTab=null] - If provided, switches to this tab when showing.
    */
-  const toggleEruda = (state = null) => {
+  const toggleEruda = (state = null, targetTab = null) => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (!erudaDevTools) return;
 
     const isCurrentlyCollapsed = erudaDevTools.style.height === '0px' || erudaDevTools.offsetHeight < 10;
+    const shouldShow = state === null ? isCurrentlyCollapsed : state;
 
-    const show = () => {
+    if (shouldShow) {
       const lastHeight = localStorage.getItem('erudaHeight') || '250px';
       erudaDevTools.style.height = lastHeight;
       erudaToggle.textContent = '▼';
       localStorage.setItem('erudaCollapsed', 'false');
-      // Use a small timeout to ensure the UI is ready before switching tabs
-      setTimeout(() => window.thoughtform.eruda?.show('console'), 50);
-    };
-
-    const hide = () => {
+      if (targetTab) {
+        // Use a small timeout to ensure the UI is ready before switching tabs
+        setTimeout(() => window.thoughtform.eruda?.show(targetTab), 50);
+      }
+    } else { // should hide
+      if (isCurrentlyCollapsed) return; // Do nothing if already hidden
       localStorage.setItem('erudaHeight', erudaDevTools.style.height);
       erudaDevTools.style.height = '0px';
       erudaToggle.textContent = '▲';
       localStorage.setItem('erudaCollapsed', 'true');
-    };
-
-    if (state === true) { // Force show
-      if (isCurrentlyCollapsed) {
-        show();
-      } else {
-        // If already shown, just ensure the correct tab is active
-        setTimeout(() => window.thoughtform.eruda?.show('console'), 50);
-      }
-    } else if (state === false) { // Force hide
-      if (!isCurrentlyCollapsed) hide();
-    } else { // Toggle
-      if (isCurrentlyCollapsed) {
-        show();
-      } else {
-        hide();
-      }
     }
   };
 
@@ -213,7 +199,7 @@ function initializeErudaResizer() {
         localStorage.setItem('erudaHeight', erudaDevTools.style.height);
         localStorage.setItem('erudaCollapsed', 'false');
     } else {
-        toggleEruda();
+        toggleEruda(null, null);
     }
   };
   

@@ -40,6 +40,21 @@ export function initializeDevTools() {
     window.thoughtform.eruda = eruda;
   }
 
+  // --- Add listener to open devtools when a tab is clicked ---
+  setTimeout(() => {
+    const navBar = el.querySelector('.luna-tab-item')?.parentElement;
+    if (navBar) {
+      navBar.addEventListener('click', (e) => {
+        const tabItem = e.target.closest('.luna-tab-item');
+        if (tabItem) {
+          const tabName = tabItem.innerText.toLowerCase();
+          // Force show and switch to the clicked tab
+          window.thoughtform.ui.toggleDevtools?.(true, tabName);
+        }
+      });
+    }
+  }, 500);
+
   // --- Fix for Eruda elements panel inspection ---
   setTimeout(() => {
     const elementsPanel = el.querySelector('.eruda-elements');
@@ -236,3 +251,4 @@ export function initializeDevTools() {
   });
   return dataTool;
 }
+
