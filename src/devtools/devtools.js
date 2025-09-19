@@ -35,6 +35,11 @@ export function initializeDevTools() {
     useShadowDom: false,
   });
 
+  // Expose the eruda instance globally for programmatic control
+  if (window.thoughtform) {
+    window.thoughtform.eruda = eruda;
+  }
+
   // --- Fix for Eruda elements panel inspection ---
   setTimeout(() => {
     const elementsPanel = el.querySelector('.eruda-elements');

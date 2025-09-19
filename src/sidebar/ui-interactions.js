@@ -151,6 +151,8 @@ function initializeErudaResizer() {
       erudaDevTools.style.height = lastHeight;
       erudaToggle.textContent = '▼';
       localStorage.setItem('erudaCollapsed', 'false');
+      // Use a small timeout to ensure the UI is ready before switching tabs
+      setTimeout(() => window.thoughtform.eruda?.show('console'), 50);
     };
 
     const hide = () => {
@@ -161,7 +163,12 @@ function initializeErudaResizer() {
     };
 
     if (state === true) { // Force show
-      if (isCurrentlyCollapsed) show();
+      if (isCurrentlyCollapsed) {
+        show();
+      } else {
+        // If already shown, just ensure the correct tab is active
+        setTimeout(() => window.thoughtform.eruda?.show('console'), 50);
+      }
     } else if (state === false) { // Force hide
       if (!isCurrentlyCollapsed) hide();
     } else { // Toggle
@@ -244,3 +251,4 @@ function initializeErudaResizer() {
   });
   observer.observe(erudaContainer, { childList: true });
 }
+
