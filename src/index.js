@@ -33,6 +33,22 @@ const gitClient = new Git(gardenName);
 initializeAppInteractions();
 initializeDevTools();
 
+// --- Global Error Handling ---
+window.onerror = function(message, source, lineno, colno, error) {
+  console.error("Caught global error:", message, error);
+  // Force the devtools to be shown when an error occurs
+  window.thoughtform.ui.toggleDevtools?.(true);
+  // Return false to allow the default browser error handling to continue
+  return false;
+};
+
+window.onunhandledrejection = function(event) {
+  console.error("Caught unhandled promise rejection:", event.reason);
+  // Force the devtools to be shown
+  window.thoughtform.ui.toggleDevtools?.(true);
+};
+// --- End of Error Handling ---
+
 const editor = new Editor({
   target: 'main',
   gitClient: gitClient

@@ -135,25 +135,44 @@ function initializeErudaResizer() {
   erudaResizer.appendChild(erudaToggle);
   let dragStartY = 0;
   let isDragging = false;
-  const toggleEruda = () => {
-    // Ensure erudaDevTools is the latest element
+
+  /**
+   * Toggles or sets the visibility of the Eruda dev tools panel.
+   * @param {boolean|null} [state=null] - `true` to show, `false` to hide, `null` to toggle.
+   */
+  const toggleEruda = (state = null) => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (!erudaDevTools) return;
-    
+
     const isCurrentlyCollapsed = erudaDevTools.style.height === '0px' || erudaDevTools.offsetHeight < 10;
-    
-    if (isCurrentlyCollapsed) {
+
+    const show = () => {
       const lastHeight = localStorage.getItem('erudaHeight') || '250px';
       erudaDevTools.style.height = lastHeight;
       erudaToggle.textContent = '▼';
       localStorage.setItem('erudaCollapsed', 'false');
-    } else {
+    };
+
+    const hide = () => {
       localStorage.setItem('erudaHeight', erudaDevTools.style.height);
       erudaDevTools.style.height = '0px';
       erudaToggle.textContent = '▲';
       localStorage.setItem('erudaCollapsed', 'true');
+    };
+
+    if (state === true) { // Force show
+      if (isCurrentlyCollapsed) show();
+    } else if (state === false) { // Force hide
+      if (!isCurrentlyCollapsed) hide();
+    } else { // Toggle
+      if (isCurrentlyCollapsed) {
+        show();
+      } else {
+        hide();
+      }
     }
   };
+
 
   // Expose the toggle function on the global thoughtform API
   if (window.thoughtform && window.thoughtform.ui) {

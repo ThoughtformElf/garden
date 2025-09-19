@@ -198,6 +198,8 @@ export class CommandPalette {
         console.log(`Execution successful for ${file.path}. Result:`, result);
       } catch (error) {
         console.error(`Execution failed for ${file.path}:`, error);
+        // Also trigger the devtools to show on a caught error
+        window.thoughtform.ui.toggleDevtools?.(true);
       }
     } else { // 'search' mode
       if (file.garden !== this.gitClient.gardenName) {
