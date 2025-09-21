@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { VitePWA } from 'vite-plugin-pwa';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
   plugins: [
@@ -18,27 +19,17 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/eruda/eruda.js',
+          dest: 'eruda' // This will create `dist/eruda/eruda.js`
+        }
+      ]
+    }),    
   ],
   optimizeDeps: {
     include: ['isomorphic-git', '@isomorphic-git/lightning-fs', 'jszip'],
   },
-  build: {
-    rollupOptions: {
-      output: {
-        // This refined chunking strategy solves the dependency loading error
-        manualChunks(id) {
-          if (id.includes('gpt-tokenizer')) {
-            return 'chunk-gpt-tokenizer';
-          }
-          if (id.includes('codemirror')) {
-            return 'chunk-codemirror';
-          }
-          // Let Vite bundle isomorphic-git with other vendors to preserve dependencies
-          if (id.includes('node_modules')) {
-            return 'chunk-vendor';
-          }
-        },
-      },
-    },
-  },
+  build: {},
 });
