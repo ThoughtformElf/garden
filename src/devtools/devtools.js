@@ -185,7 +185,7 @@ export function initializeDevTools() {
                 try {
                     await importGardensFromZip(file, selectedGardens, (msg) => {
                         progressHTML += `${msg}<br>`;
-                        progressModal.updateContent(progressHTML);
+                        modal.updateContent(progressHTML);
                     });
                 } catch(e) {
                     console.error('Import failed:', e);
@@ -225,7 +225,7 @@ export function initializeDevTools() {
             try {
                 await deleteGardens(selectedGardens, (msg) => {
                     progressHTML += `${msg}<br>`;
-                    progressModal.updateContent(progressHTML);
+                    modal.updateContent(progressHTML);
                 });
             } catch (e) {
                 console.error('Deletion failed:', e);
