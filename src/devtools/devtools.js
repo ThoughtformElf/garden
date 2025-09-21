@@ -1,4 +1,3 @@
-import eruda from 'eruda';
 import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
 import { Modal } from '../util/modal.js';
 

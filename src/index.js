@@ -1,4 +1,4 @@
-// src/index.js
+window.process = { env: {} }; 
 import { Buffer } from 'buffer';
 window.Buffer = Buffer; // Polyfill for isomorphic-git
 import { Editor } from './editor/editor.js';
