@@ -1,14 +1,14 @@
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { VitePWA } from 'vite-plugin-pwa';
-import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 export default defineConfig({
   plugins: [
     nodePolyfills({
       globals: {
         Buffer: true,
-      }
+      },
+      protocolImports: true,
     }),
     VitePWA({
       registerType: 'autoUpdate',
@@ -19,14 +19,6 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'node_modules/eruda/eruda.js',
-          dest: 'eruda' // This will create `dist/eruda/eruda.js`
-        }
-      ]
-    }),    
   ],
   optimizeDeps: {
     include: ['isomorphic-git', '@isomorphic-git/lightning-fs', 'jszip'],
