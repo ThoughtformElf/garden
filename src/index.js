@@ -1,6 +1,6 @@
 window.process = { env: {} }; 
 import { Buffer } from 'buffer';
-window.Buffer = Buffer; // Polyfill for isomorphic-git
+window.Buffer = Buffer;
 import { Editor } from './editor/editor.js';
 import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';

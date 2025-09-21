@@ -1,42 +1,59 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
+
 
 export default defineConfig({
-  // No 'base' property is needed for your custom domain
   plugins: [
     nodePolyfills({
-      globals: {
-        Buffer: true, // Keep this for Buffer access
-      },
-      protocolImports: true,
-    }),
+        globals: {
+          Buffer: true,
+        },
+        protocolImports: true,
+      }),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,md}'],
-        // Increase the size limit to prevent PWA build errors
+        // Increase the file size limit to 5MB to handle the largest chunk
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
-    // This reliably copies eruda.js into the build directory
     viteStaticCopy({
       targets: [
         {
           src: 'node_modules/eruda/eruda.js',
-          dest: 'eruda' // Creates `dist/eruda/eruda.js`
+          dest: '.' 
         }
       ]
     })
   ],
-  // This alias is the key to fixing the production 'buffer' error
   resolve: {
     alias: {
       buffer: 'buffer/',
     },
   },
-  // We can let Vite handle chunking to avoid dependency errors
-  build: {},
+  // Re-introduce manualChunks to split large libraries
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('gpt-tokenizer')) {
+            return 'chunk-gpt-tokenizer';
+          }
+          if (id.includes('codemirror')) {
+            return 'chunk-codemirror';
+          }
+          if (id.includes('isomorphic-git')) {
+            return 'chunk-git';
+          }
+          if (id.includes('node_modules')) {
+            return 'chunk-vendor';
+          }
+        },
+      },
+    },
+  },
 });
