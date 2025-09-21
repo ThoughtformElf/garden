@@ -37,15 +37,12 @@ initializeDevTools();
 // --- Global Error Handling ---
 window.onerror = function(message, source, lineno, colno, error) {
   console.error("Caught global error:", message, error);
-  // Ensure devtools are shown when an error occurs, and force console tab
   window.thoughtform.ui.toggleDevtools?.(true, 'console');
-  // Return false to allow the default browser error handling to continue
   return false;
 };
 
 window.onunhandledrejection = function(event) {
   console.error("Caught unhandled promise rejection:", event.reason);
-  // Ensure devtools are shown when an error occurs, and force console tab
   window.thoughtform.ui.toggleDevtools?.(true, 'console');
 };
 // --- End of Error Handling ---
