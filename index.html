@@ -5,6 +5,13 @@
   <title>Thoughtform Garden</title>
   <link rel="stylesheet" href="./src/css/style.css" />
   <link rel="icon" type="image/png" href="/favicon.png" />
+  <script>
+    window.global = window;
+    window.process = {
+      env: { DEBUG: undefined },
+      version: ''
+    };
+  </script>
 </head>
 <body>
   <div class="app-container">

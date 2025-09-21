@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "buffer": "^6.0.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.10",
     "@codemirror/lang-javascript": "^6.2.4",
@@ -31,13 +32,13 @@
     "isomorphic-git": "^1.33.1",
     "jszip": "^3.10.1",
     "lodash": "^4.17.21",
+    "process": "^0.11.10",
     "vite-plugin-pwa": "^1.0.3"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.1.0",
-    "buffer": "^6.0.3",
-    "process": "^0.11.10",
     "shx": "^0.4.0",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

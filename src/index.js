@@ -1,6 +1,7 @@
-window.process = { env: {} }; 
+import process from 'process';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
+window.process = process;
 import { Editor } from './editor/editor.js';
 import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';
@@ -107,4 +108,3 @@ const checkEditorReady = setInterval(() => {
     }, { capture: true }); // Use capturing phase.
   }
 }, 100);
-

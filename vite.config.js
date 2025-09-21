@@ -12,34 +12,6 @@ export default defineConfig({
       },
     }),
   ],
-  // This explicitly tells Vite to use the browser version of these packages
-  resolve: {
-    alias: {
-      'buffer': 'buffer/',
-      'process': 'process/browser',
-    },
-  },
-  // This ensures the polyfills are available during development
-  optimizeDeps: {
-    esbuildOptions: {
-      define: {
-        global: 'globalThis',
-      },
-      plugins: [
-        {
-          name: 'node-globals-polyfill',
-          setup(build) {
-            build.onResolve({ filter: /^buffer/ }, args => ({
-              path: require.resolve('buffer/'),
-            })),
-            build.onResolve({ filter: /^process/ }, args => ({
-                path: require.resolve('process/browser'),
-            }))
-          },
-        },
-      ],
-    },
-  },
   build: {
     rollupOptions: {
       output: {
