@@ -1,5 +1,6 @@
 import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
 import { Modal } from '../util/modal.js';
+import eruda from 'eruda';
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `
