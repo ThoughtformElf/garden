@@ -1,17 +1,14 @@
-# .github/workflows/deploy.yml
-
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main # Or whatever your default branch is
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
-    # THE FIX IS HERE: Add this permissions block
     permissions:
       contents: write
       
@@ -38,3 +35,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
+          cname: thoughtform.garden
