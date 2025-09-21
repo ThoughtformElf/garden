@@ -14,14 +14,20 @@ export default defineConfig({
     }),
   ],
   define: {
+    // This ensures that 'global' is replaced with 'window' during the build
     'global': 'window',
   },
   resolve: {
     alias: {
+      // These are your existing aliases
       'process': 'process/browser',
       'stream': 'stream-browserify',
       'zlib': 'browserify-zlib',
-      'util': 'util'
+      'util': 'util',
+      // --- ADD THIS LINE ---
+      // This tells Vite to use the 'buffer' npm package whenever any
+      // module tries to import the Node.js 'buffer' module.
+      'buffer': 'buffer',
     }
   },
   build: {
