@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import path from 'path';
 
 export default defineConfig({
   plugins: [
@@ -12,6 +13,17 @@ export default defineConfig({
       },
     }),
   ],
+  define: {
+    'global': 'window',
+  },
+  resolve: {
+    alias: {
+      'process': 'process/browser',
+      'stream': 'stream-browserify',
+      'zlib': 'browserify-zlib',
+      'util': 'util'
+    }
+  },
   build: {
     rollupOptions: {
       output: {

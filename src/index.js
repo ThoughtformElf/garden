@@ -1,7 +1,7 @@
-import process from 'process';
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
-window.process = process;
+window.process = { env: {} }; 
+
 import { Editor } from './editor/editor.js';
 import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';
@@ -56,8 +56,6 @@ const editor = new Editor({
 });
 
 // --- Initialize Command Palette & API ---
-// We wait for the editor to be fully ready before creating the palette
-// and setting up the master keydown listener.
 const checkEditorReady = setInterval(() => {
   if (editor.isReady) {
     clearInterval(checkEditorReady);
@@ -66,10 +64,7 @@ const checkEditorReady = setInterval(() => {
     window.thoughtform.commandPalette = commandPalette;
 
     // --- MASTER KEYDOWN LISTENER ---
-    // This is the single source of truth for global keyboard shortcuts.
-    // It uses `capture: true` to intercept events before other listeners.
     window.addEventListener('keydown', (e) => {
-      // Don't interfere with inputs, textareas, etc., unless it's the editor itself.
       const activeEl = document.activeElement;
       const isInputFocused = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
       if (isInputFocused && !activeEl.classList.contains('cm-content')) {
@@ -101,10 +96,9 @@ const checkEditorReady = setInterval(() => {
         case '`':
           e.preventDefault();
           e.stopPropagation();
-          // Manually toggle without forcing a specific tab
           window.thoughtform.ui.toggleDevtools?.(null, null);
           break;
       }
-    }, { capture: true }); // Use capturing phase.
+    }, { capture: true });
   }
 }, 100);
