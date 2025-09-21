@@ -8,21 +8,41 @@ export default defineConfig({
       injectRegister: 'auto',
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,md}'],
-        // Increase the size limit to prevent PWA build errors
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
   ],
+  // This explicitly tells Vite to use the browser version of these packages
   resolve: {
-    // This is the key to fixing the "buffer" error in all environments
     alias: {
-      buffer: 'buffer/',
+      'buffer': 'buffer/',
+      'process': 'process/browser',
+    },
+  },
+  // This ensures the polyfills are available during development
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+      plugins: [
+        {
+          name: 'node-globals-polyfill',
+          setup(build) {
+            build.onResolve({ filter: /^buffer/ }, args => ({
+              path: require.resolve('buffer/'),
+            })),
+            build.onResolve({ filter: /^process/ }, args => ({
+                path: require.resolve('process/browser'),
+            }))
+          },
+        },
+      ],
     },
   },
   build: {
     rollupOptions: {
       output: {
-        // This is necessary to prevent the PWA build error
         manualChunks(id) {
           if (id.includes('gpt-tokenizer')) return 'chunk-gpt-tokenizer';
           if (id.includes('codemirror')) return 'chunk-codemirror';

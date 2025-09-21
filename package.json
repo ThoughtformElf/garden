@@ -36,6 +36,7 @@
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.1.0",
     "buffer": "^6.0.3",
+    "process": "^0.11.10",
     "shx": "^0.4.0",
     "vite": "^7.1.5"
   }
