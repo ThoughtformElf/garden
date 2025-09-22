@@ -48,6 +48,9 @@ export class SyncSignaling {
       case 'session_created':
         this.sync.sessionCode = data.sessionId;
         this.sync.updateStatus('Session created. Share this code with your peer.', this.sync.sessionCode);
+        // --- MODIFICATION: DO NOT create offer here ---
+        // The offer will be created when the peer_joined message is received.
+        // --- END MODIFICATION ---
         break;
         
       case 'peer_joined':
@@ -58,6 +61,13 @@ export class SyncSignaling {
            console.log("DEBUG: Stored target peer ID:", this.targetPeerId);
         }
         this.sync.updateStatus('Peer joined. Establishing connection...', this.sync.sessionCode);
+
+        // --- ADDITION: Initiator creates offer only AFTER peer joins ---
+        if (this.sync.isInitiator) {
+            console.log("DEBUG: Initiator creating offer after peer joined.");
+            this.createOfferAfterPeerJoined(); // Call a new helper method
+        }
+        // --- END ADDITION ---
         break;
 
       case 'signal':
@@ -122,6 +132,32 @@ export class SyncSignaling {
     }
   }
 
+  // --- ADDITION: New helper method for Initiator ---
+  async createOfferAfterPeerJoined() {
+    try {
+        // Ensure peer connection exists (it should, but be safe)
+        if (!this.sync.peerConnection) {
+             console.error("DEBUG: createOfferAfterPeerJoined called but peerConnection is null");
+             return;
+        }
+
+        // Create offer
+        console.log("DEBUG: Creating offer");
+        const offer = await this.sync.peerConnection.createOffer();
+        await this.sync.peerConnection.setLocalDescription(offer);
+
+        // Send offer through signaling server
+        console.log("DEBUG: Sending offer");
+        this.sendSignal({ type: 'offer', sdp: offer.sdp });
+
+    } catch (error) {
+        console.error('Error creating/sending offer after peer joined:', error);
+        this.sync.updateStatus('Error creating offer: ' + error.message);
+        this.sync.addMessage(`Error: ${error.message}`);
+    }
+  }
+  // --- END ADDITION ---
+
   // Start a new WebRTC session (initiator)
   async startSession() {
     try {
@@ -146,7 +182,8 @@ export class SyncSignaling {
         this.sync.addMessage(`ICE state: ${this.sync.peerConnection.iceConnectionState}`);
       };
       
-      // Create data channel
+      // Create data channel (moved here, before any signaling)
+      console.log("DEBUG: Creating data channel");
       this.sync.dataChannel = this.sync.peerConnection.createDataChannel('syncChannel');
       this.sync.fileSync.setupDataChannel(this.sync.dataChannel);
       
@@ -161,24 +198,14 @@ export class SyncSignaling {
         }
       };
       
-      // Create offer
-      console.log("DEBUG: Creating offer");
-      const offer = await this.sync.peerConnection.createOffer();
-      await this.sync.peerConnection.setLocalDescription(offer);
-      
-      // Send offer through signaling server
-      console.log("DEBUG: Sending offer");
-      this.sendSignal({
-        type: 'offer',
-        sdp: offer.sdp
-      });
-      
+      // --- MODIFICATION: Move offer creation to after peer joins ---
       // Request session creation from server
       this.ws.send(JSON.stringify({
         type: 'create_session'
       }));
       
       this.sync.updateStatus('Creating session...');
+      // --- END MODIFICATION ---
     } catch (error) {
       console.error('Error starting session:', error);
       this.sync.updateStatus('Error starting session: ' + error.message);
@@ -272,12 +299,12 @@ export class SyncSignaling {
   sendSyncMessage(data) {
     // If data channel is open, use it (preferred for speed)
     if (this.sync.dataChannel && this.sync.dataChannel.readyState === 'open') {
-      this.sync.dataChannel.send(JSON.stringify(data));
-      console.log("DEBUG: Sent sync message via data channel");
+        this.sync.dataChannel.send(JSON.stringify(data));
+        console.log("DEBUG: Sent sync message via data channel");
     } else {
-      // Fallback to signaling server if data channel is not available/open
-      console.log("DEBUG: Data channel not open, falling back to signaling for sync message");
-      this.sendSyncMessageViaSignaling(data);
+        // Fallback to signaling server if data channel is not available/open
+        console.log("DEBUG: Data channel not open, falling back to signaling for sync message");
+        this.sendSyncMessageViaSignaling(data);
     }
   }
   // --- END MODIFIED sendSyncMessage ---
