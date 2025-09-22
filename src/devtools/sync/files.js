@@ -1,5 +1,7 @@
 // src/devtools/sync/files.js
 import { Modal } from '../../util/modal.js';
+import debug from '../../util/debug.js'; // Import the debug utility
+
 // Do not import Git for fallback creation, as it's not working reliably
 
 export class SyncFiles {
@@ -18,6 +20,7 @@ export class SyncFiles {
             this.sync.updateStatus('Connected', this.sync.sessionCode);
             this.sync.ui.showMessages();
             this.sync.addMessage('Data channel opened');
+            debug.log("DEBUG: Data channel opened");
         };
 
         channel.onmessage = (event) => {
@@ -27,6 +30,7 @@ export class SyncFiles {
             } catch (error) {
                 console.error('Error parsing sync message:', error);
                 this.sync.addMessage('Received: ' + event.data);
+                debug.error('Error parsing sync message:', error);
             }
         };
 
@@ -35,12 +39,14 @@ export class SyncFiles {
             this.sync.updateStatus('Disconnected', this.sync.sessionCode);
             this.sync.ui.hideMessages();
             this.sync.addMessage('Data channel closed');
+            debug.log("DEBUG: Data channel closed");
         };
 
         channel.onerror = (error) => {
             console.error('Data channel error:', error);
             this.sync.updateStatus('Data channel error: ' + error.message);
             this.sync.addMessage('Data channel error: ' + error.message);
+            debug.error('Data channel error:', error);
         };
     }
 
@@ -57,6 +63,7 @@ export class SyncFiles {
                 break;
             default:
                 console.log('Unknown sync message type:', data.type);
+                debug.log('Unknown sync message type:', data.type);
         }
     }
 
@@ -80,28 +87,28 @@ export class SyncFiles {
                 if (window.thoughtform[key] && typeof window.thoughtform[key] === 'object') {
                     if (window.thoughtform[key].hasOwnProperty('readFile') && window.thoughtform[key].hasOwnProperty('writeFile')) {
                         // This looks like a gitClient-like object
-                        console.log(`DEBUG: Found potential gitClient-like object at window.thoughtform.${key}`);
+                        debug.log(`DEBUG: Found potential gitClient-like object at window.thoughtform.${key}`);
                         return window.thoughtform[key];
                     }
                     // Check if it has a gitClient property
                     if (window.thoughtform[key].gitClient) {
-                        console.log(`DEBUG: Found gitClient at window.thoughtform.${key}.gitClient`);
+                        debug.log(`DEBUG: Found gitClient at window.thoughtform.${key}.gitClient`);
                         return window.thoughtform[key].gitClient;
                     }
                 }
             }
             // Specific common paths
             if (window.thoughtform.gitClient) {
-                console.log(`DEBUG: Found gitClient at window.thoughtform.gitClient`);
+                debug.log(`DEBUG: Found gitClient at window.thoughtform.gitClient`);
                 return window.thoughtform.gitClient;
             }
             if (window.thoughtform.editor && window.thoughtform.editor.gitClient) {
-                console.log(`DEBUG: Found gitClient at window.thoughtform.editor.gitClient`);
+                debug.log(`DEBUG: Found gitClient at window.thoughtform.editor.gitClient`);
                 return window.thoughtform.editor.gitClient;
             }
         }
 
-        console.log("DEBUG: _getGitClient: No gitClient found in standard locations or window.thoughtform");
+        debug.log("DEBUG: _getGitClient: No gitClient found in standard locations or window.thoughtform");
         return null;
     }
     // --- End Helper ---
@@ -113,6 +120,7 @@ export class SyncFiles {
         if (!gitClientToUse) {
             console.warn('Git client not set, cannot handle file update');
             this.sync.addMessage('Error: Git client not available, cannot handle file update');
+            debug.warn('Git client not set, cannot handle file update');
             return;
         }
 
@@ -144,7 +152,7 @@ export class SyncFiles {
                 // We should treat this as the OLDEST possible state, so it should accept any update.
                 // The condition should be "if (incoming_timestamp >= oldest_possible)".
                 // By setting currentTimestamp to -1, any incoming timestamp >= 0 will win.
-                console.log(`DEBUG: File ${data.path} not found locally, will accept incoming update.`);
+                debug.log(`DEBUG: File ${data.path} not found locally, will accept incoming update.`);
                 currentTimestamp = -1; // Represents oldest possible
                 // --- END KEY FIX 1 ---
             }
@@ -155,7 +163,7 @@ export class SyncFiles {
             // This also means if both sides have timestamp 0, it will still update (idempotent).
             if (data.timestamp >= currentTimestamp) {
             // --- END KEY FIX 2 ---
-                console.log(`DEBUG: Updating file ${data.path} (remote: ${data.timestamp}, local: ${currentTimestamp})`);
+                debug.log(`DEBUG: Updating file ${data.path} (remote: ${data.timestamp}, local: ${currentTimestamp})`);
                 await gitClientToUse.writeFile(data.path, data.content);
                 this.sync.addMessage(`Updated file: ${data.path}`);
 
@@ -173,13 +181,14 @@ export class SyncFiles {
                     }
                 }
             } else {
-                console.log(`DEBUG: Skipped updating file ${data.path} (remote: ${data.timestamp}, local: ${currentTimestamp})`);
+                debug.log(`DEBUG: Skipped updating file ${data.path} (remote: ${data.timestamp}, local: ${currentTimestamp})`);
                 // Optional: Add a message for skipped files
                 // this.sync.addMessage(`Skipped file (not newer): ${data.path}`);
             }
         } catch (error) {
             console.error('Error handling file update for path:', data.path, error);
             this.sync.addMessage(`Error updating file ${data.path}: ${error.message}`);
+            debug.error('Error handling file update for path:', data.path, error);
         }
     }
 
@@ -188,6 +197,7 @@ export class SyncFiles {
         if (!gitClientToUse) {
             console.warn('Git client not set, cannot send all files');
             this.sync.addMessage('Error: Git client not available, cannot send all files');
+            debug.warn('Git client not set, cannot send all files');
             return;
         }
 
@@ -216,6 +226,7 @@ export class SyncFiles {
                     });
                 } catch (e) {
                     console.warn(`Could not read file ${file} for sync:`, e);
+                    debug.warn(`Could not read file ${file} for sync:`, e);
                 }
             }
 
@@ -223,11 +234,13 @@ export class SyncFiles {
         } catch (error) {
             console.error('Error sending all files:', error);
             this.sync.addMessage(`Error sending all files: ${error.message}`);
+            debug.error('Error sending all files:', error);
         }
     }
 
     async handleAllFiles(data) {
         this.sync.addMessage('Received all files from peer');
+        debug.log('Received all files from peer');
     }
 
     // --- Robust getAllFiles that works with different gitClient calling conventions ---
@@ -241,14 +254,14 @@ export class SyncFiles {
             // Try the standard way first: gitClient.listFiles(gitClient, '/')
             try {
                 files = await gitClientToUse.listFiles(gitClientToUse, '/');
-                console.log("DEBUG: getAllFiles succeeded with listFiles(gitClient, '/')");
+                debug.log("DEBUG: getAllFiles succeeded with listFiles(gitClient, '/')");
             } catch (method1Error) {
-                console.log("DEBUG: listFiles(gitClient, '/') failed, trying listFiles('/')", method1Error);
+                debug.log("DEBUG: listFiles(gitClient, '/') failed, trying listFiles('/')", method1Error);
                 // Fallback 1: gitClient.listFiles('/')
                 try {
                     files = await gitClientToUse.listFiles('/');
                 } catch (method2Error) {
-                    console.log("DEBUG: listFiles('/') failed, trying internal _listFiles helper", method2Error);
+                    debug.log("DEBUG: listFiles('/') failed, trying internal _listFiles helper", method2Error);
                     // Fallback 2: Use an internal helper similar to sidebar's approach
                     files = await this._listAllFiles(gitClientToUse, '/');
                 }
@@ -256,6 +269,7 @@ export class SyncFiles {
             return files.filter(file => file !== '/.git');
         } catch (error) {
             console.error('Error getting file list:', error);
+            debug.error('Error getting file list:', error);
             return [];
         }
     }
@@ -284,13 +298,13 @@ export class SyncFiles {
                         fileList.push(path);
                     }
                 } catch (e) {
-                    console.warn(`Could not stat ${path}, skipping.`, e);
+                    debug.warn(`Could not stat ${path}, skipping.`, e);
                 }
             }
         } catch (e) {
             // If root directory '/' is not found, it might be empty or not initialized in a way pfs expects.
             // This can happen if the garden is brand new.
-            console.log(`Directory not found or not readable: ${dir}. It might be empty.`, e);
+            debug.log(`Directory not found or not readable: ${dir}. It might be empty.`, e);
         }
         return fileList;
     }
@@ -305,20 +319,21 @@ export class SyncFiles {
         if (!gitClientToUse) {
             this.sync.addMessage('Git client not available. Please make sure a garden is loaded.');
             console.error('syncAllFiles: Git client not available from any source.');
+            debug.error('syncAllFiles: Git client not available from any source.');
             // Log what we *do* have for debugging
-            console.log("DEBUG: this.gitClient:", this.gitClient);
-            console.log("DEBUG: this.sync.gitClient:", this.sync?.gitClient);
-            console.log("DEBUG: window.thoughtform keys:", Object.keys(window.thoughtform || {}));
+            debug.log("DEBUG: this.gitClient:", this.gitClient);
+            debug.log("DEBUG: this.sync.gitClient:", this.sync?.gitClient);
+            debug.log("DEBUG: window.thoughtform keys:", Object.keys(window.thoughtform || {}));
             if (window.thoughtform) {
                 for (const key in window.thoughtform) {
                     if (typeof window.thoughtform[key] === 'object' && window.thoughtform[key] !== null) {
-                        console.log(`DEBUG: window.thoughtform.${key} keys:`, Object.keys(window.thoughtform[key]));
+                        debug.log(`DEBUG: window.thoughtform.${key} keys:`, Object.keys(window.thoughtform[key]));
                     }
                 }
             }
             return;
         }
-        console.log("DEBUG: syncAllFiles: Got gitClient to use");
+        debug.log("DEBUG: syncAllFiles: Got gitClient to use");
         // --- END KEY CHANGES ---
 
         try {
@@ -372,14 +387,16 @@ export class SyncFiles {
                 } catch (e) {
                     console.warn(`Could not read/send file ${file} for sync:`, e);
                     this.sync.addMessage(`Warning: Could not process file ${file}`);
+                    debug.warn(`Could not read/send file ${file} for sync:`, e);
                 }
             }
 
             this.sync.addMessage(`Synced all files with peer. Sent ${sentCount}/${files.length} files.`);
-            console.log(`DEBUG: syncAllFiles completed. Sent ${sentCount}/${files.length} files.`);
+            debug.log(`DEBUG: syncAllFiles completed. Sent ${sentCount}/${files.length} files.`);
         } catch (error) {
             console.error('Error syncing all files:', error);
             this.sync.addMessage(`Error syncing all files: ${error.message}`);
+            debug.error('Error syncing all files:', error);
         }
     }
 
