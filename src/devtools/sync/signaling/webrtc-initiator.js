@@ -22,7 +22,11 @@ export class WebRtcInitiator {
             await this.signaling.connectToSignalingServer(); // Use delegate
 
             syncInstance.peerConnection = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: [
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' },
+                  { urls: 'stun:stun.services.mozilla.com' }
+                ]
             });
 
             // Connection state listeners
