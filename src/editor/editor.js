@@ -62,7 +62,7 @@ export class Editor {
     
     initializeDragAndDrop(this.gitClient, this.sidebar);
     
-    const initialContent = await this.gitClient.readFile(this.filePath);
+    const initialContent = await this.loadFileContent(this.filePath);
 
     const loadingIndicator = document.getElementById('loading-indicator');
     if(loadingIndicator) loadingIndicator.remove();
@@ -101,8 +101,25 @@ export class Editor {
     this.editorView.focus();
   }
 
-  // --- No other methods in this file were changed ---
-  // (loadFile, handleUpdate, etc. remain the same)
+  async loadFileContent(filepath) {
+    try {
+      const rawContent = await this.gitClient.readFile(filepath);
+      // Check if the content is a JSON object with our metadata structure
+      try {
+        const parsed = JSON.parse(rawContent);
+        if (parsed && typeof parsed.content !== 'undefined') {
+          return parsed.content;
+        }
+      } catch (e) {
+        // Not a JSON file, treat as raw text content for backwards compatibility.
+      }
+      return rawContent; // Return raw content if not in new format
+    } catch (e) {
+      console.warn(`Could not read file ${filepath}, starting with empty content.`, e);
+      return ''; // Return empty string if file doesn't exist
+    }
+  }
+  
   async showDiff(originalContent) {
     if (originalContent === null) {
       console.error("Cannot show diff, original content is null.");
@@ -152,7 +169,7 @@ export class Editor {
   async loadFile(filepath) {
     console.log(`Loading ${filepath}...`);
     this.hideDiff();
-    const newContent = await this.gitClient.readFile(filepath);
+    const newContent = await this.loadFileContent(filepath);
     this.filePath = filepath;
 
     const newLanguage = getLanguageExtension(filepath);
@@ -174,7 +191,7 @@ export class Editor {
   
   async forceReloadFile(filepath) {
       console.log(`forceReloadFile: Forcibly reloading ${filepath} from disk.`);
-      const newContent = await this.gitClient.readFile(filepath);
+      const newContent = await this.loadFileContent(filepath);
       this.filePath = filepath;
       const currentDoc = this.editorView.state.doc;
       this.editorView.dispatch({
@@ -190,8 +207,15 @@ export class Editor {
       console.log('In preview mode, not saving changes.');
       return;
     }
+    
+    const fileData = {
+      content: newContent,
+      lastModified: new Date().toISOString()
+    };
+    
     console.log(`Saving ${this.filePath}...`);
-    await this.gitClient.writeFile(this.filePath, newContent);
+    await this.gitClient.writeFile(this.filePath, JSON.stringify(fileData, null, 2));
+    
     if (this.sidebar) {
       await this.sidebar.refresh();
     }

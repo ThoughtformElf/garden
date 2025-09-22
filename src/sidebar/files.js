@@ -45,7 +45,11 @@ export const fileActions = {
       await this.showAlert({ title: 'File Exists', message: `File "${newName}" already exists.` });
     } catch (e) {
       if (e.code === 'ENOENT') {
-        await this.gitClient.writeFile(newPath, '');
+        const fileData = {
+          content: '',
+          lastModified: new Date().toISOString()
+        };
+        await this.gitClient.writeFile(newPath, JSON.stringify(fileData, null, 2));
         window.location.hash = `#${newPath}`;
       } else {
         console.error('Error checking for file:', e);
@@ -104,8 +108,25 @@ export const fileActions = {
     if (!newFilename) return;
     const newPath = `${directory}/${newFilename}`;
     try {
-      const content = await this.gitClient.pfs.readFile(filepath, 'utf8');
-      await this.gitClient.writeFile(newPath, content);
+      const rawContent = await this.gitClient.pfs.readFile(filepath, 'utf8');
+      let contentToDuplicate = rawContent;
+
+      // Check if the source file is in the new format and extract its content
+      try {
+        const parsed = JSON.parse(rawContent);
+        if (parsed && typeof parsed.content !== 'undefined') {
+            contentToDuplicate = parsed.content;
+        }
+      } catch (e) {
+        // Not a JSON object, treat as raw content
+      }
+
+      const newData = {
+        content: contentToDuplicate,
+        lastModified: new Date().toISOString()
+      };
+      
+      await this.gitClient.writeFile(newPath, JSON.stringify(newData, null, 2));
       await this.refresh();
     } catch (e) {
       console.error('Error duplicating file:', e);
@@ -125,8 +146,7 @@ export const fileActions = {
         const wasViewingDeletedFile = decodeURIComponent(window.location.hash) === `#${filepath}`;
         await this.gitClient.pfs.unlink(filepath);
         if (wasViewingDeletedFile) {
-          window.location.hash = '#/README';
-          await this.editor.loadFile('/README');
+          window.location.hash = '#/README.md';
         } else {
           await this.refresh();
         }
