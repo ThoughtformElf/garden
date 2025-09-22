@@ -1,7 +1,8 @@
-// src/devtools/sync-core.js
+// src/devtools/sync/index.js
 import { SyncSignaling } from './signaling.js';
 import { SyncFiles } from './files.js';
 import { SyncUI } from './ui.js';
+import debug from '../../util/debug.js'; // Import debug utility
 
 // A simple event emitter class to communicate with other parts of the app
 class Emitter {
@@ -47,6 +48,20 @@ export class Sync extends Emitter {
     this._container.style.overflowY = 'auto';
     this.ui.render();
     this.ui.bindEvents();
+    
+    // --- ADDITION: Connect SyncFiles progress events to SyncUI handler ---
+    // This must be done after ui.render() and ui.bindEvents() so the UI methods exist
+    if (this.fileSync && this.ui && typeof this.ui.updateSyncProgress === 'function') {
+        this.fileSync.addEventListener('syncProgress', this.ui.updateSyncProgress.bind(this.ui));
+        debug.log("DEBUG: Connected SyncFiles syncProgress event to SyncUI handler");
+    } else {
+        debug.error("DEBUG: Failed to connect SyncFiles syncProgress event: components not ready");
+        // Fallback console error if debug is disabled
+        if (!(window.thoughtform && window.thoughtform.debug)) {
+             console.error("Sync: Failed to connect file sync progress events. UI or FileSync components may not be initialized correctly.");
+        }
+    }
+    // --- END ADDITION ---
   }
 
   setGitClient(gitClient) {

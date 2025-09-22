@@ -1,10 +1,16 @@
 // src/devtools/sync/ui.js
 import debug from '../../util/debug.js';
+import { Modal } from '../../util/modal.js'; // Import Modal
 
 export class SyncUI {
     constructor(syncInstance) {
         this.sync = syncInstance;
         this.syncMethodIndicatorEl = null;
+        // --- ADDITION: Store reference to the progress modal ---
+        this.syncProgressModal = null;
+        this.syncProgressLogArea = null; // Reference to the scrollable log area inside the modal
+        this.syncProgressFinalMessageArea = null; // Reference to the final message area
+        // --- END ADDITION ---
     }
 
     render() {
@@ -104,6 +110,9 @@ export class SyncUI {
         if (syncAllBtn) {
             syncAllBtn.addEventListener('click', async () => {
                 debug.log("UI: Send All Files button clicked");
+                // --- ADDITION: Show progress modal when sync starts ---
+                this.showSyncProgressModal();
+                // --- END ADDITION ---
                 await this.sync.fileSync.syncAllFiles();
             });
         }
@@ -111,6 +120,9 @@ export class SyncUI {
         if (requestAllBtn) {
             requestAllBtn.addEventListener('click', () => {
                 debug.log("UI: Request All Files button clicked");
+                // --- ADDITION: Show progress modal when request starts ---
+                this.showSyncProgressModal();
+                // --- END ADDITION ---
                 this.sync.fileSync.requestAllFiles();
             });
         }
@@ -193,4 +205,132 @@ export class SyncUI {
             debug.log("UI: Messages area hidden");
         }
     }
+    
+    // --- ADDITION: Sync Progress Modal Methods ---
+    
+    /**
+     * Creates and displays the sync progress modal.
+     */
+    showSyncProgressModal() {
+        // If a modal is already open, close it first
+        if (this.syncProgressModal) {
+            this.syncProgressModal.destroy();
+        }
+        
+        // Create a new modal
+        this.syncProgressModal = new Modal({
+            title: 'File Sync Progress',
+            // Optional: Make it wider for better log visibility
+            // width: '600px' 
+        });
+        
+        // Create the content structure for the modal
+        const progressContent = `
+            <div id="sync-progress-log" style="height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; background-color: #1a1a1a; margin-bottom: 10px; font-family: monospace; font-size: 12px;"></div>
+            <div id="sync-progress-final-message" style="font-weight: bold; padding: 5px; min-height: 20px;"></div>
+        `;
+        
+        // Set the content
+        this.syncProgressModal.updateContent(progressContent);
+        
+        // Get references to the log and final message areas
+        this.syncProgressLogArea = this.syncProgressModal.content.querySelector('#sync-progress-log');
+        this.syncProgressFinalMessageArea = this.syncProgressModal.content.querySelector('#sync-progress-final-message');
+        
+        // Add a close button, initially disabled
+        this.syncProgressCloseButton = this.syncProgressModal.addFooterButton('Close', () => {
+            if (this.syncProgressModal) {
+                this.syncProgressModal.destroy();
+                this.syncProgressModal = null;
+                this.syncProgressLogArea = null;
+                this.syncProgressFinalMessageArea = null;
+                this.syncProgressCloseButton = null;
+            }
+        });
+        this.syncProgressCloseButton.disabled = true; // Disable until sync is complete/cancelled/errored
+        
+        // Show the modal
+        this.syncProgressModal.show();
+        
+        debug.log("UI: Sync progress modal shown");
+    }
+    
+    /**
+     * Updates the sync progress modal with a new message.
+     * This method is intended to be called by the event listener for 'syncProgress' events.
+     * @param {CustomEvent} event - The syncProgress event dispatched by SyncFiles.
+     */
+    updateSyncProgress(event) {
+        // Check if the modal is currently displayed
+        if (!this.syncProgressModal || !this.syncProgressLogArea || !this.syncProgressFinalMessageArea) {
+            debug.warn("UI: Sync progress modal not found, cannot update progress.");
+            return;
+        }
+        
+        const detail = event.detail;
+        const message = detail.message || 'No message';
+        const type = detail.type || 'info'; // 'info', 'error', 'complete', 'cancelled'
+        
+        // Create a log entry element
+        const logEntry = document.createElement('div');
+        const timestamp = new Date().toLocaleTimeString(); // e.g., "10:30:15"
+        logEntry.textContent = `[${timestamp}] ${message}`;
+        logEntry.style.marginBottom = '5px';
+        
+        // Style based on type
+        switch (type) {
+            case 'error':
+                logEntry.style.color = 'var(--base-accent-destructive)'; // Red
+                break;
+            case 'complete':
+                logEntry.style.color = 'var(--base-accent-action)'; // Green
+                break;
+            case 'cancelled':
+                logEntry.style.color = 'var(--base-accent-warning)'; // Orange
+                break;
+            case 'info':
+            default:
+                logEntry.style.color = 'var(--color-text-primary)'; // Default
+                break;
+        }
+        
+        // Append the log entry to the log area
+        this.syncProgressLogArea.appendChild(logEntry);
+        
+        // Scroll the log area to the bottom to show the latest message
+        this.syncProgressLogArea.scrollTop = this.syncProgressLogArea.scrollHeight;
+        
+        // Handle special types that indicate the end of the process
+        if (type === 'complete' || type === 'error' || type === 'cancelled') {
+            // Update the final message area
+            this.syncProgressFinalMessageArea.textContent = message;
+            this.syncProgressFinalMessageArea.style.color = logEntry.style.color; // Match color
+            
+            // Enable the close button
+            if (this.syncProgressCloseButton) {
+                this.syncProgressCloseButton.disabled = false;
+            }
+            
+            debug.log("UI: Sync progress modal updated with final status:", message);
+        } else {
+            debug.log("UI: Sync progress modal updated with message:", message);
+        }
+    }
+    
+    /**
+     * Hides and destroys the sync progress modal.
+     * (This is optional as the close button already does this)
+     */
+    hideSyncProgressModal() {
+        if (this.syncProgressModal) {
+            this.syncProgressModal.destroy();
+            this.syncProgressModal = null;
+            this.syncProgressLogArea = null;
+            this.syncProgressFinalMessageArea = null;
+            this.syncProgressCloseButton = null;
+            debug.log("UI: Sync progress modal hidden");
+        }
+    }
+    
+    // --- END ADDITION: Sync Progress Modal Methods ---
 }

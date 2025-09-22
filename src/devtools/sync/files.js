@@ -1,6 +1,6 @@
 // src/devtools/sync/files.js
 import { Modal } from '../../util/modal.js';
-import debug from '../../util/debug.js'; // Import the debug utility
+import debug from '../../util/debug.js';
 
 // Do not import Git for fallback creation, as it's not working reliably
 
@@ -8,7 +8,46 @@ export class SyncFiles {
     constructor(syncInstance) {
         this.sync = syncInstance;
         this.gitClient = null;
+        
+        // --- ADDITION: Simple Event Emitter ---
+        // Basic event target functionality
+        this._listeners = {};
+        // --- END ADDITION ---
     }
+    
+    // --- ADDITION: Simple Event Emitter Methods ---
+    addEventListener(type, callback) {
+        if (!(type in this._listeners)) {
+            this._listeners[type] = [];
+        }
+        this._listeners[type].push(callback);
+    }
+
+    removeEventListener(type, callback) {
+        if (!(type in this._listeners)) {
+            return;
+        }
+        const stack = this._listeners[type];
+        for (let i = 0, l = stack.length; i < l; i++) {
+            if (stack[i] === callback) {
+                stack.splice(i, 1);
+                return;
+            }
+        }
+    }
+
+    dispatchEvent(event) {
+        if (!(event.type in this._listeners)) {
+            return true;
+        }
+        const stack = this._listeners[event.type].slice();
+
+        for (let i = 0, l = stack.length; i < l; i++) {
+            stack[i].call(this, event);
+        }
+        return !event.defaultPrevented;
+    }
+    // --- END ADDITION: Simple Event Emitter Methods ---
 
     setGitClient(gitClient) {
         this.gitClient = gitClient;
@@ -116,11 +155,18 @@ export class SyncFiles {
     // Inside src/devtools/sync/files.js
 
     async handleFileUpdate(data) {
+        // --- ADDITION: Dispatch progress event ---
+        this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Received file update for: ${data.path}`, type: 'info' } }));
+        // --- END ADDITION ---
+        
         const gitClientToUse = this._getGitClient();
         if (!gitClientToUse) {
             console.warn('Git client not set, cannot handle file update');
             this.sync.addMessage('Error: Git client not available, cannot handle file update');
             debug.warn('Git client not set, cannot handle file update');
+            // --- ADDITION: Dispatch error event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: Git client not available, cannot handle file update for ${data.path}`, type: 'error' } }));
+            // --- END ADDITION ---
             return;
         }
 
@@ -164,8 +210,14 @@ export class SyncFiles {
             if (data.timestamp >= currentTimestamp) {
             // --- END KEY FIX 2 ---
                 debug.log(`DEBUG: Updating file ${data.path} (remote: ${data.timestamp}, local: ${currentTimestamp})`);
+                // --- ADDITION: Dispatch progress event ---
+                this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Updating file: ${data.path}`, type: 'info' } }));
+                // --- END ADDITION ---
                 await gitClientToUse.writeFile(data.path, data.content);
                 this.sync.addMessage(`Updated file: ${data.path}`);
+                // --- ADDITION: Dispatch progress event ---
+                this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Successfully updated file: ${data.path}`, type: 'info' } }));
+                // --- END ADDITION ---
 
                 // Reload editor if it's the current file
                 // Try various locations for the editor
@@ -182,6 +234,9 @@ export class SyncFiles {
                 }
             } else {
                 debug.log(`DEBUG: Skipped updating file ${data.path} (remote: ${data.timestamp}, local: ${currentTimestamp})`);
+                // --- ADDITION: Dispatch progress event ---
+                this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Skipped file (not newer): ${data.path}`, type: 'info' } }));
+                // --- END ADDITION ---
                 // Optional: Add a message for skipped files
                 // this.sync.addMessage(`Skipped file (not newer): ${data.path}`);
             }
@@ -189,24 +244,40 @@ export class SyncFiles {
             console.error('Error handling file update for path:', data.path, error);
             this.sync.addMessage(`Error updating file ${data.path}: ${error.message}`);
             debug.error('Error handling file update for path:', data.path, error);
+            // --- ADDITION: Dispatch error event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error updating file ${data.path}: ${error.message}`, type: 'error' } }));
+            // --- END ADDITION ---
         }
     }
 
     async handleRequestAllFiles() {
+        // --- ADDITION: Dispatch progress event ---
+        this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Received request for all files.', type: 'info' } }));
+        // --- END ADDITION ---
+        
         const gitClientToUse = this._getGitClient();
         if (!gitClientToUse) {
             console.warn('Git client not set, cannot send all files');
             this.sync.addMessage('Error: Git client not available, cannot send all files');
             debug.warn('Git client not set, cannot send all files');
+            // --- ADDITION: Dispatch error event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Error: Git client not available, cannot send all files', type: 'error' } }));
+            // --- END ADDITION ---
             return;
         }
 
         try {
             // Use the robust getAllFiles helper
             const files = await this.getAllFiles(gitClientToUse);
+            // --- ADDITION: Dispatch progress event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Found ${files.length} files to send.`, type: 'info' } }));
+            // --- END ADDITION ---
 
             for (const file of files) {
                 try {
+                    // --- ADDITION: Dispatch progress event ---
+                    this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Reading file: ${file}`, type: 'info' } }));
+                    // --- END ADDITION ---
                     const content = await gitClientToUse.readFile(file);
                     let timestamp = 0;
 
@@ -218,6 +289,9 @@ export class SyncFiles {
                     }
 
                     // Use signaling's send method which has the fallback logic
+                    // --- ADDITION: Dispatch progress event ---
+                    this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Sending file: ${file}`, type: 'info' } }));
+                    // --- END ADDITION ---
                     this.sync.signaling.sendSyncMessage({
                         type: 'file_update',
                         path: file,
@@ -227,20 +301,31 @@ export class SyncFiles {
                 } catch (e) {
                     console.warn(`Could not read file ${file} for sync:`, e);
                     debug.warn(`Could not read file ${file} for sync:`, e);
+                    // --- ADDITION: Dispatch error event ---
+                    this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Warning: Could not read file ${file} for sync: ${e.message}`, type: 'error' } }));
+                    // --- END ADDITION ---
                 }
             }
-
             this.sync.addMessage('Sent all files to peer');
+            // --- ADDITION: Dispatch completion event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Finished sending all files to peer.', type: 'complete' } }));
+            // --- END ADDITION ---
         } catch (error) {
             console.error('Error sending all files:', error);
             this.sync.addMessage(`Error sending all files: ${error.message}`);
             debug.error('Error sending all files:', error);
+            // --- ADDITION: Dispatch error event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error sending all files: ${error.message}`, type: 'error' } }));
+            // --- END ADDITION ---
         }
     }
 
     async handleAllFiles(data) {
         this.sync.addMessage('Received all files from peer');
         debug.log('Received all files from peer');
+        // --- ADDITION: Dispatch progress event ---
+        this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Received all files from peer.', type: 'info' } }));
+        // --- END ADDITION ---
     }
 
     // --- Robust getAllFiles that works with different gitClient calling conventions ---
@@ -311,6 +396,10 @@ export class SyncFiles {
     // --- End Internal helper ---
 
     async syncAllFiles() {
+        // --- ADDITION: Dispatch start event ---
+        this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Starting to send all files...', type: 'info' } }));
+        // --- END ADDITION ---
+        
         // --- KEY CHANGE 1: Remove isConnected check, rely on signaling fallback ---
         // if (!this.sync.isConnected || !this.gitClient) { // OLD CHECK
 
@@ -320,6 +409,9 @@ export class SyncFiles {
             this.sync.addMessage('Git client not available. Please make sure a garden is loaded.');
             console.error('syncAllFiles: Git client not available from any source.');
             debug.error('syncAllFiles: Git client not available from any source.');
+            // --- ADDITION: Dispatch error event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Error: Git client not available. Please make sure a garden is loaded.', type: 'error' } }));
+            // --- END ADDITION ---
             // Log what we *do* have for debugging
             debug.log("DEBUG: this.gitClient:", this.gitClient);
             debug.log("DEBUG: this.sync.gitClient:", this.sync?.gitClient);
@@ -355,16 +447,25 @@ export class SyncFiles {
 
             if (!confirmed) {
                 this.sync.addMessage('Send all files cancelled.');
+                // --- ADDITION: Dispatch cancellation event ---
+                this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Send all files cancelled by user.', type: 'cancelled' } }));
+                // --- END ADDITION ---
                 return;
             }
             // --- END KEY CHANGE 3 ---
 
             this.sync.addMessage('Syncing all files...');
             const files = await this.getAllFiles(gitClientToUse); // Use robust helper
+            // --- ADDITION: Dispatch progress event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Found ${files.length} files to sync.`, type: 'info' } }));
+            // --- END ADDITION ---
 
             let sentCount = 0;
             for (const file of files) {
                 try {
+                    // --- ADDITION: Dispatch progress event ---
+                    this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Reading file: ${file}`, type: 'info' } }));
+                    // --- END ADDITION ---
                     const content = await gitClientToUse.readFile(file);
                     let timestamp = 0;
 
@@ -376,6 +477,9 @@ export class SyncFiles {
                     }
 
                     // --- KEY CHANGE 4: Use signaling's send method (has fallback) ---
+                    // --- ADDITION: Dispatch progress event ---
+                    this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Sending file: ${file} (${sentCount + 1}/${files.length})`, type: 'info' } }));
+                    // --- END ADDITION ---
                     this.sync.signaling.sendSyncMessage({
                         type: 'file_update',
                         path: file,
@@ -388,15 +492,24 @@ export class SyncFiles {
                     console.warn(`Could not read/send file ${file} for sync:`, e);
                     this.sync.addMessage(`Warning: Could not process file ${file}`);
                     debug.warn(`Could not read/send file ${file} for sync:`, e);
+                    // --- ADDITION: Dispatch error event ---
+                    this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Warning: Could not process file ${file}: ${e.message}`, type: 'error' } }));
+                    // --- END ADDITION ---
                 }
             }
 
             this.sync.addMessage(`Synced all files with peer. Sent ${sentCount}/${files.length} files.`);
             debug.log(`DEBUG: syncAllFiles completed. Sent ${sentCount}/${files.length} files.`);
+            // --- ADDITION: Dispatch completion event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Sync completed successfully. Sent ${sentCount}/${files.length} files.`, type: 'complete' } }));
+            // --- END ADDITION ---
         } catch (error) {
             console.error('Error syncing all files:', error);
             this.sync.addMessage(`Error syncing all files: ${error.message}`);
             debug.error('Error syncing all files:', error);
+            // --- ADDITION: Dispatch error event ---
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error syncing all files: ${error.message}`, type: 'error' } }));
+            // --- END ADDITION ---
         }
     }
 
@@ -404,6 +517,10 @@ export class SyncFiles {
         // --- KEY CHANGE 5: Remove isConnected check ---
         // if (!this.sync.isConnected) { // OLD CHECK
         // --- END KEY CHANGE 5 ---
+        
+        // --- ADDITION: Dispatch start event ---
+        this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Requesting all files from peer...', type: 'info' } }));
+        // --- END ADDITION ---
         
         // --- KEY CHANGE 6: Use signaling's send method (has fallback) ---
         this.sync.signaling.sendSyncMessage({
@@ -427,5 +544,7 @@ export class SyncFiles {
 
     destroy() {
         // Cleanup if needed
+        // Clear listeners to prevent memory leaks
+        this._listeners = {};
     }
 }
