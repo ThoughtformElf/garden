@@ -2,7 +2,7 @@
 import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
 import { Modal } from '../util/modal.js';
 import eruda from 'eruda';
-import { Sync } from './sync.js'; // Import the new Sync class
+import { Sync } from './sync/index.js'; // Import the new Sync class
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `
