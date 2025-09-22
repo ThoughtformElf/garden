@@ -11,7 +11,7 @@ export class SyncSignaling {
     constructor(syncInstance) {
         this.sync = syncInstance;
         this.ws = null; // WebSocket reference
-        this.signalingServerUrl = localStorage.getItem('thoughtform_signaling_server') || 'ws://localhost:8080';
+        this.signalingServerUrl = localStorage.getItem('thoughtform_signaling_server') || 'wss://socket.thoughtform.garden';
         this.peerId = null;
         this.targetPeerId = null;
         // Track the current best available sync method based on connection state
