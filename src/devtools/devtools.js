@@ -1,6 +1,8 @@
+// src/devtools/devtools.js
 import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
 import { Modal } from '../util/modal.js';
 import eruda from 'eruda';
+import { Sync } from './sync.js'; // Import the new Sync class
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `
@@ -244,5 +246,38 @@ export function initializeDevTools() {
     show() { this._$el.show(); },
     hide() { this._$el.hide(); },
   });
-  return dataTool;
+
+  // ***** CORRECTED CODE START *****
+  // The Sync class instance is created and managed inside the tool definition.
+  const syncTool = eruda.add({
+    name: 'Sync',
+    init($el) {
+      this.sync = new Sync();
+      this.sync.init($el.get(0));
+
+      // Attach listeners HERE, inside the init function where 'this.sync' is defined.
+      this.sync.on('start', () => {
+          console.log('DEVTOOLS: "Start Sync" button clicked');
+          // In the next phase, this will trigger WebRTC logic
+          this.sync.updateStatus('Waiting for peer...', 'ABC-123'); // Example code
+      });
+      this.sync.on('join', (code) => {
+          console.log(`DEVTOOLS: "Join Sync" with code: ${code}`);
+          // In the next phase, this will trigger WebRTC logic
+          this.sync.updateStatus('Connecting...');
+      });
+    },
+    show() {
+      this.sync.show();
+    },
+    hide() {
+      this.sync.hide();
+    },
+    destroy() {
+      this.sync.destroy();
+    }
+  });
+  // ***** CORRECTED CODE END *****
+
+  return eruda;
 }

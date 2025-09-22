@@ -1,3 +1,4 @@
+/* src/css/devtools.css */
 body .luna-tab-item {
   font-size: 1rem;
 }
@@ -407,3 +408,60 @@ html .luna-setting-item-checkbox input {
   height: 1.5rem;
   margin-right: 1rem;
 }
+
+/* Styles for selection UI used in Data tab */
+.garden-selection-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--color-border-secondary);
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.garden-selection-list label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+/* ***** NEW STYLES FOR SYNC TAB START ***** */
+#eruda-Sync {
+    color: var(--color-text-primary);
+}
+
+.eruda-sync-status {
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border-secondary);
+    margin-bottom: 10px;
+}
+
+.eruda-sync-status strong {
+    color: var(--color-text-secondary);
+}
+
+.eruda-sync-main label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--color-text-secondary);
+}
+
+.eruda-input {
+    background-color: var(--base-dark);
+    border: 1px solid var(--color-border-secondary);
+    color: var(--color-text-primary);
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    width: calc(100% - 85px); /* Adjust width based on button size */
+    margin-right: 5px;
+}
+
+.eruda-code {
+    background-color: var(--base-dark);
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', Courier, monospace;
+    color: #66ff66; /* Using a specific color for visibility */
+    border: 1px solid var(--color-border-secondary);
+    display: inline-block;
+}
+/* ***** NEW STYLES FOR SYNC TAB END ***** */
