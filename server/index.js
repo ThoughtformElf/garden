@@ -21,58 +21,58 @@ const server = http.createServer((req, res) => {
 // Create WebSocket server
 const wss = new WebSocket.Server({ server });
 
-// Store active sessions
-const sessions = new Map();
+// Store active sessions and peers
+const sessions = new Map(); // sessionId -> { initiator, peers: [WebSocket] }
 
-// Generate a random session ID
-function generateSessionId() {
-  return crypto.randomBytes(4).toString('hex').toUpperCase();
-}
-
-// Handle new WebSocket connections
 wss.on('connection', (ws, req) => {
-  // Parse URL to get session ID from query parameters
-  const parsedUrl = url.parse(req.url, true);
-  const sessionId = parsedUrl.query.session;
-  const peerId = crypto.randomBytes(8).toString('hex'); // Unique ID for this peer
+  console.log('New WebSocket connection');
   
-  console.log(`New connection: ${peerId} for session: ${sessionId || 'new'}`);
+  // Extract session ID from URL query parameters (if joining)
+  const queryParams = url.parse(req.url, true).query;
+  const joinSessionId = queryParams.sessionId;
   
-  // Store connection info
+  // Assign a temporary ID to the peer until they create/join a session
+  const peerId = crypto.randomBytes(16).toString('hex');
   ws.peerId = peerId;
-  ws.sessionId = sessionId;
   
-  // Handle incoming messages
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
       
       switch (data.type) {
         case 'create_session':
-          // Create a new session
-          const newSessionId = generateSessionId();
-          ws.sessionId = newSessionId;
+          // Generate a random 6-character session ID
+          const sessionId = crypto.randomBytes(3).toString('hex').toUpperCase();
           
           // Store session info
-          sessions.set(newSessionId, {
-            id: newSessionId,
+          sessions.set(sessionId, {
             initiator: ws,
             peers: [ws]
           });
           
-          // Send session created confirmation
+          ws.sessionId = sessionId;
+          
+          // Send session created confirmation to initiator
           ws.send(JSON.stringify({
             type: 'session_created',
-            sessionId: newSessionId
+            sessionId: sessionId
           }));
           
-          console.log(`Session created: ${newSessionId} by ${peerId}`);
+          console.log(`Session ${sessionId} created by peer ${peerId}`);
           break;
           
         case 'join_session':
-          // Join an existing session
-          const joinSessionId = data.sessionId;
-          const session = sessions.get(joinSessionId);
+          const sessionIdToJoin = data.sessionId;
+          
+          if (!sessionIdToJoin) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Session ID is required to join'
+            }));
+            return;
+          }
+          
+          const session = sessions.get(sessionIdToJoin);
           
           if (!session) {
             ws.send(JSON.stringify({
@@ -84,84 +84,115 @@ wss.on('connection', (ws, req) => {
           
           // Add peer to session
           session.peers.push(ws);
-          ws.sessionId = joinSessionId;
+          ws.sessionId = sessionIdToJoin;
           
-          // Notify initiator that peer has joined
+          // Notify initiator that peer joined
           if (session.initiator && session.initiator.readyState === WebSocket.OPEN) {
             session.initiator.send(JSON.stringify({
               type: 'peer_joined',
-              peerId: ws.peerId
+              peerId: ws.peerId // Send the joining peer's ID
             }));
           }
           
-          console.log(`Peer ${peerId} joined session: ${joinSessionId}`);
+          console.log(`Peer ${peerId} joined session ${sessionIdToJoin}`);
           break;
           
         case 'signal':
-          // Forward signaling data to the other peer
-          const targetSession = sessions.get(ws.sessionId);
-          if (!targetSession) return;
+          // Forward signaling data to the other peer in the session
+          const sessionForSignal = sessions.get(ws.sessionId);
           
-          // Find the other peer (not the sender)
-          const otherPeer = targetSession.peers.find(peer => 
-            peer !== ws && peer.readyState === WebSocket.OPEN
-          );
-          
-          if (otherPeer) {
-            otherPeer.send(JSON.stringify({
-              type: 'signal',
-              peerId: ws.peerId,
-              data: data.data
-            }));
+          if (sessionForSignal) {
+            // Find the *other* peer (not the sender)
+            const targetPeer = sessionForSignal.peers.find(peer => peer !== ws);
+            
+            if (targetPeer && targetPeer.readyState === WebSocket.OPEN) {
+              targetPeer.send(JSON.stringify({
+                type: 'signal',
+                data: data.data
+              }));
+            }
           }
           break;
+
+        // --- NEW: Handle direct sync messages ---
+        case 'direct_sync_message':
+          console.log(`Received direct_sync_message from peer ${peerId}`);
+          const sessionForSync = sessions.get(ws.sessionId);
           
-        default:
-          console.log(`Unknown message type: ${data.type}`);
+          if (sessionForSync) {
+            if (data.targetPeerId) {
+              // Send to specific target peer
+              const targetPeer = sessionForSync.peers.find(peer => peer.peerId === data.targetPeerId);
+              if (targetPeer && targetPeer.readyState === WebSocket.OPEN) {
+                targetPeer.send(JSON.stringify({
+                  type: 'direct_sync_message',
+                  message: data.message
+                }));
+                console.log(`Forwarded direct_sync_message to specific peer ${data.targetPeerId}`);
+              } else {
+                console.warn(`Target peer ${data.targetPeerId} not found or not open for direct_sync_message`);
+              }
+            } else {
+              // Broadcast to all other peers in the session
+              sessionForSync.peers.forEach(peer => {
+                if (peer !== ws && peer.readyState === WebSocket.OPEN) {
+                  peer.send(JSON.stringify({
+                    type: 'direct_sync_message',
+                    message: data.message
+                  }));
+                  console.log(`Broadcast direct_sync_message to peer ${peer.peerId}`);
+                }
+              });
+            }
+          } else {
+            console.warn(`No session found for peer ${peerId} sending direct_sync_message`);
+          }
+          break;
+        // --- END NEW ---
       }
     } catch (error) {
-      console.error('Error handling message:', error);
+      console.error('Error processing message:', error);
     }
   });
   
-  // Handle connection close
   ws.on('close', () => {
-    console.log(`Connection closed: ${peerId}`);
+    console.log(`WebSocket connection closed for peer ${peerId}`);
     
-    // If this was part of a session, clean up
+    // Remove peer from session
     if (ws.sessionId) {
       const session = sessions.get(ws.sessionId);
+      
       if (session) {
-        // Remove peer from session
+        // Remove peer from peers array
         session.peers = session.peers.filter(peer => peer !== ws);
         
-        // If no peers left, delete the session
-        if (session.peers.length === 0) {
-          sessions.delete(ws.sessionId);
-          console.log(`Session deleted: ${ws.sessionId}`);
-        } else {
-          // Notify other peers that this peer left
+        // Notify other peer if session initiator left
+        if (session.initiator === ws) {
           session.peers.forEach(peer => {
             if (peer.readyState === WebSocket.OPEN) {
               peer.send(JSON.stringify({
-                type: 'peer_left',
-                peerId: ws.peerId
+                type: 'peer_left'
               }));
             }
           });
+          
+          // Delete session if initiator leaves
+          sessions.delete(ws.sessionId);
+          console.log(`Session ${ws.sessionId} deleted because initiator left`);
+        } else {
+          // Notify initiator that peer left
+          if (session.initiator && session.initiator.readyState === WebSocket.OPEN) {
+            session.initiator.send(JSON.stringify({
+              type: 'peer_left'
+            }));
+          }
         }
       }
     }
   });
-  
-  // Handle errors
-  ws.on('error', (error) => {
-    console.error(`WebSocket error for ${peerId}:`, error);
-  });
 });
 
-// Start server
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-  console.log(`WebSocket signaling server running on port ${PORT}`);
+  console.log(`Signaling server running on port ${PORT}`);
 });
