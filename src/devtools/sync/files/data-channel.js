@@ -1,4 +1,4 @@
-// src/devtools/sync/files/data-channel-handler.js
+// src/devtools/sync/files/data-channel.js
 import debug from '../../../util/debug.js';
 
 // Helper class/module for setting up data channel callbacks

@@ -1,7 +1,7 @@
 // src/devtools/sync/files/sync-actions.js
 import { Modal } from '../../../util/modal.js';
 import debug from '../../../util/debug.js';
-import { FileOperations } from './file-operations.js'; // Import for getAllFiles
+import { FileOperations } from './operations.js'; // Import for getAllFiles
 
 // Helper class/module for high-level sync actions
 export class SyncActions {

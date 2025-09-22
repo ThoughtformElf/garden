@@ -1,12 +1,12 @@
 // src/devtools/sync/files/index.js
-import { EventEmitterMixin } from './event-emitter-mixin.js';
-import { GitClientHelper } from './git-client-helper.js';
-import { DataChannelHandler } from './data-channel-handler.js';
-import { MessageHandler } from './message-handler.js';
+import { EventEmitterMixin } from './event-emitter.js';
+import { GitClientHelper } from './git-client.js';
+import { DataChannelHandler } from './data-channel.js';
+import { MessageHandler } from './messages.js';
 // Import actions for delegation
-import { SyncActions } from './sync-actions.js';
+import { SyncActions } from './syncing.js';
 // Import operations for delegation (if needed directly, though MessageHandler/FileOperations might use them)
-import { FileOperations } from './file-operations.js';
+import { FileOperations } from './operations.js';
 
 // Import external dependencies if still needed at this level
 // import { Modal } from '../../util/modal.js'; // Might be needed if used directly here

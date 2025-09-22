@@ -1,6 +1,6 @@
 // src/devtools/sync/files/message-handler.js
 import debug from '../../../util/debug.js';
-import { FileOperations } from './file-operations.js'; // Import for handleFileUpdate logic
+import { FileOperations } from './operations.js'; // Import for handleFileUpdate logic
 
 // Helper class/module for handling incoming messages
 export class MessageHandler {

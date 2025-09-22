@@ -1,4 +1,4 @@
-// src/devtools/sync/files/event-emitter-mixin.js
+// src/devtools/sync/files/event-emitter.js
 // Provides basic event emitter functionality as a mixin or base class
 
 export class EventEmitterMixin {
