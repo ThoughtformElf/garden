@@ -212,30 +212,61 @@ export class Git {
     }
   }
 
+  /**
+   * Writes content to a file, creating parent directories if needed.
+   * @param {string} filepath The path to the file (e.g., '/prompt/youtube-summary.md').
+   * @param {string} content The content to write.
+   */
   async writeFile(filepath, content) {
     try {
       await this.pfs.writeFile(filepath, content, 'utf8');
       this.markGardenAsDirty(true);
     } catch (e) {
-      // If the error is that the directory doesn't exist, create it and retry.
+      // If the error is that the file's parent directory doesn't exist, create it and retry.
       if (e.code === 'ENOENT') {
         try {
           const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
-          if (dirname) {
-            await this.pfs.mkdir(dirname, { recursive: true });
-            // Retry writing the file after creating the directory
+          if (dirname && dirname !== '/') {
+            // --- MORE ROBUST DIRECTORY CREATION ---
+            try {
+              // Attempt to create the directory recursively.
+              // This should handle existing directories gracefully with { recursive: true }.
+              await this.pfs.mkdir(dirname, { recursive: true });
+            } catch (mkdirError) {
+              // If mkdir fails for any reason (including unexpected EEXIST),
+              // log it, but don't necessarily stop. The subsequent writeFile might still work
+              // if the directory actually exists, or it will fail with a clearer error.
+              console.warn(`Warning: Could not ensure directory exists for ${filepath} (Tried to create ${dirname}):`, mkdirError.message || mkdirError);
+              // Optionally, re-throw if you want the write to fail immediately:
+              // throw mkdirError;
+            }
+            // --- END MORE ROBUST DIRECTORY CREATION ---
+
+            // Retry writing the file after attempting directory creation.
+            // If the directory still doesn't exist or isn't writable, this will fail appropriately.
             await this.pfs.writeFile(filepath, content, 'utf8');
             this.markGardenAsDirty(true);
+          } else {
+             // dirname was empty or just '/', which shouldn't trigger ENOENT for writeFile
+             // Re-throw the original error as it's unexpected
+             console.error(`Unexpected ENOENT error for filepath '${filepath}' where dirname is '${dirname}':`, e);
+             throw e;
           }
-        } catch (mkdirError) {
-          console.error(`Error creating directory for ${filepath}:`, mkdirError);
+        } catch (retryError) {
+          // If retrying (creating dir or writing again) fails, log both errors and throw the retry error
+          // as it's likely more specific to the current attempt.
+          console.error(`Error after retrying write for ${filepath}. Original error:`, e.message || e);
+          console.error(`Retry error:`, retryError.message || retryError);
+          throw retryError;
         }
       } else {
+        // Re-throw any error that wasn't related to a missing parent directory.
         console.error(`Error writing file ${filepath}:`, e);
+        throw e;
       }
     }
   }
-
+  
   markGardenAsDirty(isDirty) {
     try {
       const dirtyRaw = localStorage.getItem('dirty_gardens');
