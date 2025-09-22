@@ -1,6 +1,6 @@
 // src/devtools/sync/index.js
 import { SyncSignaling } from './signaling.js';
-import { SyncFiles } from './files.js';
+import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';
 import debug from '../../util/debug.js'; // Import debug utility
 
