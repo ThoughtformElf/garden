@@ -1,134 +1,117 @@
 // src/devtools/sync/signaling/index.js
-// Final updated version
 import debug from '../../../util/debug.js';
 import { WebSocketManager } from './websocket-manager.js';
 import { SignalingMessageHandler } from './signaling-message-handler.js';
-import { WebRtcInitiator } from './webrtc-initiator.js'; // Import new module
-import { WebRtcJoiner } from './webrtc-joiner.js';       // Import new module
-import { SyncMessageRouter } from './sync-message-router.js'; // Import new module
+import { WebRtcInitiator } from './webrtc-initiator.js';
+import { WebRtcJoiner } from './webrtc-joiner.js';
+import { SyncMessageRouter } from './sync-message-router.js';
 
 export class SyncSignaling {
     constructor(syncInstance) {
         this.sync = syncInstance;
-        this.ws = null; // WebSocket reference
+        this.ws = null;
         this.signalingServerUrl = localStorage.getItem('thoughtform_signaling_server') || 'wss://socket.thoughtform.garden';
         this.peerId = null;
         this.targetPeerId = null;
-        // Track the current best available sync method based on connection state
-        this.currentSyncMethod = 'none'; // 'webrtc_active', 'webrtc_inactive', 'websocket', 'none'
 
-        // --- Initialize helper modules ---
+        // State for negotiation flow
+        this.isNegotiating = false;
+        this.negotiationSyncName = null;
+
         this._webSocketManager = new WebSocketManager(this);
         this._signalingMessageHandler = new SignalingMessageHandler(this);
-        this._webrtcInitiator = new WebRtcInitiator(this); // Initialize new module
-        this._webrtcJoiner = new WebRtcJoiner(this);       // Initialize new module
-        this._syncMessageRouter = new SyncMessageRouter(this); // Initialize new module
-        // --- End Initialize helper modules ---
+        this._webrtcInitiator = new WebRtcInitiator(this);
+        this._webrtcJoiner = new WebRtcJoiner(this);
+        this._syncMessageRouter = new SyncMessageRouter(this);
     }
 
     updateSignalingServerUrl(url) {
         this.signalingServerUrl = url;
         localStorage.setItem('thoughtform_signaling_server', url);
     }
+    
+    async negotiateSession(syncName) {
+        if (this.isNegotiating) return;
 
-    // Getter for the current sync method state
-    getCurrentSyncMethodState() {
-        return this.currentSyncMethod;
-    }
+        this.isNegotiating = true;
+        this.negotiationSyncName = syncName;
+        this.sync.isInitiator = false; // Assume not initiator until confirmed
 
-    // --- PRIVATE METHOD: Update currentSyncMethod and UI indicator ---
-    _updateCurrentSyncMethodState(method) {
-        if (this.currentSyncMethod !== method) {
-            this.currentSyncMethod = method;
-            debug.log("DEBUG: Current sync method state updated to:", method);
-            // Update the UI indicator if the UI instance is available
-            if (this.sync && this.sync.ui && typeof this.sync.ui.updateSyncMethodIndicator === 'function') {
-                this.sync.ui.updateSyncMethodIndicator();
-            }
+        try {
+            await this.connectToSignalingServer();
+            debug.log(`Attempting to create session with persistent name: ${syncName}`);
+            
+            // The message handler will now take over based on the server's response
+            // ('session_created' or 'error') to this request.
+            this._webSocketManager.sendCreateSessionRequest(syncName);
+            
+        } catch (error) {
+            this.sync.updateConnectionState('error', `Failed to connect to signaling server.`);
+            this.isNegotiating = false;
         }
     }
-    // --- END PRIVATE METHOD ---
 
-    // --- DELEGATED METHODS ---
-    // Delegate connect method
+    // Called by the message handler if creating a session fails because it already exists.
+    attemptToJoinSession() {
+        debug.log(`Create failed, now attempting to join session: ${this.negotiationSyncName}`);
+        this.joinSession(this.negotiationSyncName);
+    }
+    
+    // Internal method to set up this peer as the session initiator.
+    async startSession(syncName) {
+        this.isNegotiating = false;
+        return this._webrtcInitiator.startSession(syncName);
+    }
+
+    // Internal method to set up this peer as a session joiner.
+    async joinSession(syncName) {
+        this.isNegotiating = false;
+        return this._webrtcJoiner.joinSession(syncName);
+    }
+    
     connectToSignalingServer() {
         return this._webSocketManager.connectToSignalingServer();
     }
 
-    // Delegate sendSignal method
     sendSignal(data) {
         return this._webSocketManager.sendSignal(data);
     }
 
-    // Delegate startSession method
-    async startSession() {
-        return this._webrtcInitiator.startSession();
-    }
-
-    // Delegate joinSession method
-    async joinSession(code) {
-        return this._webrtcJoiner.joinSession(code);
-    }
-
-    // Delegate createOfferAfterPeerJoined method
-    async createOfferAfterPeerJoined() {
-        // Check if the initiator module has this method (it should)
-        if (this._webrtcInitiator && typeof this._webrtcInitiator.createOfferAfterPeerJoined === 'function') {
-             return this._webrtcInitiator.createOfferAfterPeerJoined();
-        } else {
-             debug.error("DEBUG: WebRTC Initiator module does not have createOfferAfterPeerJoined method.");
-        }
-    }
-
-    // Delegate sendSyncMessage method
     sendSyncMessage(data) {
         return this._syncMessageRouter.sendSyncMessage(data);
     }
-
-    // Delegate sendSyncMessageViaSignaling method (if needed externally, though less likely)
-    // sendSyncMessageViaSignaling(data) {
-    //     return this._syncMessageRouter.sendSyncMessageViaSignaling(data);
-    // }
-    // --- END DELEGATED METHODS ---
-
-    // Keep handleSignal here for now as it's complex and interacts directly with peerConnection
+    
     async handleSignal(data) {
         const syncInstance = this.sync;
         try {
-            debug.log("DEBUG: Received signal:", data.type);
+            if (!syncInstance.peerConnection) {
+                debug.error("Received signal but peerConnection is not initialized.");
+                return;
+            }
+
             if (data.type === 'offer') {
-                debug.log("DEBUG: Handling offer");
                 await syncInstance.peerConnection.setRemoteDescription(new RTCSessionDescription(data));
                 const answer = await syncInstance.peerConnection.createAnswer();
                 await syncInstance.peerConnection.setLocalDescription(answer);
-                debug.log("DEBUG: Sending answer");
-                this.sendSignal({ // Use delegate
-                    type: 'answer',
-                    sdp: answer.sdp
-                });
+                this.sendSignal({ type: 'answer', sdp: answer.sdp });
             } else if (data.type === 'answer') {
-                debug.log("DEBUG: Handling answer");
                 await syncInstance.peerConnection.setRemoteDescription(new RTCSessionDescription(data));
             } else if (data.type === 'candidate') {
-                debug.log("DEBUG: Handling ICE candidate");
-                const candidate = new RTCIceCandidate(data.candidate);
-                await syncInstance.peerConnection.addIceCandidate(candidate);
+                await syncInstance.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         } catch (error) {
             debug.error('Error handling signal:', error);
             syncInstance.addMessage(`WebRTC error: ${error.message}`);
+            this.sync.updateConnectionState('error', `WebRTC Error: ${error.message}`);
         }
     }
 
-    // Delegate destroy logic
     destroy() {
+        this.isNegotiating = false;
+        this.negotiationSyncName = null;
         if (this.ws) {
             this.ws.close();
+            this.ws = null;
         }
-        // Reset sync method state on destroy
-        this._updateCurrentSyncMethodState('none');
-        // Potentially clean up peerConnection and dataChannel listeners if needed
-        // This might involve calling destroy/cleanup methods on the WebRTC modules if they had specific cleanup.
-        // For now, setting ws to null and state to 'none' is sufficient.
     }
 }

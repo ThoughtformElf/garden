@@ -240,32 +240,23 @@ export function initializeDevTools() {
         const deleteBtn = modal.addFooterButton('Delete Selected', deleteHandler);
         deleteBtn.classList.add('destructive');
         modal.addFooterButton('Cancel', () => modal.destroy());
-        modal.show(); // Show modal after content and listeners are ready
+        modal.show();
       });
     },
     show() { this._$el.show(); },
     hide() { this._$el.hide(); },
   });
 
-  // ***** CORRECTED CODE START *****
-  // The Sync class instance is created and managed inside the tool definition.
   const syncTool = eruda.add({
     name: 'Sync',
     init($el) {
       this.sync = new Sync();
       this.sync.init($el.get(0));
 
-      // Attach listeners HERE, inside the init function where 'this.sync' is defined.
-      this.sync.on('start', () => {
-          console.log('DEVTOOLS: "Start Sync" button clicked');
-          // In the next phase, this will trigger WebRTC logic
-          this.sync.updateStatus('Waiting for peer...', 'ABC-123'); // Example code
-      });
-      this.sync.on('join', (code) => {
-          console.log(`DEVTOOLS: "Join Sync" with code: ${code}`);
-          // In the next phase, this will trigger WebRTC logic
-          this.sync.updateStatus('Connecting...');
-      });
+      // ***** THIS IS THE FIX *****
+      // The obsolete event listeners that caused the crash have been removed.
+      // All UI interaction is now handled inside the Sync/SyncUI classes.
+      // ***** END OF FIX *****
     },
     show() {
       this.sync.show();
@@ -277,7 +268,6 @@ export function initializeDevTools() {
       this.sync.destroy();
     }
   });
-  // ***** CORRECTED CODE END *****
 
   return eruda;
 }

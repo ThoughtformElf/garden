@@ -101,16 +101,26 @@ wss.on('connection', (ws, req) => {
             switch (data.type) {
                 case 'create_session':
                     let sessionId;
-                    let attempts = 0;
-                    const maxAttempts = 100;
-                    do {
-                        sessionId = crypto.randomBytes(3).toString('hex').toUpperCase();
-                        attempts++;
-                    } while (sessions.has(sessionId) && attempts < maxAttempts);
+                    const requestedSessionId = data.sessionId ? String(data.sessionId).toUpperCase() : null;
 
-                    if (attempts >= maxAttempts) {
-                        ws.send(JSON.stringify({ type: 'error', message: 'Failed to create a unique session ID. Please try again.' }));
-                        return;
+                    if (requestedSessionId) {
+                        if (sessions.has(requestedSessionId)) {
+                             ws.send(JSON.stringify({ type: 'error', message: `Session '${requestedSessionId}' already exists.` }));
+                             return;
+                        }
+                        sessionId = requestedSessionId;
+                    } else {
+                        let attempts = 0;
+                        const maxAttempts = 100;
+                        do {
+                            sessionId = crypto.randomBytes(3).toString('hex').toUpperCase();
+                            attempts++;
+                        } while (sessions.has(sessionId) && attempts < maxAttempts);
+
+                        if (attempts >= maxAttempts) {
+                            ws.send(JSON.stringify({ type: 'error', message: 'Failed to create a unique session ID. Please try again.' }));
+                            return;
+                        }
                     }
 
                     sessions.set(sessionId, { initiator: ws, peers: [ws] });
@@ -125,7 +135,7 @@ wss.on('connection', (ws, req) => {
                         return;
                     }
 
-                    const sessionIdToJoin = data.sessionId;
+                    const sessionIdToJoin = data.sessionId.toUpperCase();
                     const sessionToJoin = sessions.get(sessionIdToJoin);
 
                     if (sessionToJoin) {
@@ -153,6 +163,23 @@ wss.on('connection', (ws, req) => {
                         console.warn(`Signal received from peer ${peerId} not in a session.`);
                     }
                     break;
+                
+                // *** FIX 3: ADDED this case to handle the WebSocket fallback for file sync. ***
+                case 'direct_sync_message':
+                    const sessionForSync = sessions.get(ws.sessionId);
+                    if (sessionForSync) {
+                        // Relay sync message to all other peers in the session.
+                        const targetPeers = sessionForSync.peers.filter(peer => peer !== ws);
+                        targetPeers.forEach(targetPeer => {
+                            if (targetPeer && targetPeer.readyState === WebSocket.OPEN) {
+                                // The original 'data' object is what needs to be relayed.
+                                targetPeer.send(JSON.stringify(data));
+                            }
+                        });
+                    } else {
+                        console.warn(`Sync message received from peer ${peerId} not in a session.`);
+                    }
+                    break;
 
                 default:
                     console.warn(`Unknown message type received from ${peerId}:`, data.type);
@@ -176,6 +203,11 @@ wss.on('connection', (ws, req) => {
                 }
 
                 if (session.initiator === ws || session.peers.length === 0) {
+                    session.peers.forEach(peer => {
+                         if (peer.readyState === WebSocket.OPEN) {
+                             peer.send(JSON.stringify({ type: 'error', message: 'Session closed by initiator.' }));
+                         }
+                    });
                     sessions.delete(ws.sessionId);
                     console.log(`Session ${ws.sessionId} deleted.`);
                 } else {

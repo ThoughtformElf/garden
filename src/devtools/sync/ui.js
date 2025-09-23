@@ -1,16 +1,20 @@
 // src/devtools/sync/ui.js
 import debug from '../../util/debug.js';
-import { Modal } from '../../util/modal.js'; // Import Modal
+import { Modal } from '../../util/modal.js';
 
 export class SyncUI {
     constructor(syncInstance) {
         this.sync = syncInstance;
         this.syncMethodIndicatorEl = null;
-        // --- ADDITION: Store reference to the progress modal ---
         this.syncProgressModal = null;
-        this.syncProgressLogArea = null; // Reference to the scrollable log area inside the modal
-        this.syncProgressFinalMessageArea = null; // Reference to the final message area
-        // --- END ADDITION ---
+        this.syncProgressLogArea = null;
+        this.syncProgressFinalMessageArea = null;
+        this.syncProgressCloseButton = null;
+
+        // Cache DOM elements for frequent access
+        this.connectBtn = null;
+        this.nameInput = null;
+        this.autoConnectCheckbox = null;
     }
 
     render() {
@@ -18,36 +22,38 @@ export class SyncUI {
             this.sync._container.innerHTML = `
 <div id="eruda-Sync">
     <div class="eruda-sync-config" style="margin-bottom: 20px; padding: 10px; border: 1px solid #444; border-radius: 4px;">
-        <h3>Signaling Server Configuration</h3>
+        <h3>Sync Configuration</h3>
+        <label for="sync-name-input">Sync Name:</label>
+        <input type="text" id="sync-name-input" class="eruda-input" placeholder="e.g., my-devices">
+        <div style="margin-top: 10px;">
+            <label style="display: flex; align-items: center;">
+                <input type="checkbox" id="sync-autoconnect-checkbox" style="margin-right: 5px;">
+                <span>Auto-connect on startup</span>
+            </label>
+        </div>
+        <button id="sync-connect-btn" class="eruda-button" style="margin-top: 15px;">Connect</button>
+    </div>
+
+    <!-- THIS IS THE FIX: Added server configuration UI back in -->
+    <div class="eruda-sync-config" style="margin-bottom: 20px; padding: 10px; border: 1px solid #444; border-radius: 4px;">
+        <h3>Signaling Server</h3>
         <label for="signaling-server-url">Server URL:</label>
-        <input type="text" id="signaling-server-url" class="eruda-input" value="${this.sync.signaling.signalingServerUrl}" placeholder="wss://socket.thoughtform.garden">
+        <input type="text" id="signaling-server-url" class="eruda-input" value="${this.sync.signaling.signalingServerUrl}">
         <button id="save-signaling-config" class="eruda-button" style="margin-left: 10px;">Save</button>
     </div>
+    <!-- END OF FIX -->
+
     <div class="eruda-sync-status">
         <strong>Status:</strong> <span id="sync-status">Disconnected</span>
         <br>
-        <strong>Sync Method:</strong> <span id="sync-method-indicator">None</span>
+        <strong>Method:</strong> <span id="sync-method-indicator">None</span>
     </div>
     <div class="eruda-sync-main">
-        <div id="sync-initiator">
-            <button id="start-sync-btn" class="eruda-button">Start Sync Session</button>
-            <div id="sync-session-info" style="display: none; margin-top: 10px;">
-                <p>Share this code with your other device:</p>
-                <strong id="sync-session-code" class="eruda-code"></strong>
-            </div>
-        </div>
-        <div id="sync-joiner" style="margin-top: 20px;">
-            <label for="sync-join-code">Join a session:</label>
-            <input type="text" id="sync-join-code" class="eruda-input" placeholder="Enter code...">
-            <button id="join-sync-btn" class="eruda-button">Join</button>
-        </div>
-
         <div style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #444;">
-            <h4>File Sync:</h4>
+            <h4>File Sync Actions:</h4>
             <button id="sync-all-files-btn" class="eruda-button">Send All Files</button>
             <button id="request-all-files-btn" class="eruda-button" style="margin-left: 10px;">Request All Files</button>
         </div>
-
     </div>
     <div class="eruda-sync-messages" id="eruda-sync-messages" style="display:none; margin-top: 20px;">
         <h3>Messages</h3>
@@ -55,7 +61,11 @@ export class SyncUI {
     </div>
 </div>
             `;
+            // Cache elements after rendering
             this.syncMethodIndicatorEl = this.sync._container.querySelector('#sync-method-indicator');
+            this.connectBtn = this.sync._container.querySelector('#sync-connect-btn');
+            this.nameInput = this.sync._container.querySelector('#sync-name-input');
+            this.autoConnectCheckbox = this.sync._container.querySelector('#sync-autoconnect-checkbox');
         }
     }
 
@@ -65,54 +75,57 @@ export class SyncUI {
             return;
         }
 
-        const startBtn = this.sync._container.querySelector('#start-sync-btn');
-        const joinBtn = this.sync._container.querySelector('#join-sync-btn');
-        const saveConfigBtn = this.sync._container.querySelector('#save-signaling-config');
-        const syncAllBtn = this.sync._container.querySelector('#sync-all-files-btn');
-        const requestAllBtn = this.sync._container.querySelector('#request-all-files-btn');
+        // Load saved settings from localStorage to populate the form
+        this.nameInput.value = localStorage.getItem('thoughtform_sync_name') || '';
+        this.autoConnectCheckbox.checked = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
 
-        if (startBtn) {
-            startBtn.addEventListener('click', () => {
-                debug.log("UI: Start Sync button clicked");
-                this.sync.emit('start');
-                this.sync.signaling.startSession();
-            });
-        }
+        // Connect/Disconnect button listener
+        this.connectBtn.addEventListener('click', () => {
+            const currentState = this.sync.connectionState;
+            if (currentState === 'disconnected' || currentState === 'error') {
+                const syncName = this.nameInput.value.trim();
+                const autoConnect = this.autoConnectCheckbox.checked;
 
-        if (joinBtn) {
-            joinBtn.addEventListener('click', () => {
-                const codeInput = this.sync._container.querySelector('#sync-join-code');
-                const code = codeInput ? codeInput.value.trim() : '';
-                if (code) {
-                    debug.log("UI: Join Sync button clicked with code:", code);
-                    this.sync.emit('join', code);
-                    this.sync.signaling.joinSession(code);
-                } else {
-                     this.sync.addMessage('Please enter a session code to join.');
+                if (!syncName) {
+                    this.addMessage("Please enter a Sync Name.");
+                    return;
                 }
-            });
-        }
 
+                localStorage.setItem('thoughtform_sync_name', syncName);
+                localStorage.setItem('thoughtform_sync_auto_connect', autoConnect);
+
+                debug.log("UI: Connect button clicked");
+                this.sync.connect(syncName);
+            } else {
+                debug.log("UI: Disconnect button clicked");
+                this.sync.disconnect();
+            }
+        });
+
+        // THIS IS THE FIX: Added event listener for the server config save button
+        const saveConfigBtn = this.sync._container.querySelector('#save-signaling-config');
         if (saveConfigBtn) {
             saveConfigBtn.addEventListener('click', () => {
                 const urlInput = this.sync._container.querySelector('#signaling-server-url');
                 const newUrl = urlInput ? urlInput.value.trim() : '';
                 if (newUrl) {
-                    debug.log("UI: Save Config button clicked with URL:", newUrl);
                     this.sync.signaling.updateSignalingServerUrl(newUrl);
-                    this.sync.updateStatus(`Signaling server URL updated to: ${newUrl}`);
+                    this.addMessage(`Signaling server updated to: ${newUrl}`);
+                    debug.log("UI: Save Config button clicked with URL:", newUrl);
                 } else {
-                     this.sync.addMessage('Please enter a valid URL.');
+                     this.addMessage('Please enter a valid signaling server URL.');
                 }
             });
         }
+        // END OF FIX
+
+        const syncAllBtn = this.sync._container.querySelector('#sync-all-files-btn');
+        const requestAllBtn = this.sync._container.querySelector('#request-all-files-btn');
 
         if (syncAllBtn) {
             syncAllBtn.addEventListener('click', async () => {
                 debug.log("UI: Send All Files button clicked");
-                // --- ADDITION: Show progress modal when sync starts ---
                 this.showSyncProgressModal();
-                // --- END ADDITION ---
                 await this.sync.fileSync.syncAllFiles();
             });
         }
@@ -120,65 +133,81 @@ export class SyncUI {
         if (requestAllBtn) {
             requestAllBtn.addEventListener('click', () => {
                 debug.log("UI: Request All Files button clicked");
-                // --- ADDITION: Show progress modal when request starts ---
                 this.showSyncProgressModal();
-                // --- END ADDITION ---
                 this.sync.fileSync.requestAllFiles();
             });
         }
     }
 
-    updateStatus(message, code = null) {
+    updateStatus(message) {
         const statusEl = this.sync._container.querySelector('#sync-status');
-        const sessionCodeEl = this.sync._container.querySelector('#sync-session-code');
-        const sessionInfoEl = this.sync._container.querySelector('#sync-session-info');
-
         if (statusEl) {
             statusEl.textContent = message;
-            debug.log("UI: Status updated to:", message);
-            // Update the sync method indicator when status changes
-            this.updateSyncMethodIndicator();
-        }
-
-        if (code && sessionCodeEl && sessionInfoEl) {
-            sessionCodeEl.textContent = code;
-            sessionInfoEl.style.display = 'block';
-        } else if (sessionInfoEl) {
-            sessionInfoEl.style.display = 'none';
         }
     }
+    
+    updateControls(state) {
+        const isDisconnected = (state === 'disconnected' || state === 'error');
+        const isConnecting = (state === 'connecting');
+        
+        if (this.connectBtn) {
+            this.connectBtn.disabled = isConnecting;
+            if (isDisconnected) this.connectBtn.textContent = 'Connect';
+            else if (isConnecting) this.connectBtn.textContent = 'Connecting...';
+            else this.connectBtn.textContent = 'Disconnect';
+        }
+        
+        if (this.nameInput) this.nameInput.disabled = !isDisconnected;
+        if (this.autoConnectCheckbox) this.autoConnectCheckbox.disabled = !isDisconnected;
 
-    updateSyncMethodIndicator() {
-        if (this.syncMethodIndicatorEl) {
-            const methodState = this.sync.signaling.getCurrentSyncMethodState();
-            let displayText = 'Unknown';
-            let displayColor = 'var(--color-text-primary)';
+        // Enable/disable file sync buttons based on active connection
+        const fileSyncButtons = this.sync._container.querySelectorAll('.eruda-sync-main .eruda-button');
+        const shouldEnableFileSync = (state === 'connected-p2p' || state === 'connected-signal');
+        fileSyncButtons.forEach(btn => btn.disabled = !shouldEnableFileSync);
+    }
+    
+    updateConnectionIndicator(state) {
+        const tabEl = document.querySelector('.luna-tab-item[data-id="Sync"]');
+        if (tabEl) {
+            tabEl.classList.remove('sync-status-connecting', 'sync-status-p2p', 'sync-status-signal', 'sync-status-error');
+            
+            let methodText = 'None';
+            let methodColor = 'var(--color-text-secondary)';
 
-            switch (methodState) {
-                case 'webrtc_active':
-                    displayText = 'WebRTC (P2P) - Active';
-                    displayColor = 'var(--base-accent-action)'; // Green
+            switch (state) {
+                case 'connecting':
+                    tabEl.classList.add('sync-status-connecting');
+                    methodText = 'Connecting...';
+                    methodColor = 'var(--base-accent-warning)';
                     break;
-                case 'webrtc_inactive':
-                    displayText = 'WebRTC (P2P) - Inactive';
-                    displayColor = 'var(--base-accent-warning)'; // Orange
+                case 'connected-signal':
+                    tabEl.classList.add('sync-status-signal');
+                    methodText = 'WebSocket (Fallback)';
+                    methodColor = 'var(--base-accent-warning)';
                     break;
-                case 'websocket':
-                    displayText = 'WebSocket (Fallback)';
-                    displayColor = 'var(--base-accent-warning)'; // Orange
+                case 'connected-p2p':
+                    tabEl.classList.add('sync-status-p2p');
+                    methodText = 'WebRTC (P2P)';
+                    methodColor = 'var(--base-accent-action)';
                     break;
-                case 'none':
+                case 'error':
+                    tabEl.classList.add('sync-status-error');
+                    methodText = 'Error';
+                    methodColor = 'var(--base-accent-destructive)';
+                    break;
+                case 'disconnected':
                 default:
-                    displayText = 'None';
-                    displayColor = 'var(--color-text-secondary)'; // Gray
+                    methodText = 'None';
+                    methodColor = 'var(--color-text-secondary)';
                     break;
             }
-            this.syncMethodIndicatorEl.textContent = displayText;
-            this.syncMethodIndicatorEl.style.color = displayColor;
-            debug.log("UI: Sync method indicator updated to:", displayText);
+            if (this.syncMethodIndicatorEl) {
+                 this.syncMethodIndicatorEl.textContent = methodText;
+                 this.syncMethodIndicatorEl.style.color = methodColor;
+            }
         }
     }
-
+    
     addMessage(text) {
         const messagesList = this.sync._container.querySelector('#eruda-messages-list');
         if (messagesList) {
@@ -186,141 +215,56 @@ export class SyncUI {
             messageEl.textContent = text;
             messagesList.appendChild(messageEl);
             messagesList.scrollTop = messagesList.scrollHeight;
-            debug.log("UI: Message added:", text);
         }
     }
-
+    
     showMessages() {
         const messagesDiv = this.sync._container.querySelector('#eruda-sync-messages');
-        if (messagesDiv) {
-            messagesDiv.style.display = 'block';
-            debug.log("UI: Messages area shown");
-        }
+        if (messagesDiv) messagesDiv.style.display = 'block';
     }
 
     hideMessages() {
         const messagesDiv = this.sync._container.querySelector('#eruda-sync-messages');
-        if (messagesDiv) {
-            messagesDiv.style.display = 'none';
-            debug.log("UI: Messages area hidden");
-        }
+        if (messagesDiv) messagesDiv.style.display = 'none';
     }
-    
-    // --- ADDITION: Sync Progress Modal Methods ---
-    
-    /**
-     * Creates and displays the sync progress modal.
-     */
+
     showSyncProgressModal() {
-        // If a modal is already open, close it first
-        if (this.syncProgressModal) {
-            this.syncProgressModal.destroy();
-        }
-        
-        // Create a new modal
-        this.syncProgressModal = new Modal({
-            title: 'File Sync Progress',
-            // Optional: Make it wider for better log visibility
-            // width: '600px' 
-        });
-        
-        // Create the content structure for the modal
+        if (this.syncProgressModal) this.syncProgressModal.destroy();
+        this.syncProgressModal = new Modal({ title: 'File Sync Progress' });
         const progressContent = `
             <div id="sync-progress-log" style="height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; background-color: #1a1a1a; margin-bottom: 10px; font-family: monospace; font-size: 12px;"></div>
             <div id="sync-progress-final-message" style="font-weight: bold; padding: 5px; min-height: 20px;"></div>
         `;
-        
-        // Set the content
         this.syncProgressModal.updateContent(progressContent);
-        
-        // Get references to the log and final message areas
         this.syncProgressLogArea = this.syncProgressModal.content.querySelector('#sync-progress-log');
         this.syncProgressFinalMessageArea = this.syncProgressModal.content.querySelector('#sync-progress-final-message');
-        
-        // Add a close button, initially disabled
-        this.syncProgressCloseButton = this.syncProgressModal.addFooterButton('Close', () => {
-            if (this.syncProgressModal) {
-                this.syncProgressModal.destroy();
-                this.syncProgressModal = null;
-                this.syncProgressLogArea = null;
-                this.syncProgressFinalMessageArea = null;
-                this.syncProgressCloseButton = null;
-            }
-        });
-        this.syncProgressCloseButton.disabled = true; // Disable until sync is complete/cancelled/errored
-        
-        // Show the modal
+        this.syncProgressCloseButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
+        this.syncProgressCloseButton.disabled = true;
         this.syncProgressModal.show();
-        
-        debug.log("UI: Sync progress modal shown");
     }
-    
-    /**
-     * Updates the sync progress modal with a new message.
-     * This method is intended to be called by the event listener for 'syncProgress' events.
-     * @param {CustomEvent} event - The syncProgress event dispatched by SyncFiles.
-     */
+
     updateSyncProgress(event) {
-        // Check if the modal is currently displayed
-        if (!this.syncProgressModal || !this.syncProgressLogArea || !this.syncProgressFinalMessageArea) {
-            debug.warn("UI: Sync progress modal not found, cannot update progress.");
-            return;
-        }
-        
-        const detail = event.detail;
-        const message = detail.message || 'No message';
-        const type = detail.type || 'info'; // 'info', 'error', 'complete', 'cancelled'
-        
-        // Create a log entry element
+        if (!this.syncProgressModal || !this.syncProgressLogArea) return;
+        const { message = 'No message', type = 'info' } = event.detail;
         const logEntry = document.createElement('div');
-        const timestamp = new Date().toLocaleTimeString(); // e.g., "10:30:15"
+        const timestamp = new Date().toLocaleTimeString();
         logEntry.textContent = `[${timestamp}] ${message}`;
         logEntry.style.marginBottom = '5px';
-        
-        // Style based on type
         switch (type) {
-            case 'error':
-                logEntry.style.color = 'var(--base-accent-destructive)'; // Red
-                break;
-            case 'complete':
-                logEntry.style.color = 'var(--base-accent-action)'; // Green
-                break;
-            case 'cancelled':
-                logEntry.style.color = 'var(--base-accent-warning)'; // Orange
-                break;
-            case 'info':
-            default:
-                logEntry.style.color = 'var(--color-text-primary)'; // Default
-                break;
+            case 'error': logEntry.style.color = 'var(--base-accent-destructive)'; break;
+            case 'complete': logEntry.style.color = 'var(--base-accent-action)'; break;
+            case 'cancelled': logEntry.style.color = 'var(--base-accent-warning)'; break;
+            default: logEntry.style.color = 'var(--color-text-primary)'; break;
         }
-        
-        // Append the log entry to the log area
         this.syncProgressLogArea.appendChild(logEntry);
-        
-        // Scroll the log area to the bottom to show the latest message
         this.syncProgressLogArea.scrollTop = this.syncProgressLogArea.scrollHeight;
-        
-        // Handle special types that indicate the end of the process
-        if (type === 'complete' || type === 'error' || type === 'cancelled') {
-            // Update the final message area
-            this.syncProgressFinalMessageArea.textContent = message;
-            this.syncProgressFinalMessageArea.style.color = logEntry.style.color; // Match color
-            
-            // Enable the close button
-            if (this.syncProgressCloseButton) {
-                this.syncProgressCloseButton.disabled = false;
-            }
-            
-            debug.log("UI: Sync progress modal updated with final status:", message);
-        } else {
-            debug.log("UI: Sync progress modal updated with message:", message);
+        if (['complete', 'error', 'cancelled'].includes(type)) {
+            if (this.syncProgressFinalMessageArea) this.syncProgressFinalMessageArea.textContent = message;
+            if (this.syncProgressFinalMessageArea) this.syncProgressFinalMessageArea.style.color = logEntry.style.color;
+            if (this.syncProgressCloseButton) this.syncProgressCloseButton.disabled = false;
         }
     }
-    
-    /**
-     * Hides and destroys the sync progress modal.
-     * (This is optional as the close button already does this)
-     */
+
     hideSyncProgressModal() {
         if (this.syncProgressModal) {
             this.syncProgressModal.destroy();
@@ -328,9 +272,6 @@ export class SyncUI {
             this.syncProgressLogArea = null;
             this.syncProgressFinalMessageArea = null;
             this.syncProgressCloseButton = null;
-            debug.log("UI: Sync progress modal hidden");
         }
     }
-    
-    // --- END ADDITION: Sync Progress Modal Methods ---
 }
