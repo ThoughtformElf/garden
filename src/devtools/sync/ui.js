@@ -20,7 +20,7 @@ export class SyncUI {
     <div class="eruda-sync-config" style="margin-bottom: 20px; padding: 10px; border: 1px solid #444; border-radius: 4px;">
         <h3>Signaling Server Configuration</h3>
         <label for="signaling-server-url">Server URL:</label>
-        <input type="text" id="signaling-server-url" class="eruda-input" value="${this.sync.signaling.signalingServerUrl}" placeholder="ws://localhost:8080">
+        <input type="text" id="signaling-server-url" class="eruda-input" value="${this.sync.signaling.signalingServerUrl}" placeholder="wss://socket.thoughtform.garden">
         <button id="save-signaling-config" class="eruda-button" style="margin-left: 10px;">Save</button>
     </div>
     <div class="eruda-sync-status">

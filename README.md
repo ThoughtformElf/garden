@@ -8,26 +8,29 @@
 
 ---
 
-**Thoughtform Garden** is an experimental, browser-based coding environment that merges a personal knowledge base with a functional IDE. It is an "editor-first OS" that lives entirely in your browser, designed to explore literate programming, cultivate self-improving code, and collaborate with AI agents.
+**Thoughtform Garden** is an experimental, browser-based coding environment merging a personal knowledge base with a functional IDE. It's an "editor-first OS" designed for literate programming, self-improving code, and collaboration with AI agents.
 
-This project is more than a tool; it's an exploration into the **Tao of Digital Gardening**—a practice of intentional, mindful interaction with information. It's a space to turn the chaos of the digital world into a garden of personal gnosis, shepherding streams of tokens into streams of consciousness.
+This project is more than a tool; it's an exploration into the **Tao of Digital Gardening**—a practice of intentional interaction with information. It's a space to turn digital chaos into a garden of personal gnosis.
 
 ## Local Development
 To run the project on your machine for development:
 1.  **Clone the repository:**
-    ```
-    git clone https://github.com/thoughtforms/garden.git
-    cd garden
-    ```
+```bash
+git clone https://github.com/thoughtforms/garden.git
+cd garden
+```
+
 2.  **Install dependencies:**
-    ```
-    npm install
-    ```
+```bash
+npm install
+```
 3.  **Run the development server:**
-    ```
-    npm run dev
-    ```
-This will start a local server at `http://localhost:5173`. The live, stable instance is always available at [**thoughtform.garden**](https://thoughtform.garden), no account registration needed.
+
+```bash
+npm run dev
+```
+
+This will start a local server (usually at `http://localhost:5173`). The live instance is always available at [**thoughtform.garden**](https://thoughtform.garden), no registration needed.
 
 ***
 
@@ -35,80 +38,92 @@ This will start a local server at `http://localhost:5173`. The live, stable inst
 Thoughtform Garden is designed to be intuitive. Here are the key workflows.
 
 ### The Command Palette: Your Universal Interface
-The Command Palette has two modes for powerful interaction: **Search** and **Execute**.
-
--   **Search Mode (`Ctrl+P`):** This is your universal file finder. It provides a single, unified search across **all files in all of your gardens.** Simply start typing any part of a file or garden name to instantly filter results, and press `Enter` to open the file.
--   **Execute Mode (`Ctrl+Shift+P`):** This is your command runner. It finds and executes any `.js` file within your current garden, turning simple scripts into powerful commands.
+Access the Command Palette with two modes:
+-   **Search Mode (`Ctrl+P`):** Find any file across all gardens instantly.
+-   **Execute Mode (`Ctrl+Shift+P`):** Run any `.js` file within your current garden as a command.
 
 ### The Executable Layer: Creating Your Own Commands
-Thoughtform Garden is now a powerful userscript manager for itself. You can write JavaScript files that have direct access to the application's core components, allowing you to automate workflows and extend the editor's functionality on the fly.
+Thoughtform Garden acts as a userscript manager for itself. Scripts have access to `editor` and `git` globals.
 
-1.  **Create a script file:** In the file explorer, create a new file, for example, `my-command.js`.
-2.  **Write your script:** Your script has access to two powerful global objects: `editor` and `git`.
+1.  **Create a script file:** E.g., `my-command.js`.
+2.  **Write your script:**
 
 ```js
 // Example: my-command.js
-// This script will get the content of the current file,
-// append a timestamp, and save the change as a new commit.
-
-// 1. Access the 'editor' object
 const currentDoc = editor.editorView.state.doc;
 const newContent = currentDoc.toString() + `\n\nUpdated: ${new Date().toISOString()}`;
 
-// 2. Dispatch a change to the editor view
 editor.editorView.dispatch({
   changes: { from: 0, to: currentDoc.length, insert: newContent }
 });
 
-// 3. Access the 'git' object to commit the change
 await git.commit('Appended update timestamp via script');
-
 console.log('Timestamp appended and committed successfully!');
 ```
 
-3.  **Run your command:** Press `Ctrl+Shift+P`, type `my-command.js`, and press `Enter`. The script will execute immediately.
+3.  **Run your command:** Press `Ctrl+Shift+P`, type `my-command.js`, and press `Enter`.
 
 ### Multi-Workspace Management
-Your work is organized into "Gardens"—separate, self-contained workspaces.
-- **Switching Gardens**: Click the **Gardens** tab in the sidebar to see all your workspaces. Clicking a garden name instantly switches to it.
+Work is organized into "Gardens"—separate workspaces.
+- **Switching Gardens**: Click the **Gardens** tab in the sidebar.
 - **Managing Gardens**: **Right-click** (or **long-press** on mobile) in the Gardens view to create, duplicate, or delete gardens.
 
 ### File & Version Control
-Within each garden, you have a complete git-based workflow.
+Each garden has a complete git-based workflow.
 - **File Management**: **Right-click** (or **long-press**) on any file in the **Files** tab to `Rename`, `Duplicate`, or `Delete` it.
-- **Git Workflow**: The **Git** tab provides a full version control interface, including staging, committing, viewing history, and diffing changes.
+- **Git Workflow**: The **Git** tab provides staging, committing, viewing history, and diffing changes.
 
 ### Data Portability
-Your data is yours. The **Data** tab in the bottom devtools panel gives you full control.
-- **Selective Export**: Click **Export...** to open a modal where you can select which gardens to back up into a single `.zip` file.
-- **Selective Import**: Click **Import...** and choose a `.zip` backup. You'll be prompted to select which gardens from the archive you wish to restore.
-- **Clear Data**: A "Danger Zone" option allows you to permanently delete selected gardens to reset your environment.
+Your data is yours. The **Data** tab in devtools gives you full control.
+- **Selective Export**: Export selected gardens into a single `.zip` file.
+- **Selective Import**: Import a `.zip` backup and choose which gardens to restore.
+- **Clear Data**: Permanently delete selected gardens.
+
+***
+
+## Peer-to-Peer (P2P) File Synchronization
+
+Thoughtform Garden features an experimental P2P file sync system using WebRTC, with a WebSocket fallback.
+
+### How It Works (Simplified)
+
+1.  **Direct Connection (WebRTC):** When two browsers connect, they attempt to establish a direct, encrypted link using WebRTC for fast file transfers.
+2.  **Coordination (WebSocket Signaling):** A lightweight WebSocket server helps browsers find each other initially. This server does *not* normally relay file data.
+3.  **Fallback (WebSocket Relay):** If a direct WebRTC link fails (due to firewalls/NATs), the system automatically uses the WebSocket server to relay the file data, ensuring sync always works.
+
+### Using P2P Sync
+
+-   **Start Session:** One user clicks "Start Sync Session" in DevTools. A code is generated.
+-   **Join Session:** Another user clicks "Join a session" and enters the code.
+-   **Transfer Files:** Use "Send All Files" or "Request All Files" buttons. The system prioritizes fast P2P but uses the WebSocket relay if needed.
+
+This P2P system is a step towards the vision of ambient, multi-device computing.
 
 ***
 
 ## The Philosophy: A Cognitive Core
-This is not just an application; it is a **Cognitive Core**. It is a system designed to become a direct extension of your mind—a version-controlled, locally-hosted, and infinitely malleable environment for thought. By blending a journal, an IDE, and a knowledge graph, Thoughtform Garden facilitates a tight feedback loop between you and your digital self, augmented by AI.
+This is a system designed to become a direct extension of your mind—a version-controlled, locally-hosted environment for thought. By blending a journal, an IDE, and a knowledge graph, it facilitates a tight feedback loop between you and your digital self, augmented by AI.
 
 ## The Agentic Loop: Human + AI = AGI
-The ultimate vision is to create a symbiotic partnership where the boundaries between user and AI blur. By giving an LLM access to its own source code, the complete version history of the garden, and a secure environment for API keys, the system becomes a "Test-Time Reinforcement Learning" environment. Instead of updating weights, the agent can update its own context and prompts, enabling a powerful loop of self-improvement and reflection. This collaboration—the human providing intent and the AI providing generative execution—is a practical step toward an emergent, functional AGI.
+The vision is a symbiotic partnership where human intent and AI execution blur. By giving an LLM access to its own source code, garden history, and API keys, the system becomes a "Test-Time Reinforcement Learning" environment. The agent updates context and prompts, enabling a powerful loop of self-improvement. This collaboration is a practical step towards an emergent, functional AGI.
 
 ---
 
 ## Roadmap: From Editor to Egregore
-The current editor is the foundation. The future is focused on building a fully ambient, multi-modal computing experience.
+The current editor is the foundation. The future focuses on a fully ambient, multi-modal experience.
 #### Phase 1: Quality of Life
-- **Command Palette**: A universal finder for files across all gardens.
-- **Keyboard Shortcuts**: Customizable keymaps for core actions and navigation.
-- **Enhanced Theming**: Refactor styles to use CSS variables for easy theme switching and personalization.
+- **Command Palette**: Universal finder for files.
+- **Keyboard Shortcuts**: Customizable keymaps.
+- **Enhanced Theming**: CSS variables for themes.
 #### Phase 2: The OS Layer
-- **Code Execution**: Allow code written in the editor to be executed in a sandboxed environment.
-- **URL-Based Commands**: Implement `?repo=` support to clone and render any git repository, turning the Garden into a universal lens for knowledge.
-- **Environment Variables**: Add a dedicated UI for managing secrets like API keys.
+- **Code Execution**: Execute editor code in a sandbox.
+- **URL-Based Commands**: `?repo=` support for any git repository.
+- **Environment Variables**: UI for managing API keys.
 #### Phase 3: The Agentic Leap
-- **Remote Sync & Collaboration**: Implement `git push/pull` with a secure authentication layer to sync gardens between devices.
-- **LLM Integration**: Build a dedicated interface for chatting with an AI that has full context of the current garden.
-- **Device Swarms**: Use WebRTC or WebSockets to create ad-hoc, multi-device computing clusters.
+- **Remote Sync & Collaboration**: `git push/pull` with auth.
+- **LLM Integration**: Chat with an AI that has full garden context.
+- **Device Swarms**: Ad-hoc multi-device computing clusters (WebRTC/WebSockets).
 #### Phase 4: Full Embodiment
-- **Visual & Multimodal Editing**: Move beyond text to include node-based graph editors and viewers.
-- **Sensor Integration**: Connect to browser sensors (camera, microphone) for hands-free interaction.
-- **Robotic Embodiment**: Create pathways to stream context to and from physical robots, augmenting reality with your digital gnosis.
+- **Visual & Multimodal Editing**: Node-based editors.
+- **Sensor Integration**: Camera, microphone access.
+- **Robotic Embodiment**: Stream context to/from robots.
