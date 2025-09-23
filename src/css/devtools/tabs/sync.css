@@ -4,26 +4,26 @@
   user-select: text !important;
 }
 
-#eruda-Sync {
+#eruda-Sync .sync-container {
   color: var(--color-text-primary);
   user-select: text !important;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.eruda-sync-status {
+.eruda-sync-config {
+  margin-bottom: 0;
+  padding: 1rem;
+  border: 1px solid var(--color-border-secondary);
+}
+
+.eruda-sync-config h3,
+.eruda-sync-config h4 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
   border-bottom: 1px solid var(--color-border-secondary);
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-}
-
-.eruda-sync-status strong {
-  color: var(--base-accent-destructive);
-}
-
-.eruda-sync-main label {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--base-accent-destructive);
-  font-weight: bold;
+  padding-bottom: 0.5rem;
 }
 
 .eruda-input {
@@ -32,20 +32,11 @@
   color: var(--color-text-primary);
   padding: 0.5rem;
   font-size: 1rem;
-  width: calc(100% - 85px);
-  margin-right: 5px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
-.eruda-code {
-  background-color: var(--base-dark);
-  padding: 5px 8px;
-  color: var(--base-accent-action);
-  border: 1px solid var(--color-border-secondary);
-  display: inline-block;
-  user-select: text; 
-}
-
-/* Base style for the status dot. It's invisible by default. */
 .luna-tab-item[data-id="Sync"] {
   position: relative;
 }
@@ -60,22 +51,65 @@
   display: none;
   right: -0.35rem;
 }
-
-/* Yellow Dot: For connecting or WebSocket fallback states. */
 .luna-tab-item[data-id="Sync"].sync-status-connecting::after,
 .luna-tab-item[data-id="Sync"].sync-status-signal::after {
   color: var(--base-accent-emphasis);
   display: inline;
 }
-
-/* Green Dot: For a successful, high-speed P2P connection. */
 .luna-tab-item[data-id="Sync"].sync-status-p2p::after {
   color: var(--base-accent-action);
   display: inline;
 }
-
-/* Red Dot: For connection errors. */
 .luna-tab-item[data-id="Sync"].sync-status-error::after {
   color: var(--base-accent-destructive);
   display: inline;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.sync-form-group {
+  margin-bottom: 0.5rem;
+}
+
+#eruda-Sync input[type="checkbox"] {
+  margin: 0;
+}
+
+.sync-status-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.5rem;
+  align-items: center;
+}
+
+.sync-status-grid strong {
+  color: var(--base-accent-action);
+}
+
+#eruda-Sync h3, #eruda-Sync h4 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.sync-messages-list {
+  height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-secondary);
+  padding: 10px;
+  background-color: var(--base-dark);
+  border-radius: 4px;
+}
+
+.sync-label {
+  white-space: nowrap;
+}
+
+.sync-panel {
+  border: 1px solid var(--color-border-secondary);
+  padding: 1rem;
 }

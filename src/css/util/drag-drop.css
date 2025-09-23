@@ -12,7 +12,7 @@
   transition: opacity 0.2s ease-in-out;
   color: var(--color-text-bright);
   font-family: Arial, sans-serif;
-  font-size: 24px;
+  font-size: 2rem;
   text-align: center;
   border: 2px dashed var(--color-border-interactive);
   box-sizing: border-box;

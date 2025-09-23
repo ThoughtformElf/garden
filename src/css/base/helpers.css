@@ -1,0 +1,39 @@
+.flex {
+  display: flex;
+}
+.full-width {
+  width: 100%;
+}
+.mr-1 {
+  margin-right: 0.25rem;
+}
+.pr-1,
+.eruda-container .pr-1 {
+  padding-right: 0.25rem;
+}
+html span.pr-1 {
+  display: inline-block;
+}
+
+
+.flex-grow {
+  flex: 1;
+}
+
+.space-between {
+    justify-content: space-between;
+}
+
+.flex-center {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.flex-center span {
+    color: var(--color-text-primary);
+}
+
+.hidden {
+    display: none !important;
+}

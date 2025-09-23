@@ -3,6 +3,10 @@ html .eruda-container .luna-tab {
   color: var(--base-text-primary);
 }
 
+html .eruda-container h3 {
+  margin-bottom: 1rem;
+}
+
 html .eruda-container .luna-tab-item.luna-tab-selected {
   background: var(--base-dark);
 }
