@@ -10,9 +10,6 @@ export class SignalingMessageHandler {
         const syncInstance = this.signaling.sync;
         switch (data.type) {
             case 'session_created':
-                // *** FIX 1: REMOVED the incorrect updateStatus call. ***
-                // The startSession method is now solely responsible for updating the state
-                // from 'connecting' to 'connected-signal', which is the correct flow.
                 if (this.signaling.isNegotiating) {
                     this.signaling.startSession(data.sessionId);
                 }
@@ -23,8 +20,6 @@ export class SignalingMessageHandler {
                     this.signaling.targetPeerId = data.peerId;
                 }
                 
-                // *** FIX 2: Use updateConnectionState to keep the status message current. ***
-                // The state remains 'connected-signal', but we update the message to reflect the new activity.
                 syncInstance.updateConnectionState('connected-signal', 'Peer joined. Establishing P2P connection...');
                 
                 if (syncInstance.isInitiator && this.signaling._webrtcInitiator) {
@@ -39,14 +34,44 @@ export class SignalingMessageHandler {
 
             case 'peer_left':
                 syncInstance.addMessage('Peer disconnected from session.');
-                syncInstance.updateConnectionState('connected-signal', 'Peer left. Using WebSocket fallback.');
                 this.signaling.targetPeerId = null;
+
+                if (syncInstance.isInitiator) {
+                    debug.log("Initiator resetting peer connection, ready for next peer.");
+                    this.signaling._webrtcInitiator.setupPeerConnection();
+                    syncInstance.updateConnectionState('connected-signal', 'Peer left. Ready for new connection.');
+                } else {
+                    syncInstance.updateConnectionState('connected-signal', 'Peer left. Using WebSocket fallback.');
+                }
                 break;
 
             case 'error':
                 debug.error('Signaling error:', data.message);
                 if (this.signaling.isNegotiating && data.message.includes('already exists')) {
                     this.signaling.attemptToJoinSession();
+                
+                /**
+                 * THIS IS THE FIX:
+                 * Handle the case where the session initiator disconnects. Instead of just
+                 * showing an error, the client will now attempt to re-establish the session.
+                 */
+                } else if (data.message.includes('Session closed by initiator')) {
+                    debug.log("Initiator left. This client will attempt to re-establish the session.");
+                    syncInstance.addMessage("Host disconnected. Attempting to reconnect...");
+                    
+                    // Grab the session name before disconnect() clears it.
+                    const sessionToReconnect = syncInstance.syncName;
+
+                    if (sessionToReconnect) {
+                        // Fully disconnect and clean up the old state.
+                        syncInstance.disconnect();
+
+                        // Use a short timeout to allow the disconnection to settle
+                        // before starting a new connection negotiation.
+                        setTimeout(() => {
+                            syncInstance.connect(sessionToReconnect);
+                        }, 500);
+                    }
                 } else {
                     syncInstance.updateConnectionState('error', `Signaling error: ${data.message}`);
                 }
