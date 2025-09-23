@@ -1,4 +1,4 @@
-# Thoughtform Garden
+# Thoughtform.Garden
 
 > An in-browser OS for vibe-driven development and agentic computing.<br>
 > ![GitHub Repo stars](https://img.shields.io/github/stars/thoughtforms/garden)
@@ -81,23 +81,28 @@ Your data is yours. The **Data** tab in devtools gives you full control.
 
 ***
 
-## Peer-to-Peer (P2P) File Synchronization
+## Ambient, Peer-to-Peer (P2P) Synchronization
 
-Thoughtform Garden features an experimental P2P file sync system using WebRTC, with a WebSocket fallback.
+Thoughtform Garden features a persistent, self-healing P2P synchronization system using WebRTC. This transforms isolated browser tabs into a cohesive, multi-device swarm, allowing you to orchestrate an "agentic supercomputer" from any connected device.
 
-### How It Works (Simplified)
+### How It Works
 
-1.  **Direct Connection (WebRTC):** When two browsers connect, they attempt to establish a direct, encrypted link using WebRTC for fast file transfers.
-2.  **Coordination (WebSocket Signaling):** A lightweight WebSocket server helps browsers find each other initially. This server does *not* normally relay file data.
-3.  **Fallback (WebSocket Relay):** If a direct WebRTC link fails (due to firewalls/NATs), the system automatically uses the WebSocket server to relay the file data, ensuring sync always works.
+1.  **Direct Connection (WebRTC):** The system prioritizes a direct, encrypted, peer-to-peer link between devices. This is ideal for fast, low-latency file transfers.
+2.  **Coordination (WebSocket Signaling):** A lightweight WebSocket server helps devices find each other using a shared **Sync Name**, which acts as a persistent "room" for your devices to meet in.
+3.  **Seamless Fallback (WebSocket Relay):** If a direct P2P link cannot be established (due to restrictive firewalls or NATs), the system automatically and seamlessly falls back to relaying encrypted file data through the WebSocket server. This ensures the connection always succeeds.
+4.  **Self-Healing Network:** The network is designed for resilience. If the device that initiated the session (the "host") disconnects, another peer will automatically take over, re-establish the session, and allow all other devices to rejoin without any manual intervention.
 
-### Using P2P Sync
+### Configuring Your Sync Swarm
 
--   **Start Session:** One user clicks "Start Sync Session" in DevTools. A code is generated.
--   **Join Session:** Another user clicks "Join a session" and enters the code.
--   **Transfer Files:** Use "Send All Files" or "Request All Files" buttons. The system prioritizes fast P2P but uses the WebSocket relay if needed.
+1.  **Open DevTools:** Press `Ctrl+\`` (backtick) and navigate to the **Sync** tab.
+2.  **Set a Sync Name:** Enter a unique, memorable name for your device group (e.g., `my-device-swarm`). This is your shared secret.
+3.  **Enable Auto-Connect (Optional):** Check the "Auto-connect on startup" box to have this device automatically join the swarm every time you load the page.
+4.  **Connect:** Click "Connect". Repeat this process on your other devices using the *exact same* Sync Name.
+5.  **Monitor Status:** The **Sync** tab in DevTools will have a colored dot indicating the connection quality:
+    -   **Yellow Dot:** Connecting, or connected via the reliable WebSocket fallback.
+    -   **Green Dot:** Connected via a high-speed, direct P2P WebRTC link.
 
-This P2P system is a step towards the vision of ambient, multi-device computing.
+Once connected, use the "Send All Files" or "Request All Files" buttons to synchronize your gardens across the swarm.
 
 ***
 
