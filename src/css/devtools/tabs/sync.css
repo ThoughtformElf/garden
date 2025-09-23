@@ -44,3 +44,38 @@
   display: inline-block;
   user-select: text; 
 }
+
+/* Base style for the status dot. It's invisible by default. */
+.luna-tab-item[data-id="Sync"] {
+  position: relative;
+}
+.luna-tab-item[data-id="Sync"]::after {
+  content: '●';
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-left: 0.5rem;
+  position: absolute;
+  vertical-align: middle;
+  color: transparent;
+  display: none;
+  right: -0.35rem;
+}
+
+/* Yellow Dot: For connecting or WebSocket fallback states. */
+.luna-tab-item[data-id="Sync"].sync-status-connecting::after,
+.luna-tab-item[data-id="Sync"].sync-status-signal::after {
+  color: var(--base-accent-emphasis);
+  display: inline;
+}
+
+/* Green Dot: For a successful, high-speed P2P connection. */
+.luna-tab-item[data-id="Sync"].sync-status-p2p::after {
+  color: var(--base-accent-action);
+  display: inline;
+}
+
+/* Red Dot: For connection errors. */
+.luna-tab-item[data-id="Sync"].sync-status-error::after {
+  color: var(--base-accent-destructive);
+  display: inline;
+}
