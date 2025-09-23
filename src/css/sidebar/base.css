@@ -1,4 +1,3 @@
-@import './git.css';
 #sidebar {
   position: relative;
   width: var(--sidebar-width);
