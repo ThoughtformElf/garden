@@ -1,0 +1,80 @@
+@import './tabs/index.css';
+
+/* ===== BASE STYLES ===== */
+#eruda-container {
+  flex-shrink: 0;
+  background: #1e1e1e;
+  overflow: visible;
+}
+
+.eruda-dev-tools {
+  position: relative !important;
+  min-height: 0;
+}
+
+#eruda-resizer {
+  height: 2rem;
+  cursor: pointer;
+  background-color: var(--color-border-secondary);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+#eruda-resizer:hover { 
+  background-color: var(--base-accent-destructive); 
+}
+
+#eruda-toggle {
+  width: 2rem;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1.25rem;
+  pointer-events: none;
+}
+
+/* ===== GLOBAL OVERRIDES ===== */
+html .eruda-container *,
+html #eruda-elements .eruda-control [class*=" eruda-icon-"], 
+html #eruda-elements .eruda-control [class^=eruda-icon-],
+html #eruda-elements .eruda-section h2,
+html #eruda-network .eruda-control [class*=" eruda-icon-"], 
+html #eruda-network .eruda-control [class^=eruda-icon-],
+html .luna-data-grid {
+  font-size: 1rem;
+  line-height: 1.25rem;
+}
+
+.luna-console-count-container {
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem;
+}
+
+html #eruda-elements .eruda-elements,
+html #eruda-network .eruda-network {
+  padding-top: 2.5rem;
+}
+
+html #eruda-resources .eruda-title .eruda-btn,
+html #eruda-elements .eruda-section h2 .eruda-btn {
+  margin-left: 1rem;
+  margin-right: 0.5rem;
+}
+
+html #eruda-resources .eruda-title {
+  padding: 1rem 0.5rem;
+}
+
+#eruda-control {
+  padding-left: 3rem !important;
+}
+
+#eruda-console {
+  padding-top: 3rem !important;
+}

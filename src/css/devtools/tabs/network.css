@@ -1,0 +1,22 @@
+/* ===== NETWORK TAB ===== */
+html #eruda-network .eruda-control {
+  background: var(--base-dark);
+  border-bottom: none;
+}
+
+html #eruda-network .eruda-control .eruda-icon-record.eruda-recording {
+  color: var(--base-accent-destructive);
+  text-shadow: 0 0 4px var(--base-accent-destructive);
+}
+
+html #eruda-network .eruda-control .eruda-icon-clear {
+  left: 2rem;
+}
+
+html #eruda-network .eruda-network .eruda-control .eruda-icon-copy {
+  right: 0.5rem;
+}
+
+html #eruda-network .eruda-network .eruda-control .eruda-icon-filter {
+  right: 2.5rem;
+}

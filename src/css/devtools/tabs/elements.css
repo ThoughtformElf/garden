@@ -1,0 +1,93 @@
+/* ===== ELEMENTS TAB ===== */
+html #eruda-elements .eruda-elements,
+html #eruda-elements .eruda-detail {
+  background: var(--base-dark);
+}
+
+html #eruda-elements .eruda-control,
+html #eruda-elements .eruda-section h2,
+html #eruda-elements .eruda-listeners .eruda-listener-wrapper .eruda-listener .eruda-listener-type {
+  background: var(--base-dark);
+  border-bottom: none;
+  border-top: none;
+}
+
+html #eruda-elements .eruda-section,
+html #eruda-elements .eruda-styles .eruda-style-wrapper .eruda-style-rules,
+html #eruda-elements .eruda-listeners .eruda-listener-wrapper .eruda-listener,
+html #eruda-elements .eruda-computed-style .eruda-table-wrapper {
+  border-color: var(--color-border-secondary);
+}
+
+html #eruda-elements .eruda-crumbs {
+  background: var(--base-dark);
+  border-top: none;
+  color: var(--color-text-primary);
+}
+
+html #eruda-elements .eruda-crumbs li:hover, 
+html #eruda-elements .eruda-crumbs li:last-child {
+  background: var(--base-accent-destructive);
+}
+
+/* Elements Syntax Highlighting */
+html .eruda-tag-name-color,
+html .eruda-container table {
+  color: var(--base-white);
+}
+
+html .eruda-container .luna-dom-viewer .luna-dom-viewer-html-tag, 
+html .eruda-container .luna-dom-viewer .luna-dom-viewer-tag-name,
+html .eruda-attribute-name-color {
+  color: var(--base-accent-info);
+}
+
+html .eruda-container .luna-dom-viewer .luna-dom-viewer-attribute-name {
+  color: var(--base-accent-action);
+}
+
+html .eruda-container .luna-dom-viewer .luna-dom-viewer-attribute-value,
+html .eruda-string-color {
+  color: var(--base-accent-emphasis);
+}
+
+html #eruda-elements .eruda-styles .eruda-style-wrapper .eruda-style-rules .eruda-rule span,
+html #eruda-elements .eruda-computed-style table td.eruda-key {
+  color: var(--base-accent-destructive);
+}
+
+/* Elements Box Model */
+html .eruda-container .luna-box-model-border, 
+html .eruda-container .luna-box-model-content, 
+html .eruda-container .luna-box-model-margin, 
+html .eruda-container .luna-box-model-padding, 
+html .eruda-container .luna-box-model-position,
+html .eruda-container .luna-box-model {
+  background: var(--base-dark);
+  color: var(--color-text-primary);
+}
+
+html #eruda-elements .eruda-section {
+  color: var(--color-text-primary);
+}
+
+/* Elements Icons */
+html .luna-dom-viewer-icon-caret-down, 
+html .luna-dom-viewer-icon-caret-right {
+  font-size: 1rem !important;
+}
+
+html #eruda-elements .eruda-elements .eruda-control .eruda-icon-delete {
+  right: 2rem;
+}
+
+/* ===== ELEMENTS HIGHLIGHT ===== */
+.eruda-elements-highlight {
+  display: none !important;
+  z-index: -1 !important;
+}
+
+body.eruda-select-active .eruda-elements-highlight {
+  display: block !important;
+  z-index: 99999 !important;
+}

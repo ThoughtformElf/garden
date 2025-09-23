@@ -1,0 +1,51 @@
+/* ===== SETTINGS TAB ===== */
+html .eruda-container .luna-setting {
+  background: var(--base-dark);
+  color: var(--color-text-primary);
+}
+
+html .eruda-container .luna-setting-item-checkbox input:checked {
+  background: var(--base-accent-destructive);
+  border: none;
+}
+
+html .eruda-container .luna-setting-item-checkbox input,
+html .eruda-container .luna-setting-item-checkbox input:hover {
+  border-color: var(--base-accent-destructive);
+}
+
+html .eruda-container .luna-setting-item.luna-setting-selected, 
+html .eruda-container .luna-setting-item:hover {
+  background: var(--base-interactive);
+  color: var(--base-white);
+}
+
+html .eruda-container .luna-setting-item-button button {
+  background: var(--base-accent-destructive);
+  color: var(--base-white);
+  border: none;
+  padding: 0.5rem 1rem;
+}
+
+html .eruda-container .luna-setting-item-select .luna-setting-select select {
+  background: var(--base-dark);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-secondary);
+}
+
+/* Setting Item Styles */
+html .luna-setting-item .luna-setting-control, 
+html .luna-setting-item .luna-setting-description,
+html .luna-setting-item-select .luna-setting-select select,
+html .luna-setting-item-checkbox input:checked:after,
+html .eruda-container .luna-setting-item-title,
+html .luna-setting-item-button button {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+html .luna-setting-item-checkbox input {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 1rem;
+}

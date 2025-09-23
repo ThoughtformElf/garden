@@ -3,7 +3,8 @@
 @import './base.css';
 @import './sidebar.css';
 @import './editor.css';
-@import './devtools.css';
+@import './devtools/index.css';
+@import './buttons.css';
 @import './context-menu.css';
 @import './modal.css';
 @import './drag-drop.css';

@@ -28,6 +28,12 @@ p {
   margin-bottom: 1rem;
 }
 
+hr {
+  border: none;
+  border-top: 1px solid var(--color-border-secondary);
+  margin: 2rem 0;
+}
+
 .app-container {
   display: flex;
   flex-direction: column;

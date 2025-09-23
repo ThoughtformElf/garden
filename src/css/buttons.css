@@ -1,0 +1,23 @@
+/* ===== BUTTONS ===== */
+button, .eruda-button { 
+  padding: 0.5rem; 
+  background-color: var(--base-accent-action); 
+  color: var(--base-black); 
+  border: none; 
+  cursor: pointer; 
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.eruda-button:hover { 
+  background-color: color-mix(in srgb, var(--base-accent-action), white); 
+}
+
+.eruda-button.destructive { 
+  background-color: var(--base-accent-destructive); 
+  color: var(--base-white); 
+}
+
+.eruda-button.destructive:hover { 
+  background-color: var(--base-accent-destructive); 
+}

@@ -1,0 +1,46 @@
+/* ===== SYNC TAB ===== */
+.eruda-container * {
+  pointer-events: all !important;
+  user-select: text !important;
+}
+
+#eruda-Sync {
+  color: var(--color-text-primary);
+  user-select: text !important;
+}
+
+.eruda-sync-status {
+  border-bottom: 1px solid var(--color-border-secondary);
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+}
+
+.eruda-sync-status strong {
+  color: var(--base-accent-destructive);
+}
+
+.eruda-sync-main label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--base-accent-destructive);
+  font-weight: bold;
+}
+
+.eruda-input {
+  background-color: var(--base-dark);
+  border: 1px solid var(--color-border-secondary);
+  color: var(--color-text-primary);
+  padding: 0.5rem;
+  font-size: 1rem;
+  width: calc(100% - 85px);
+  margin-right: 5px;
+}
+
+.eruda-code {
+  background-color: var(--base-dark);
+  padding: 5px 8px;
+  color: var(--base-accent-action);
+  border: 1px solid var(--color-border-secondary);
+  display: inline-block;
+  user-select: text; 
+}

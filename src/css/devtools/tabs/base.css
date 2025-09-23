@@ -1,0 +1,48 @@
+html .eruda-container .luna-tab {
+  background: var(--base-dark);
+  color: var(--base-text-primary);
+}
+
+html .eruda-container .luna-tab-item.luna-tab-selected {
+  background: var(--base-dark);
+}
+
+html .eruda-container .luna-tab-item:hover {
+  background: var(--color-border-secondary);
+  color: var(--color-text-secondary);
+}
+
+html .eruda-container .luna-tab-slider {
+  background: var(--base-accent-destructive);
+  height: 2px;
+}
+
+html .luna-tab-tabs {
+  background: var(--base-dark);
+  height: 3rem;
+  line-height: 3rem;
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+
+html .eruda-dev-tools {
+  padding-top: 3rem !important;
+  border: none;
+}
+
+html .luna-tab-item {
+  color: var(--color-text-secondary);
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+  height: auto !important;
+}
+
+html .luna-tab-title {
+  height: 3rem !important;
+  line-height: 3rem !important;
+}
+
+html .eruda-container .luna-tab-tabs-container {
+  height: 3rem !important;
+  line-height: 3rem !important;
+  border-bottom: 1px solid var(--color-border-secondary);
+}

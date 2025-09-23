@@ -1,0 +1,22 @@
+/* ===== DATA TAB ===== */
+#eruda-Data > div {
+  padding: 1rem;
+}
+
+#eruda-Data h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.garden-selection-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-secondary);
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.garden-selection-list label {
+  display: block;
+  margin-bottom: 5px;
+}
