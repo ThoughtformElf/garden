@@ -1,3 +1,9 @@
+/* Hidden for now */
+[data-id="settings"] {
+  display: none !important;
+}
+
+
 /* ===== SETTINGS TAB ===== */
 html .eruda-container .luna-setting {
   background: var(--base-dark);

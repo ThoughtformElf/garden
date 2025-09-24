@@ -39,7 +39,7 @@ export class Git {
       });
 
       const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
-      await this.pfs.writeFile('/README', defaultContent, 'utf8');
+      await this.pfs.writeFile('/README.md', defaultContent, 'utf8');
 
       this.registerNewGarden();
       console.log('New garden initialized successfully.');
@@ -208,7 +208,7 @@ export class Git {
       return content;
     } catch (e) {
       console.warn(`File not found: ${filepath}`);
-      return `// File not found: ${filepath}\n// Start typing to create it.`;
+      return `// "${filepath}" does not exist yet, type anywhere to create it.`;
     }
   }
 
