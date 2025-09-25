@@ -14,6 +14,7 @@ import { allHighlightPlugins } from './plugins/index.js';
 import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
+import { navigateToLink } from './plugins/wikilinks.js';
 
 const programmaticChange = Annotation.define();
 
@@ -79,9 +80,34 @@ export class Editor {
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: [
+        keymap.of([
+          indentWithTab,
+          {
+            key: 'Mod-Enter',
+            // ***** THIS IS THE FIX *****
+            // The `run` function only receives `view`. Returning true handles prevention.
+            run: (view) => {
+              const pos = view.state.selection.main.head;
+              const line = view.state.doc.lineAt(pos);
+              const linkRegex = /\[\[([^\[\]]+?)\]\]/g;
+              let match;
+
+              while ((match = linkRegex.exec(line.text))) {
+                const start = line.from + match.index;
+                const end = start + match[0].length;
+                if (pos >= start && pos <= end) {
+                  const linkContent = match[1];
+                  navigateToLink(linkContent);
+                  return true; // Event handled
+                }
+              }
+              return false; // Event not handled, fall through
+            },
+            // ***** END OF FIX *****
+          },
+        ]),
         vim(),
         basicSetup,
-        keymap.of([indentWithTab]), // Removed command palette keymaps
         EditorView.lineWrapping,
         lineNumbersRelative,
         basicDark,
