@@ -14,22 +14,16 @@ This project is more than a tool; it's an exploration into the **Tao of Digital 
 
 ## Local Development
 To run the project on your machine for development:
-1.  **Clone the repository:**
+1.  **Clone the repository and install dependencies:**
 ```bash
 git clone https://github.com/thoughtforms/garden.git
 cd garden
-```
-
-2.  **Install dependencies:**
-```bash
 npm install
 ```
-3.  **Run the development server:**
-
+2.  **Run the development server:**
 ```bash
 npm run dev
 ```
-
 This will start a local server (usually at `http://localhost:5173`). The live instance is always available at [**thoughtform.garden**](https://thoughtform.garden), no registration needed.
 
 ***
@@ -42,12 +36,20 @@ Access the Command Palette with two modes:
 -   **Search Mode (`Ctrl+P`):** Find any file across all gardens instantly.
 -   **Execute Mode (`Ctrl+Shift+P`):** Run any `.js` file within your current garden as a command.
 
+### Navigation & Shortcuts
+Quickly navigate between files and to external websites directly from the editor.
+-   **Follow a Link:** Use `Ctrl+Click` (desktop) or **long-press** (mobile) on any link.
+-   **Navigate from Keyboard:** Place your cursor inside any link and press `Ctrl+Enter`.
+    - `[[Wikilinks]]` navigate to other files within your garden.
+    - `[Markdown](links)` and `https://naked.urls` open in a new browser tab.
+-   **Toggle Sidebar:** `Ctrl+[`
+-   **Toggle DevTools:** `Ctrl+\`` (backtick)
+
 ### The Executable Layer: Creating Your Own Commands
 Thoughtform Garden acts as a userscript manager for itself. Scripts have access to `editor` and `git` globals.
 
 1.  **Create a script file:** E.g., `my-command.js`.
 2.  **Write your script:**
-
 ```js
 // Example: my-command.js
 const currentDoc = editor.editorView.state.doc;
@@ -60,7 +62,6 @@ editor.editorView.dispatch({
 await git.commit('Appended update timestamp via script');
 console.log('Timestamp appended and committed successfully!');
 ```
-
 3.  **Run your command:** Press `Ctrl+Shift+P`, type `my-command.js`, and press `Enter`.
 
 ### Multi-Workspace Management
@@ -94,7 +95,7 @@ Thoughtform Garden features a persistent, self-healing P2P synchronization syste
 
 ### Configuring Your Sync Swarm
 
-1.  **Open DevTools:** Press `Ctrl+\`` (backtick) and navigate to the **Sync** tab.
+1.  **Open DevTools:** Navigate to the **Sync** tab.
 2.  **Set a Sync Name:** Enter a unique, memorable name for your device group (e.g., `my-device-swarm`). This is your shared secret.
 3.  **Enable Auto-Connect (Optional):** Check the "Auto-connect on startup" box to have this device automatically join the swarm every time you load the page.
 4.  **Connect:** Click "Connect". Repeat this process on your other devices using the *exact same* Sync Name.
