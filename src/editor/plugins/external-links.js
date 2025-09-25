@@ -1,24 +1,31 @@
-// src/editor/plugins/wikilinks.js
+// src/editor/plugins/externalLinks.js
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { navigateTo, appContextField } from '../navigation.js';
 
-const wikilinkDecoration = Decoration.mark({ class: 'cm-wikilink' });
+const nakedLinkDecoration = Decoration.mark({ class: 'cm-naked-link' });
 
-class WikilinkPlugin {
+function sanitizeUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('www.')) {
+    return `https://` + url;
+  }
+  return url;
+}
+
+class ExternalLinkPlugin {
   constructor(view) {
     this.view = view;
-    this.decorations = this.findWikilinks(view);
+    this.decorations = this.findNakedLinks(view);
     this.longPressTimeout = null;
 
-    // Bind event handlers to this instance
+    // Bind event handlers
     this.onMouseDown = this.onMouseDown.bind(this);
     this.onMouseUp = this.onMouseUp.bind(this);
     this.onTouchStart = this.onTouchStart.bind(this);
     this.onTouchEnd = this.onTouchEnd.bind(this);
     this.onTouchMove = this.onTouchMove.bind(this);
 
-    // Add event listeners to the editor's DOM element
+    // Add event listeners
     this.view.dom.addEventListener('mousedown', this.onMouseDown);
     this.view.dom.addEventListener('mouseup', this.onMouseUp);
     this.view.dom.addEventListener('touchstart', this.onTouchStart, { passive: false });
@@ -27,7 +34,6 @@ class WikilinkPlugin {
   }
 
   destroy() {
-    // Clean up event listeners
     this.clearLongPressTimeout();
     this.view.dom.removeEventListener('mousedown', this.onMouseDown);
     this.view.dom.removeEventListener('mouseup', this.onMouseUp);
@@ -35,19 +41,24 @@ class WikilinkPlugin {
     this.view.dom.removeEventListener('touchend', this.onTouchEnd);
     this.view.dom.removeEventListener('touchmove', this.onTouchMove);
   }
-  
-  handleNavigation(linkEl) {
-    const appContext = this.view.state.field(appContextField);
-    if (appContext.gitClient) {
-      navigateTo(linkEl.textContent.slice(2, -2), appContext);
+
+  handleNavigation(event) {
+    // Check for naked links or standard Markdown URLs
+    const linkEl = event.target.closest('.cm-naked-link, .cm-url');
+    if (!linkEl) return false;
+    
+    const url = sanitizeUrl(linkEl.textContent);
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
+    return true;
   }
 
   onMouseDown(event) {
-    const linkEl = event.target.closest('.cm-wikilink');
-    if (linkEl && (event.ctrlKey || event.metaKey)) {
-      event.preventDefault();
-      this.handleNavigation(linkEl);
+    if (event.ctrlKey || event.metaKey) {
+      if (this.handleNavigation(event)) {
+        event.preventDefault();
+      }
     }
   }
 
@@ -56,11 +67,11 @@ class WikilinkPlugin {
   }
 
   onTouchStart(event) {
-    const linkEl = event.target.closest('.cm-wikilink');
+    const linkEl = event.target.closest('.cm-naked-link, .cm-url');
     if (linkEl) {
       event.preventDefault();
       this.longPressTimeout = setTimeout(() => {
-        this.handleNavigation(linkEl);
+        this.handleNavigation(event);
         this.longPressTimeout = null;
       }, 500);
     }
@@ -71,7 +82,7 @@ class WikilinkPlugin {
   }
   
   onTouchMove() {
-      this.clearLongPressTimeout();
+    this.clearLongPressTimeout();
   }
 
   clearLongPressTimeout() {
@@ -83,27 +94,34 @@ class WikilinkPlugin {
 
   update(update) {
     if (update.docChanged || update.viewportChanged) {
-      this.decorations = this.findWikilinks(update.view);
+      this.decorations = this.findNakedLinks(update.view);
     }
   }
 
-  findWikilinks(view) {
+  // This plugin only decorates naked links. Markdown links are already
+  // decorated by the core markdown language extension.
+  findNakedLinks(view) {
     const builder = new RangeSetBuilder();
-    const wikilinkRegex = /\[\[([^\[\]]+?)\]\]/g;
+    const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/g;
     for (const { from, to } of view.visibleRanges) {
-      const text = view.state.doc.sliceString(from, to);
-      let match;
-      while ((match = wikilinkRegex.exec(text))) {
-        const start = from + match.index;
-        const end = start + match[0].length;
-        builder.add(start, end, wikilinkDecoration);
-      }
+        const text = view.state.doc.sliceString(from, to);
+        let match;
+        while ((match = linkRegex.exec(text))) {
+            const line = view.state.doc.lineAt(from + match.index);
+            // Avoid decorating URLs that are already part of a markdown link
+            if (/\[.*\]\(.*\)/.test(line.text)) {
+                if (line.text.includes(`](${match[0]})`)) continue;
+            }
+            const start = from + match.index;
+            const end = start + match[0].length;
+            builder.add(start, end, nakedLinkDecoration);
+        }
     }
     return builder.finish();
   }
 }
 
-export const wikilinkPlugin = ViewPlugin.fromClass(
-  WikilinkPlugin,
+export const externalLinkPlugin = ViewPlugin.fromClass(
+  ExternalLinkPlugin,
   { decorations: v => v.decorations }
 );

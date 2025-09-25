@@ -3,7 +3,7 @@ import { hashtagPlugin } from './hashtags.js';
 import { wikilinkPlugin } from './wikilinks.js';
 import { checkboxPlugin } from './checkboxes.js';
 import { timestampPlugin } from './timestamps.js';
-import { linkPlugin } from './links.js';
+import { externalLinkPlugin } from './external-links.js';
 import { blockquotePlugin } from './blockquotes.js';
 import { rulerPlugin } from './ruler.js';
 
@@ -12,7 +12,7 @@ export const allHighlightPlugins = [
   wikilinkPlugin,
   checkboxPlugin,
   timestampPlugin,
-  linkPlugin,
+  externalLinkPlugin,
   blockquotePlugin,
   rulerPlugin,
 ];
