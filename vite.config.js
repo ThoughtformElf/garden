@@ -6,6 +6,28 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      // Add the manifest object here
+      manifest: {
+        name: 'Thoughtform Garden',
+        short_name: 'thoughtform.garden',
+        description: 'Web-based IDE for AI-assisted programming and personal knowledge management',
+        theme_color: '#07443b',
+        // Set the display mode to 'browser'
+        display: 'browser',
+        icons: [
+          // Make sure you have your icons defined here
+          {
+            src: 'favicon.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'favicon.png',
+            sizes: '512x512',
+            type: 'image/png'
+          }
+        ]
+      },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,md}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
@@ -13,7 +35,6 @@ export default defineConfig({
     }),
   ],
   build: {
-    // Add this line to change the output directory
     outDir: 'docs',
     rollupOptions: {
       output: {
