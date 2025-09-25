@@ -6,7 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite --host",
-    "build": "vite build && shx cp dist/index.html dist/404.html",
+    "build": "vite build && shx cp docs/index.html docs/404.html",
     "ws": "node server/index.js",
     "preview": "vite preview"
   },

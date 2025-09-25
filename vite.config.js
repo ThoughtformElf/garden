@@ -13,9 +13,10 @@ export default defineConfig({
     }),
   ],
   build: {
+    // Add this line to change the output directory
+    outDir: 'docs',
     rollupOptions: {
       output: {
-        // This removes the random hash from the filenames
         entryFileNames: `assets/[name].js`,
         chunkFileNames: `assets/[name].js`,
         assetFileNames: `assets/[name].[ext]`,
