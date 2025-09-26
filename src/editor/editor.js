@@ -173,6 +173,20 @@ export class Editor {
   }
 
   async loadFile(filepath) {
+    // --- FIX: Prevent loading images directly into the editor ---
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+    const extension = filepath.split('.').pop()?.toLowerCase();
+    if (imageExtensions.includes(extension)) {
+      console.warn(`Attempted to load image file "${filepath}" into the editor. Aborting.`);
+      // Revert the URL hash to the last known good file to prevent a broken state
+      window.location.hash = `#${encodeURIComponent(this.filePath)}`;
+      await this.sidebar.showAlert({
+        title: 'Cannot Open Image',
+        message: 'Image files cannot be opened directly in the editor. You can embed them in other notes using ![[filename.png]].'
+      });
+      return;
+    }
+    
     console.log(`Loading ${filepath}...`);
     this.hideDiff();
     const newContent = await this.loadFileContent(filepath);

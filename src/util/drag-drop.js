@@ -53,6 +53,8 @@ export function initializeDragAndDrop(gitClient, sidebar) {
   const processEntries = async (entries) => {
     const filesToProcess = [];
     const zipFiles = [];
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+    
     const traverseFileTree = async (entry, path) => {
       if (entry.isFile) {
         const file = await new Promise((resolve) => entry.file(resolve));
@@ -83,8 +85,26 @@ export function initializeDragAndDrop(gitClient, sidebar) {
 
     // Process all non-zip files first
     const filePromises = filesToProcess.map(async ({ file, path }) => {
-        const content = await file.text();
-        console.log(`[DragDrop] Writing file: ${path}`);
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        let content;
+
+        if (imageExtensions.includes(extension)) {
+            // --- FIX: Read images as an ArrayBuffer to preserve binary data ---
+            console.log(`[DragDrop] Reading binary file: ${path}`);
+            content = await file.arrayBuffer();
+        } else {
+            // --- For text files, read as text and wrap in the standard JSON structure ---
+            console.log(`[DragDrop] Reading text file: ${path}`);
+            const textContent = await file.text();
+            const fileData = {
+              content: textContent,
+              lastModified: new Date().toISOString()
+            };
+            content = JSON.stringify(fileData, null, 2);
+        }
+
+        console.log(`[DragDrop] Writing file to git: ${path}`);
+        // The writeFile method will now be able to handle both strings and ArrayBuffers
         return gitClient.writeFile(path, content);
     });
     
