@@ -1,4 +1,4 @@
-// src/git-integration.js
+// src/util/git-integration.js
 
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
@@ -25,6 +25,7 @@ export class Git {
     try {
       await this.pfs.stat('/.git');
       console.log(`Garden "${this.gardenName}" already exists. Loading it.`);
+      this.registerNewGarden();
       return;
     } catch (e) {
       // Not an existing repo, so initialize it.
@@ -245,16 +246,7 @@ export class Git {
           const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
           if (dirname && dirname !== '/') {
             // --- FIX: Robustly handle concurrent directory creation ---
-            try {
-              await this.pfs.mkdir(dirname, { recursive: true });
-            } catch (mkdirError) {
-              // Ignore the error if it's EEXIST, otherwise re-throw.
-              // This handles the race condition where another operation
-              // created the directory between our first writeFile attempt and now.
-              if (mkdirError.code !== 'EEXIST') {
-                throw mkdirError;
-              }
-            }
+            await this.pfs.mkdir(dirname, { recursive: true });
             // --- END FIX ---
             
             // Retry writing the file now that we are sure the directory exists.

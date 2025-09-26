@@ -7,8 +7,6 @@ async function listAllFiles(gitClient, dir) {
   try {
     const items = await pfs.readdir(dir);
     for (const item of items) {
-      // FIX: This line has been removed to include the .git directory in the export.
-      // if (item === '.git') continue;
       const path = `${dir === '/' ? '' : dir}/${item}`;
       try {
         const stat = await pfs.stat(path);
@@ -86,6 +84,17 @@ export async function importGardensFromZip(file, gardensToImport, log) {
   log('Zip file loaded. Starting import of selected gardens...');
 
   const importPromises = [];
+  const gitClients = new Map();
+
+  // --- FIX: Initialize each garden's Git client only ONCE before the loop ---
+  log('Initializing target gardens...');
+  for (const gardenName of gardensToImport) {
+    const gitClient = new Git(gardenName);
+    await gitClient.initRepo();
+    gitClients.set(gardenName, gitClient);
+  }
+  log('Initialization complete. Starting file writes...');
+
 
   zip.forEach((relativePath, zipEntry) => {
     if (zipEntry.dir) return;
@@ -94,18 +103,27 @@ export async function importGardensFromZip(file, gardensToImport, log) {
     
     if (gardensToImport.includes(gardenName)) {
       const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
-      // Read content as a buffer to handle any file type
       const promise = zipEntry.async('uint8array').then(async (content) => {
-        log(`  Importing: ${gardenName}${filePath}`);
-        const gitClient = new Git(gardenName);
-        await gitClient.initRepo();
-        // Use writeFile which can handle buffers
+        // --- FIX: Reuse the pre-initialized client ---
+        const gitClient = gitClients.get(gardenName);
         await gitClient.writeFile(filePath, content);
       });
       importPromises.push(promise);
     }
   });
   
+  // --- FIX: Add progress logging for large imports ---
+  const totalFiles = importPromises.length;
+  let completedFiles = 0;
+  importPromises.forEach(p => {
+    p.then(() => {
+        completedFiles++;
+        if (completedFiles % 100 === 0 || completedFiles === totalFiles) {
+            log(`Writing files... (${completedFiles}/${totalFiles})`);
+        }
+    });
+  });
+
   await Promise.all(importPromises);
   log('Import complete! Reloading page...');
   
