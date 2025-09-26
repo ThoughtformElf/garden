@@ -24,33 +24,8 @@ export function initializeDragAndDrop(gitClient, sidebar) {
     overlay.classList.remove('visible');
   };
 
-  // Helper to save a single file to the git client
-  const importFile = async (file) => {
-    const content = await file.text();
-    const filepath = `/${file.name}`;
-    console.log(`[DragDrop] Writing file: ${filepath}`);
-    await gitClient.writeFile(filepath, content);
-  };
-
-  // Helper to extract and save files from a zip archive
-  const extractZip = async (file) => {
-    const zip = await JSZip.loadAsync(file);
-    const promises = [];
-    zip.forEach((relativePath, zipEntry) => {
-      if (!zipEntry.dir) {
-        const promise = zipEntry.async('string').then(content => {
-          const filepath = `/${relativePath}`;
-          console.log(`[DragDrop] Extracting: ${filepath}`);
-          return gitClient.writeFile(filepath, content);
-        });
-        promises.push(promise);
-      }
-    });
-    await Promise.all(promises);
-  };
-
-  // This function now handles both files and directories
-  const processEntries = async (entries) => {
+  // This function now handles both files and directories, with a logging callback.
+  const processEntries = async (entries, logCallback) => {
     const filesToProcess = [];
     const zipFiles = [];
     const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
@@ -74,92 +49,51 @@ export function initializeDragAndDrop(gitClient, sidebar) {
       }
     };
 
+    logCallback('Scanning dropped items...', 'Scanning dropped items...');
     for (const entry of entries) {
         await traverseFileTree(entry, '');
     }
+    const scanMessage = `Found ${filesToProcess.length} file(s) and ${zipFiles.length} zip archive(s) to process.`;
+    logCallback(scanMessage, scanMessage);
 
-    // Only show the "Importing..." overlay if there are no zip files to prompt for.
-    if (filesToProcess.length > 0 && zipFiles.length === 0) {
-        showOverlay(`Importing ${filesToProcess.length} file(s)...`);
-    }
 
-    // Process all non-zip files first
     const filePromises = filesToProcess.map(async ({ file, path }) => {
-        const extension = file.name.split('.').pop()?.toLowerCase();
         let content;
-
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        
         if (imageExtensions.includes(extension)) {
-            // --- FIX: Read images as an ArrayBuffer to preserve binary data ---
-            console.log(`[DragDrop] Reading binary file: ${path}`);
             content = await file.arrayBuffer();
         } else {
-            // --- For text files, read as text and wrap in the standard JSON structure ---
-            console.log(`[DragDrop] Reading text file: ${path}`);
             const textContent = await file.text();
-            const fileData = {
-              content: textContent,
-              lastModified: new Date().toISOString()
-            };
+            const fileData = { content: textContent, lastModified: new Date().toISOString() };
             content = JSON.stringify(fileData, null, 2);
         }
-
-        console.log(`[DragDrop] Writing file to git: ${path}`);
-        // The writeFile method will now be able to handle both strings and ArrayBuffers
         return gitClient.writeFile(path, content);
     });
     
-    await Promise.all(filePromises);
-
-    // Then, handle each zip file with a modal
-    for (const zipFile of zipFiles) {
-        await handleZipFile(zipFile);
-    }
-  };
-
-  const handleZipFile = (file) => {
-    return new Promise((resolve) => {
-      const modal = new Modal({ title: `Import Zip File: ${file.name}` });
-      modal.updateContent(
-        `<p>How would you like to import this .zip file?</p>`
-      );
-      
-      modal.addFooterButton('Extract Files to Garden', async () => {
-        modal.updateContent('<p>Extracting files...</p>');
-        modal.clearFooter();
-        try {
-          await extractZip(file);
-        } catch (e) {
-            console.error('Zip extraction failed', e);
-            modal.updateContent('<p>Error during extraction. Check console.</p>');
-        }
-        modal.destroy();
-        resolve();
-      });
-      modal.addFooterButton('Import as Single .zip File', async () => {
-        modal.updateContent('<p>Importing file...</p>');
-        modal.clearFooter();
-        try {
-            await importFile(file);
-        } catch (e) {
-            console.error('Zip import failed', e);
-            modal.updateContent('<p>Error during import. Check console.</p>');
-        }
-        modal.destroy();
-        resolve();
-      });
-      modal.addFooterButton('Cancel', () => {
-        modal.destroy();
-        resolve();
-      });
-
-      modal.show();
+    const results = await Promise.allSettled(filePromises);
+    results.forEach((result, index) => {
+      const filePath = filesToProcess[index].path;
+      if (result.status === 'rejected') {
+        const htmlMsg = `<span style="color: var(--color-text-destructive);">ERROR:</span> Failed to write "${filePath}": ${result.reason}`;
+        const consoleMsg = `ERROR: Failed to write "${filePath}": ${result.reason}`;
+        logCallback(htmlMsg, consoleMsg);
+      } else {
+        const htmlMsg = `<span style="color: var(--color-text-success);">OK:</span> Imported "${filePath}"`;
+        const consoleMsg = `OK: Imported "${filePath}"`;
+        logCallback(htmlMsg, consoleMsg);
+      }
     });
+
+    if (zipFiles.length > 0) {
+        const zipMessage = 'Handling zip files requires manual input and is not yet supported in this flow.';
+        logCallback(zipMessage, zipMessage);
+    }
   };
 
   window.addEventListener('dragenter', (e) => {
     e.preventDefault();
     if (e.dataTransfer.types.includes('Files')) {
-      // Use the default message
       showOverlay('Drop files or folders to add them to the garden');
     }
   });
@@ -176,30 +110,45 @@ export function initializeDragAndDrop(gitClient, sidebar) {
 
   window.addEventListener('drop', async (e) => {
     e.preventDefault();
-    hideOverlay(); // Immediately hide the drop zone overlay.
+    hideOverlay();
     const items = e.dataTransfer.items;
-    if (!items || items.length === 0) {
-      return;
-    }
+    if (!items || items.length === 0) return;
+    
     const entries = Array.from(items)
       .map(item => item.webkitGetAsEntry())
       .filter(Boolean);
 
     if (entries.length > 0) {
-      console.log(`[DragDrop] Processing ${entries.length} dropped item(s).`);
-      
+      const importModal = new Modal({ title: 'Importing Files...' });
+      const logContainer = document.createElement('div');
+      logContainer.style.fontFamily = 'monospace';
+      logContainer.style.maxHeight = '300px';
+      logContainer.style.overflowY = 'auto';
+      logContainer.style.fontSize = '12px';
+      importModal.updateContent('');
+      importModal.content.appendChild(logContainer);
+      importModal.show();
+
+      let logHTML = '';
+      const logCallback = (htmlMessage, consoleMessage) => {
+        // Use the plain message for the console, and the HTML for the modal
+        console.log(`[Import Log] ${consoleMessage}`);
+        logHTML += `<div>${htmlMessage}</div>`;
+        logContainer.innerHTML = logHTML;
+        logContainer.scrollTop = logContainer.scrollHeight;
+      };
+
       try {
-        await processEntries(entries);
-        console.log('[DragDrop] All items processed.');
+        await processEntries(entries, logCallback);
+        logCallback('<strong>Import process complete.</strong>', 'Import process complete.');
       } catch (err) {
-        console.error('[DragDrop] An error occurred during import:', err);
-        await sidebar.showAlert({ title: 'Import Error', message: 'An error occurred while importing. Please check the console.' });
+        const htmlMsg = `<strong style="color: var(--color-text-destructive);">A critical error occurred: ${err.message}</strong>`;
+        const consoleMsg = `A critical error occurred: ${err.message}`;
+        logCallback(htmlMsg, consoleMsg);
+        console.error('[DragDrop] A critical error occurred during import:', err);
       } finally {
-        // Refresh sidebar and hide any remaining overlay
+        importModal.addFooterButton('Close', () => importModal.destroy());
         await sidebar.refresh();
-        setTimeout(() => {
-          hideOverlay();
-        }, 500);
       }
     }
   });

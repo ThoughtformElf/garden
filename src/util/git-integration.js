@@ -235,9 +235,8 @@ export class Git {
    * @param {string|ArrayBuffer|Uint8Array} content The content to write.
    */
   async writeFile(filepath, content) {
+    const options = typeof content === 'string' ? 'utf8' : undefined;
     try {
-      // --- FIX: Determine encoding based on content type ---
-      const options = typeof content === 'string' ? 'utf8' : undefined;
       await this.pfs.writeFile(filepath, content, options);
       this.markGardenAsDirty(true);
     } catch (e) {
@@ -245,9 +244,20 @@ export class Git {
         try {
           const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
           if (dirname && dirname !== '/') {
-            await this.pfs.mkdir(dirname, { recursive: true });
+            // --- FIX: Robustly handle concurrent directory creation ---
+            try {
+              await this.pfs.mkdir(dirname, { recursive: true });
+            } catch (mkdirError) {
+              // Ignore the error if it's EEXIST, otherwise re-throw.
+              // This handles the race condition where another operation
+              // created the directory between our first writeFile attempt and now.
+              if (mkdirError.code !== 'EEXIST') {
+                throw mkdirError;
+              }
+            }
+            // --- END FIX ---
             
-            const options = typeof content === 'string' ? 'utf8' : undefined;
+            // Retry writing the file now that we are sure the directory exists.
             await this.pfs.writeFile(filepath, content, options);
             this.markGardenAsDirty(true);
           } else {
