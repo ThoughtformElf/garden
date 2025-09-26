@@ -7,7 +7,8 @@ async function listAllFiles(gitClient, dir) {
   try {
     const items = await pfs.readdir(dir);
     for (const item of items) {
-      if (item === '.git') continue;
+      // FIX: This line has been removed to include the .git directory in the export.
+      // if (item === '.git') continue;
       const path = `${dir === '/' ? '' : dir}/${item}`;
       try {
         const stat = await pfs.stat(path);
@@ -41,7 +42,8 @@ export async function exportGardens(gardensToExport, log) {
     const files = await listAllFiles(gitClient, '/');
 
     for (const filePath of files) {
-      const content = await gitClient.readFile(filePath);
+      // For git files and other non-text files, read as a buffer
+      const content = await gitClient.pfs.readFile(filePath);
       const zipPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
       gardenFolder.file(zipPath, content);
     }
@@ -92,10 +94,12 @@ export async function importGardensFromZip(file, gardensToImport, log) {
     
     if (gardensToImport.includes(gardenName)) {
       const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
-      const promise = zipEntry.async('string').then(async (content) => {
+      // Read content as a buffer to handle any file type
+      const promise = zipEntry.async('uint8array').then(async (content) => {
         log(`  Importing: ${gardenName}${filePath}`);
         const gitClient = new Git(gardenName);
         await gitClient.initRepo();
+        // Use writeFile which can handle buffers
         await gitClient.writeFile(filePath, content);
       });
       importPromises.push(promise);
