@@ -1,5 +1,6 @@
 import { WidgetType, Decoration, ViewPlugin } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
+import { syntaxTree } from '@codemirror/language';
 import { Git } from '../../util/git-integration.js';
 import { appContextField } from '../navigation.js';
 
@@ -86,19 +87,11 @@ class EmbedWidget extends WidgetType {
     }
     
     const fullPath = path.startsWith('/') ? path : `/${path}`;
-    
-    // --- START DEBUG LOGGING ---
-    console.log(`[Embed Debug] 1. Attempting to load internal image at path: "${fullPath}"`);
-    
     const buffer = await gitClient.readFileAsBuffer(fullPath);
 
-    // This is the most likely point of failure. Let's inspect the buffer.
-    console.log(`[Embed Debug] 2. Buffer read from filesystem:`, buffer);
-    if (!buffer || buffer.byteLength === 0) {
-        console.error(`[Embed Debug] Read failed: Buffer for "${fullPath}" is empty or null.`);
-        throw new Error('File could not be read as a buffer or is empty.');
+    if (!buffer) {
+      throw new Error('File could not be read as a buffer.');
     }
-    // --- END DEBUG LOGGING ---
     
     const mimeType = getMimeType(extension);
     const blob = new Blob([buffer], { type: mimeType });
@@ -122,18 +115,32 @@ class EmbedWidget extends WidgetType {
 
 function buildDecorations(view) {
   const builder = new RangeSetBuilder();
-  // Regex for ![[wikilink.png]] style embeds
-  const internalEmbedRegex = /!\[\[([^\[\]]+?)\]\]/g;
-  // Regex for ![alt text](url) style embeds
-  const externalEmbedRegex = /!\[(.*?)\]\((.*?)\)/g;
+  const tree = syntaxTree(view.state);
+
+  const isInsideCodeBlock = (pos) => {
+    let node = tree.resolve(pos, 1); // Bias to the right, important for start of a token
+    while (node) {
+      // Check for FencedCode, CodeBlock, InlineCode, etc.
+      if (node.name.includes('Code')) {
+        return true;
+      }
+      node = node.parent;
+    }
+    return false;
+  };
 
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     
-    // --- Internal Embeds ---
+    // --- Internal Embeds: ![[wikilink.png]] ---
+    const internalEmbedRegex = /!\[\[([^\[\]]+?)\]\]/g;
     let match;
     while ((match = internalEmbedRegex.exec(text))) {
       const start = from + match.index;
+      
+      // --- SYNTAX CHECK: Skip if inside a code block ---
+      if (isInsideCodeBlock(start)) continue;
+
       const end = start + match[0].length;
       const linkTarget = match[1];
 
@@ -146,24 +153,28 @@ function buildDecorations(view) {
       );
     }
 
-    // --- External Embeds ---
+    // --- External Embeds: ![alt](url) ---
+    const externalEmbedRegex = /!\[(.*?)\]\((.*?)\)/g;
     while ((match = externalEmbedRegex.exec(text))) {
-        const start = from + match.index;
-        const end = start + match[0].length;
-        const altText = match[1];
-        const url = match[2];
+      const start = from + match.index;
+      
+      // --- SYNTAX CHECK: Skip if inside a code block ---
+      if (isInsideCodeBlock(start)) continue;
 
-        // Ensure it's a valid image URL before rendering
-        const extension = url.split('.').pop()?.toLowerCase()?.split('?')[0];
-        if (url.startsWith('http') && imageExtensions.includes(extension)) {
-            builder.add(
-                start,
-                end,
-                Decoration.replace({
-                    widget: new EmbedWidget(url, altText, 'external', view)
-                })
-            );
-        }
+      const end = start + match[0].length;
+      const altText = match[1];
+      const url = match[2];
+      
+      const extension = url.split('.').pop()?.toLowerCase()?.split('?')[0];
+      if (url.startsWith('http') && imageExtensions.includes(extension)) {
+        builder.add(
+          start,
+          end,
+          Decoration.replace({
+            widget: new EmbedWidget(url, altText, 'external', view)
+          })
+        );
+      }
     }
   }
   return builder.finish();
@@ -175,7 +186,7 @@ export const embedPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view);
     }
     update(update) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged || update.viewportChanged || syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildDecorations(update.view);
       }
     }
