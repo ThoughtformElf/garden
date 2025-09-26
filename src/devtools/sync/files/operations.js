@@ -26,7 +26,7 @@ export class FileOperations {
                     files = await this._listAllFiles(gitClientToUse, '/');
                 }
             }
-            return files.filter(file => file !== '/.git');
+            return files;
         } catch (error) {
             console.error('Error getting file list:', error);
             debug.error('Error getting file list:', error);
@@ -47,7 +47,6 @@ export class FileOperations {
         try {
             const items = await pfs.readdir(dir);
             for (const item of items) {
-                if (item === '.git') continue;
                 // Construct path correctly
                 const path = dir === '/' ? `/${item}` : `${dir}/${item}`;
                 try {
