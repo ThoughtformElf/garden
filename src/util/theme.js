@@ -26,6 +26,30 @@ const baseTheme = EditorView.theme({
     color: 'var(--color-text-secondary)',
     border: 'none',
   },
+  // Styles for embedded images
+  '.cm-embed-container': {
+    display: 'block',
+    padding: '10px 0',
+  },
+  '.cm-embedded-image': {
+    maxWidth: '100%',
+    maxHeight: '500px',
+    display: 'block',
+    margin: '0 auto',
+    borderRadius: '4px',
+    border: '1px solid var(--color-border)',
+  },
+  '.cm-embed-placeholder, .cm-embed-error': {
+    display: 'block',
+    padding: '10px',
+    backgroundColor: 'var(--color-background-secondary)',
+    borderRadius: '4px',
+    fontStyle: 'italic',
+    color: 'var(--color-text-secondary)',
+  },
+  '.cm-embed-error': {
+    color: 'var(--color-text-destructive)',
+  }
 }, { dark: true });
 
 

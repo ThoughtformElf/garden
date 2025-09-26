@@ -211,6 +211,22 @@ export class Git {
       return `// "${filepath}" does not exist yet, type anywhere to create it.`;
     }
   }
+  
+  /**
+   * Reads a file from the working directory as a Uint8Array buffer.
+   * @param {string} filepath The path to the file.
+   * @returns {Promise<Uint8Array|null>}
+   */
+  async readFileAsBuffer(filepath) {
+    try {
+      // Omitting the 'encoding' option makes it return a Uint8Array
+      const content = await this.pfs.readFile(filepath);
+      return content;
+    } catch (e) {
+      console.warn(`File not found, cannot read as buffer: ${filepath}`);
+      return null;
+    }
+  }
 
   /**
    * Writes content to a file, creating parent directories if needed.
