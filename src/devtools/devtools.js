@@ -37,6 +37,13 @@ export function initializeDevTools() {
     useShadowDom: false,
   });
 
+  // --- FIX: Increase the maximum number of console log entries ---
+  const consoleTool = eruda.get('console');
+  if (consoleTool) {
+    consoleTool.config.set('maxLogNum', 2000);
+  }
+  // --- END FIX ---
+
   if (window.thoughtform) {
     window.thoughtform.eruda = eruda;
   }
