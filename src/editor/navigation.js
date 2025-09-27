@@ -12,7 +12,7 @@ export const appContextField = StateField.define({
 });
 
 /**
- * Finds a file in the garden, ignoring case and optional .md extension.
+ * Finds a file in the garden, ignoring case
  * @param {string} targetPath - The page name from the wikilink (e.g., "chores").
  * @param {object} appContext - Contains gitClient and sidebar instances.
  * @returns {string|null} The correctly cased, full file path if found, otherwise null.
@@ -23,9 +23,7 @@ async function findFileCaseInsensitive(targetPath, appContext) {
   const allFiles = await appContext.sidebar.listFiles(appContext.gitClient, '/');
   
   // Normalize the target path for comparison
-  const normalizedTargetPath = targetPath.toLowerCase().endsWith('.md')
-    ? targetPath.toLowerCase()
-    : `${targetPath.toLowerCase()}.md`;
+  const normalizedTargetPath = targetPath.toLowerCase()
 
   for (const filePath of allFiles) {
     // Normalize the file from the list for comparison
@@ -60,9 +58,6 @@ export async function navigateTo(linkContent, appContext) {
     if (!path.startsWith('/')) {
         path = `/${path}`;
     }
-    if (!/\.[^/.]+$/.test(path)) {
-        path = `${path}.md`;
-    }
     const fullPathUrl = new URL(import.meta.url).pathname;
     const srcIndex = fullPathUrl.lastIndexOf('/src/');
     const basePath = srcIndex > -1 ? fullPathUrl.substring(0, srcIndex) : '';
@@ -77,10 +72,6 @@ export async function navigateTo(linkContent, appContext) {
       finalPath = foundPath;
     } else {
       // No file found, create a canonical path for a new file
-      // If the user wrote [[chores.md]], respect that. Otherwise, add .md.
-      if (!/\.[^/.]+$/.test(path)) {
-        path = `${path}.md`;
-      }
       finalPath = path.startsWith('/') ? path : `/${path}`;
     }
     window.location.hash = `#${encodeURIComponent(finalPath)}`;

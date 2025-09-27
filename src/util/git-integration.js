@@ -24,11 +24,10 @@ export class Git {
   async initRepo() {
     try {
       await this.pfs.stat('/.git');
-      console.log(`Garden "${this.gardenName}" already exists. Loading it.`);
       this.registerNewGarden();
       return;
     } catch (e) {
-      // Not an existing repo, so initialize it.
+      // Not an existing repo, so initialize it
     }
 
     console.log(`Initializing new garden: "${this.gardenName}"...`);
@@ -40,7 +39,7 @@ export class Git {
       });
 
       const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
-      await this.pfs.writeFile('/README.md', defaultContent, 'utf8');
+      await this.pfs.writeFile('/home', defaultContent, 'utf8');
 
       this.registerNewGarden();
       console.log('New garden initialized successfully.');
@@ -232,7 +231,7 @@ export class Git {
   /**
    * Writes content to a file, creating parent directories if needed.
    * Now handles both string and ArrayBuffer/Uint8Array content.
-   * @param {string} filepath The path to the file (e.g., '/prompt/youtube-summary.md').
+   * @param {string} filepath The path to the file (e.g., '/prompt/youtube-summary').
    * @param {string|ArrayBuffer|Uint8Array} content The content to write.
    */
   async writeFile(filepath, content) {

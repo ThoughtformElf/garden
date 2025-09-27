@@ -24,7 +24,7 @@ export class Editor {
   constructor({ url, target = 'body main', editorConfig = {}, gitClient }) { // No more commandPalette
     if (!gitClient) throw new Error('Editor requires a gitClient instance.');
     if (!window.location.hash) {
-      window.location.hash = '#README.md';
+      window.location.hash = '#home';
     }
     
     this.targetSelector = target;
@@ -245,7 +245,7 @@ export class Editor {
     let filepath = hash.startsWith('#') ? hash.substring(1) : hash;
     filepath = decodeURIComponent(filepath);
     if (!filepath) {
-      filepath = 'README.md';
+      filepath = 'home';
     }
     return filepath;
   }

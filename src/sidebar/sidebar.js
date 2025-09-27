@@ -38,11 +38,9 @@ export class Sidebar {
   }
 
   async init() {
-    console.log('Initializing sidebar...');
     this.renderTabs();
     this.setupContextMenus();
     await this.refresh();
-    console.log('Sidebar initialized.');
   }
 
   async showAlert({ title = 'Notice', message }) {

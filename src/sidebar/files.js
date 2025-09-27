@@ -146,7 +146,7 @@ export const fileActions = {
         const wasViewingDeletedFile = decodeURIComponent(window.location.hash) === `#${filepath}`;
         await this.gitClient.pfs.unlink(filepath);
         if (wasViewingDeletedFile) {
-          window.location.hash = '#/README.md';
+          window.location.hash = '#/home';
         } else {
           await this.refresh();
         }
