@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { Git } from '../util/git-integration.js';
+import { Modal } from '../util/modal.js';
 
 async function listAllFiles(gitClient, dir) {
   const pfs = gitClient.pfs;
@@ -24,6 +25,28 @@ async function listAllFiles(gitClient, dir) {
   }
   return fileList;
 }
+
+// A recursive, forceful remove utility for directories.
+async function rmrf(pfs, path) {
+    try {
+        const stat = await pfs.stat(path);
+        if (stat.isDirectory()) {
+            const entries = await pfs.readdir(path);
+            for (const entry of entries) {
+                await rmrf(pfs, `${path}/${entry}`);
+            }
+            await pfs.rmdir(path);
+        } else {
+            await pfs.unlink(path);
+        }
+    } catch (e) {
+        if (e.code !== 'ENOENT') { // Ignore if file/dir doesn't exist
+            console.error(`Error during rmrf for ${path}:`, e);
+            throw e;
+        }
+    }
+}
+
 
 export async function exportGardens(gardensToExport, log) {
   log('Starting export...');
@@ -81,55 +104,104 @@ export async function importGardensFromZip(file, gardensToImport, log) {
 
   log(`Reading ${file.name}...`);
   const zip = await JSZip.loadAsync(file);
-  log('Zip file loaded. Starting import of selected gardens...');
+  log('Zip file loaded. Analyzing backup contents...');
 
-  const importPromises = [];
+  let importStrategy = 'merge'; // Default strategy
+  const gardensWithHistoryConflict = [];
+
+  for (const gardenName of gardensToImport) {
+    const gitClient = new Git(gardenName);
+    let hasLocalHistory = false;
+    try {
+      await gitClient.pfs.stat('/.git');
+      hasLocalHistory = true;
+    } catch (e) { /* No local history, which is fine */ }
+    
+    // --- FIX: Correctly check for files in the zip archive ---
+    const hasBackupHistory = Object.keys(zip.files).some(filePath => filePath.startsWith(`${gardenName}/.git/`));
+
+    if (hasLocalHistory && hasBackupHistory) {
+      gardensWithHistoryConflict.push(gardenName);
+    }
+  }
+
+  if (gardensWithHistoryConflict.length > 0) {
+    const gardenList = `<ul>${gardensWithHistoryConflict.map(g => `<li><strong>${g}</strong></li>`).join('')}</ul>`;
+    const userChoice = await Modal.choice({
+      title: 'Replace Garden History?',
+      message: `<p>The backup contains a git history for the following existing garden(s):</p>
+                ${gardenList}
+                <p>Replacing history is a destructive action. How should we proceed?</p>`,
+      choices: [
+        { id: 'replace', text: 'Replace History', class: 'destructive' },
+        { id: 'merge', text: 'Merge Files, Keep Local History' },
+        { id: 'cancel', text: 'Cancel Import' }
+      ]
+    });
+
+    if (!userChoice || userChoice === 'cancel') {
+      log('Import cancelled by user.');
+      return;
+    }
+    importStrategy = userChoice;
+  }
+
+  if (importStrategy === 'replace') {
+    log('Strategy: Replacing history for conflicting gardens.');
+    for (const gardenName of gardensWithHistoryConflict) {
+      log(`  Deleting existing .git directory for "${gardenName}"...`);
+      const gitClient = new Git(gardenName);
+      await rmrf(gitClient.pfs, '/.git');
+      log(`  Done deleting for "${gardenName}".`);
+    }
+  } else {
+    log('Strategy: Merging files and keeping local history where conflicts exist.');
+  }
+
   const gitClients = new Map();
-
-  // --- FIX: Initialize each garden's Git client only ONCE before the loop ---
   log('Initializing target gardens...');
   for (const gardenName of gardensToImport) {
     const gitClient = new Git(gardenName);
     await gitClient.initRepo();
     gitClients.set(gardenName, gitClient);
   }
+
   log('Initialization complete. Starting file writes...');
-
-
+  const importPromises = [];
   zip.forEach((relativePath, zipEntry) => {
     if (zipEntry.dir) return;
 
     const gardenName = relativePath.split('/')[0];
-    
-    if (gardensToImport.includes(gardenName)) {
-      const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
-      const promise = zipEntry.async('uint8array').then(async (content) => {
-        // --- FIX: Reuse the pre-initialized client ---
-        const gitClient = gitClients.get(gardenName);
-        await gitClient.writeFile(filePath, content);
-      });
-      importPromises.push(promise);
+    if (!gardensToImport.includes(gardenName)) return;
+
+    // --- STRATEGY LOGIC ---
+    const isGitFile = relativePath.substring(gardenName.length + 1).startsWith('/.git/');
+    if (isGitFile && importStrategy === 'merge' && gardensWithHistoryConflict.includes(gardenName)) {
+        // Skip this git file because we're keeping local history for this garden.
+        return;
     }
+
+    const filePath = `/${relativePath.substring(gardenName.length + 1)}`;
+    const promise = zipEntry.async('uint8array').then(async (content) => {
+      const gitClient = gitClients.get(gardenName);
+      await gitClient.writeFile(filePath, content);
+    });
+    importPromises.push(promise);
   });
   
-  // --- FIX: Add progress logging for large imports ---
   const totalFiles = importPromises.length;
   let completedFiles = 0;
-  importPromises.forEach(p => {
-    p.then(() => {
-        completedFiles++;
-        if (completedFiles % 100 === 0 || completedFiles === totalFiles) {
-            log(`Writing files... (${completedFiles}/${totalFiles})`);
-        }
-    });
-  });
+  importPromises.forEach(p => p.then(() => {
+    completedFiles++;
+    if (completedFiles % 100 === 0 || completedFiles === totalFiles) {
+        log(`Writing files... (${completedFiles}/${totalFiles})`);
+    }
+  }));
 
   await Promise.all(importPromises);
   log('Import complete! Reloading page...');
   
-  setTimeout(() => {
-    window.location.reload();
-  }, 1500);
+  setTimeout(() => window.location.reload(), 1500);
 }
 
 /**
@@ -178,7 +250,6 @@ export async function deleteGardens(gardensToDelete, log) {
   setTimeout(() => {
     const currentGarden = decodeURIComponent(window.location.pathname.split('/').pop() || 'home');
     if (gardensToDelete.includes(currentGarden) || allGardens.length === 0) {
-        // --- FIX: This is the corrected base path logic ---
         const fullPath = new URL(import.meta.url).pathname;
         const srcIndex = fullPath.lastIndexOf('/src/');
         const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';

@@ -26,6 +26,30 @@ export function initializeDragAndDrop(gitClient, sidebar) {
 
   // This function now handles both files and directories, with a logging callback.
   const processEntries = async (entries, logCallback) => {
+    let finalEntries = entries;
+
+    const gitAtRoot = entries.some(entry => entry.isDirectory && entry.name === '.git');
+    if (gitAtRoot) {
+      const userChoice = await Modal.choice({
+        title: '.git Directory Detected',
+        message: `<p>The content you dropped contains a .git repository. This could unintentionally overwrite your garden's history.</p><p>How would you like to proceed?</p>`,
+        choices: [
+          { id: 'import_safe', text: 'Import Files (Ignore .git folder)' },
+          { id: 'cancel', text: 'Cancel Import', class: 'destructive' }
+        ]
+      });
+      
+      if (!userChoice || userChoice === 'cancel') {
+        logCallback('Import cancelled by user.', 'Import cancelled by user.');
+        return; // Abort the entire operation
+      }
+      
+      // If we are here, user chose 'import_safe'
+      finalEntries = entries.filter(entry => !(entry.isDirectory && entry.name === '.git'));
+      logCallback('Ignoring .git directory and proceeding with import.', 'Ignoring .git directory.');
+    }
+
+
     const filesToProcess = [];
     const zipFiles = [];
     const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
@@ -50,7 +74,7 @@ export function initializeDragAndDrop(gitClient, sidebar) {
     };
 
     logCallback('Scanning dropped items...', 'Scanning dropped items...');
-    for (const entry of entries) {
+    for (const entry of finalEntries) {
         await traverseFileTree(entry, '');
     }
     const scanMessage = `Found ${filesToProcess.length} file(s) and ${zipFiles.length} zip archive(s) to process.`;
@@ -86,7 +110,7 @@ export function initializeDragAndDrop(gitClient, sidebar) {
     });
 
     if (zipFiles.length > 0) {
-        const zipMessage = 'Handling zip files requires manual input and is not yet supported in this flow.';
+        const zipMessage = 'Note: Zip archives must be imported via the DevTools > Data panel.';
         logCallback(zipMessage, zipMessage);
     }
   };

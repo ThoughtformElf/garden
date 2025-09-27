@@ -125,4 +125,41 @@ export class Modal {
       modal.show();
     });
   }
+
+  /**
+   * Shows a modal with multiple custom choices.
+   * @param {Object} options
+   * @param {string} options.title - The title of the modal.
+   * @param {string} options.message - The HTML content/message for the modal.
+   * @param {Array<{id: string, text: string, class?: string}>} options.choices - Array of choice objects for buttons.
+   * @returns {Promise<string|null>} A promise that resolves with the ID of the chosen option, or null if cancelled.
+   */
+  static choice({ title, message, choices }) {
+    return new Promise((resolve) => {
+      const modal = new Modal({ title });
+      modal.updateContent(message);
+
+      choices.forEach(choice => {
+        const button = modal.addFooterButton(choice.text, () => {
+          resolve(choice.id);
+          modal.destroy();
+        });
+        if (choice.class) {
+          button.classList.add(choice.class);
+        }
+      });
+      
+      // Allow Esc key to cancel
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          resolve(null); // Resolve with null on escape
+          modal.destroy();
+          document.removeEventListener('keydown', handleKeyDown);
+        }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+      
+      modal.show();
+    });
+  }
 }
