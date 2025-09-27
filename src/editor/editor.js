@@ -36,9 +36,12 @@ export class Editor {
     this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
+    this.mainContainer = null;
 
     this.languageCompartment = new Compartment();
     this.tokenCounterCompartment = new Compartment();
+    this.imageViewerElement = null;
+    this.currentObjectUrl = null;
 
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
     
@@ -46,8 +49,8 @@ export class Editor {
   }
 
   async init() {
-    const container = document.querySelector(this.targetSelector);
-    if (!container) {
+    this.mainContainer = document.querySelector(this.targetSelector);
+    if (!this.mainContainer) {
       console.error(`Target container not found: ${this.targetSelector}`);
       return;
     }
@@ -67,7 +70,12 @@ export class Editor {
 
     const loadingIndicator = document.getElementById('loading-indicator');
     if(loadingIndicator) loadingIndicator.remove();
-    container.style.display = 'flex';
+    this.mainContainer.style.display = 'flex';
+
+    // --- Create and inject the image viewer element ---
+    this.imageViewerElement = document.createElement('div');
+    this.imageViewerElement.className = 'image-viewer-container';
+    this.mainContainer.appendChild(this.imageViewerElement);
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
@@ -98,12 +106,13 @@ export class Editor {
         this.tokenCounterCompartment.of(createTokenCounterExtension()),
         ...(this.editorConfig.extensions || []),
       ],
-      parent: container,
+      parent: this.mainContainer,
     });
     
     Editor.editors.push(this);
     this.isReady = true;
     this.listenForNavigation();
+    this.loadFile(this.filePath); // Initial load to handle potential images
     this.editorView.focus();
   }
 
@@ -173,18 +182,43 @@ export class Editor {
   }
 
   async loadFile(filepath) {
-    // --- FIX: Prevent loading images directly into the editor ---
     const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
     const extension = filepath.split('.').pop()?.toLowerCase();
+
     if (imageExtensions.includes(extension)) {
-      console.warn(`Attempted to load image file "${filepath}" into the editor. Aborting.`);
-      // Revert the URL hash to the last known good file to prevent a broken state
-      window.location.hash = `#${encodeURIComponent(this.filePath)}`;
-      await this.sidebar.showAlert({
-        title: 'Cannot Open Image',
-        message: 'Image files cannot be opened directly in the editor. You can embed them in other notes using ![[filename.png]].'
-      });
+      console.log(`Displaying image: ${filepath}`);
+      this.hideDiff();
+
+      this.mainContainer.classList.remove('is-editor');
+      this.mainContainer.classList.add('is-image-preview');
+      this.imageViewerElement.innerHTML = '<p>Loading image...</p>';
+
+      const buffer = await this.gitClient.readFileAsBuffer(filepath);
+      if (buffer) {
+        const mimeType = `image/${extension === 'svg' ? 'svg+xml' : extension}`;
+        const blob = new Blob([buffer], { type: mimeType });
+        
+        if (this.currentObjectUrl) URL.revokeObjectURL(this.currentObjectUrl);
+        
+        this.currentObjectUrl = URL.createObjectURL(blob);
+        this.imageViewerElement.innerHTML = `<img src="${this.currentObjectUrl}" alt="${filepath}" />`;
+      } else {
+        this.imageViewerElement.innerHTML = `<p class="error">Could not load image: ${filepath}</p>`;
+      }
+
+      this.filePath = filepath;
+      if (this.sidebar) {
+        await this.sidebar.refresh();
+      }
       return;
+    }
+
+    this.mainContainer.classList.remove('is-image-preview');
+    this.mainContainer.classList.add('is-editor');
+
+    if (this.currentObjectUrl) {
+      URL.revokeObjectURL(this.currentObjectUrl);
+      this.currentObjectUrl = null;
     }
     
     console.log(`Loading ${filepath}...`);
@@ -211,14 +245,7 @@ export class Editor {
   
   async forceReloadFile(filepath) {
       console.log(`forceReloadFile: Forcibly reloading ${filepath} from disk.`);
-      const newContent = await this.loadFileContent(filepath);
-      this.filePath = filepath;
-      const currentDoc = this.editorView.state.doc;
-      this.editorView.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: newContent },
-          annotations: programmaticChange.of(true),
-      });
-      this.hideDiff();
+      await this.loadFile(filepath);
   }
 
   async handleUpdate(newContent) {

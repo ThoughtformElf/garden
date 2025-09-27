@@ -1,0 +1,109 @@
+.cm-keyword  { color: var(--base-accent-emphasis); }
+.cm-name     { color: var(--base-accent-info); }
+.cm-string   { color: var(--base-accent-emphasis); }
+.cm-function { color: var(--base-accent-action); }
+.cm-constant { color: var(--base-accent-action); }
+.cm-definition { color: var(--base-text-primary); }
+.cm-type     { color: var(--base-accent-action); }
+.cm-operator { color: var(--base-text-primary); }
+.cm-comment  { color: var(--base-text-muted); }
+.cm-hashtag  { color: var(--base-accent-highlight); font-style: italic; }
+.cm-strong   { font-weight: bold; }
+.cm-emphasis { font-style: italic; }
+.cm-strikethrough { text-decoration: line-through; }
+.cm-link     {
+  background: var(--base-syntax-link-bg);
+  color: var(--base-syntax-link-text);
+  text-decoration: none;
+  font-weight: bold;
+}
+.cm-heading  { font-weight: bold; color: var(--base-accent-destructive); }
+.cm-atom     { color: var(--base-accent-action); }
+.cm-invalid  { color: var(--base-accent-destructive); }
+
+main, .cm-editor {
+  height: 100%;
+  width: 100%;
+}
+.cm-editor { background-color: var(--color-background-primary); }
+.cm-diff-inserted { background-color: var(--color-syntax-diff-add-bg); }
+.cm-diff-deleted {
+  background-color: var(--color-syntax-diff-del-bg);
+  text-decoration: line-through;
+}
+.cm-vim-panel input { color: var(--color-text-primary); }
+.cm-wikilink {
+  background-color: var(--color-syntax-wikilink-bg);
+  color: var(--color-syntax-wikilink-text);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.cm-wikilink .cm-link {
+  background: var(--color-syntax-wikilink-bg);
+  color: var(--color-syntax-wikilink-text);
+  text-decoration: none;
+}
+.cm-hashtag {
+  background-color: var(--color-syntax-hashtag-bg);
+  color: var(--color-syntax-hashtag-text);
+}
+.cm-checkbox-todo {
+  background-color: var(--color-syntax-checkbox-todo-bg);
+  color: var(--color-syntax-checkbox-todo-text);
+}
+.cm-checkbox-done {
+  background-color: var(--color-syntax-checkbox-done-bg);
+  color: var(--color-syntax-checkbox-done-text);
+}
+.cm-checkbox-done .cm-link {
+  color: var(--color-syntax-checkbox-done-text);
+  text-decoration: none;
+  font-weight: normal;
+}
+.cm-checkbox-doing {
+  background-color: var(--color-syntax-checkbox-doing-bg);
+  color: var(--color-syntax-checkbox-doing-text);
+}
+.cm-checkbox-doing .cm-link {
+  background: var(--color-syntax-checkbox-doing-bg);
+  text-decoration: none;
+}
+.cm-timestamp {
+  color: var(--base-accent-info);
+  font-weight: bold;
+}
+.cm-naked-link {
+  background-color: var(--color-syntax-link-bg);
+  color: var(--color-syntax-link-text);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-style: italic;
+}
+.cm-naked-link .cm-operator {
+  background: var(--color-syntax-link-bg);
+  color: var(--color-syntax-link-text);
+  text-decoration: none;
+}
+.cm-link.cm-operator {
+  font-style: italic;
+  text-decoration: none;
+  font-weight: normal;
+}
+.cm-link.cm-string {
+  font-weight: normal;
+}
+.cm-blockquote { color: var(--color-syntax-blockquote-text); }
+
+body .cm-activeLine,
+body .cm-selectionBackground {
+  background: color-mix(in srgb, var(--base-accent-destructive), #000000aa 70%) !important;
+}
+body .cm-vimMode .cm-activeLine,
+html body .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--base-accent-emphasis), black 60%) !important;
+}
+
+
+.cm-hr {
+  border: 2px dashed var(--base-accent-emphasis);
+}
