@@ -117,7 +117,6 @@ export async function importGardensFromZip(file, gardensToImport, log) {
       hasLocalHistory = true;
     } catch (e) { /* No local history, which is fine */ }
     
-    // --- FIX: Correctly check for files in the zip archive ---
     const hasBackupHistory = Object.keys(zip.files).some(filePath => filePath.startsWith(`${gardenName}/.git/`));
 
     if (hasLocalHistory && hasBackupHistory) {
@@ -175,7 +174,8 @@ export async function importGardensFromZip(file, gardensToImport, log) {
     if (!gardensToImport.includes(gardenName)) return;
 
     // --- STRATEGY LOGIC ---
-    const isGitFile = relativePath.substring(gardenName.length + 1).startsWith('/.git/');
+    // --- FINAL FIX: Correctly check for '.git' with the leading period ---
+    const isGitFile = relativePath.substring(gardenName.length + 1).startsWith('.git/');
     if (isGitFile && importStrategy === 'merge' && gardensWithHistoryConflict.includes(gardenName)) {
         // Skip this git file because we're keeping local history for this garden.
         return;
