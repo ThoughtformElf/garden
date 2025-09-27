@@ -18,6 +18,8 @@ export const gitActions = {
           }
         }
       }
+
+      const remoteSectionHTML = this.renderRemoteSection();
       const commitAreaHTML = `
         <div class="git-commit-area">
           <textarea id="git-commit-message" placeholder="Commit message..." rows="3"></textarea>
@@ -30,6 +32,7 @@ export const gitActions = {
       const oldMessage = this.contentContainer.querySelector('#git-commit-message')?.value || '';
       this.contentContainer.innerHTML = `
         <div class="git-view-container">
+          ${remoteSectionHTML}
           ${commitAreaHTML}
           ${stagedFilesHTML}
           ${unstagedFilesHTML}
@@ -48,6 +51,23 @@ export const gitActions = {
       this.contentContainer.innerHTML = `<p class="sidebar-error">Could not load Git status.</p>`;
     }
   },
+
+  renderRemoteSection() {
+    const config = this.getRemoteConfig();
+    return `
+      <div class="git-remote-section">
+        <h3>Remote</h3>
+        <input type="text" id="git-remote-url" placeholder="Remote URL" value="${config.url}">
+        <input type="password" id="git-remote-auth" placeholder="Username or Token" value="${config.auth}">
+        <div class="git-remote-actions">
+          <button id="git-pull-button">Pull</button>
+          <button id="git-push-button">Push</button>
+        </div>
+        <div class="git-remote-log" id="git-remote-log">Ready</div>
+      </div>
+    `;
+  },
+
   renderFileSection(title, files, isStaged) {
     const actionButton = isStaged
       ? `<button class="git-action-button unstage" title="Unstage Changes">-</button>`
@@ -123,7 +143,81 @@ export const gitActions = {
       
       commitButton.disabled = !(hasStagedFiles && hasMessage);
   },
+
+  getRemoteConfig() {
+    const key = `thoughtform_remote_config_${this.gitClient.gardenName}`;
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.error("Could not parse remote config from localStorage", e);
+    }
+    return { url: '', auth: '' };
+  },
+
+  saveRemoteConfig(url, auth) {
+    const key = `thoughtform_remote_config_${this.gitClient.gardenName}`;
+    const config = { url, auth };
+    localStorage.setItem(key, JSON.stringify(config));
+  },
+
   addGitViewListeners() {
+    // --- Remote Section Listeners ---
+    const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
+    const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
+    const pushButton = this.contentContainer.querySelector('#git-push-button');
+    const pullButton = this.contentContainer.querySelector('#git-pull-button');
+    const logArea = this.contentContainer.querySelector('#git-remote-log');
+
+    const updateConfig = () => {
+        this.saveRemoteConfig(remoteUrlInput.value, remoteAuthInput.value);
+    };
+
+    remoteUrlInput.addEventListener('input', updateConfig);
+    remoteAuthInput.addEventListener('input', updateConfig);
+    
+    const handleRemoteAction = async (action) => {
+      const url = remoteUrlInput.value.trim();
+      const token = remoteAuthInput.value.trim();
+      if (!url) {
+        logArea.textContent = 'Error: Remote URL is required.';
+        return;
+      }
+      
+      pushButton.disabled = true;
+      pullButton.disabled = true;
+      const actionVerb = action === 'push' ? 'Pushing' : 'Pulling';
+      logArea.textContent = `${actionVerb} to ${url}...`;
+      
+      try {
+        const result = await this.gitClient[action](url, token, (msg) => {
+          logArea.textContent = msg;
+        });
+
+        if (result.ok) {
+          logArea.textContent = `${actionVerb} complete.`;
+        } else {
+          logArea.textContent = `Error: ${result.error || 'Unknown error'}`;
+        }
+        
+        if (action === 'pull') {
+            await this.refresh();
+            await this.editor.forceReloadFile(this.editor.filePath);
+        }
+
+      } catch (e) {
+        console.error(`${actionVerb} failed:`, e);
+        logArea.textContent = `Error: ${e.message || 'Check console for details.'}`;
+      } finally {
+        pushButton.disabled = false;
+        pullButton.disabled = false;
+      }
+    };
+
+    pushButton.addEventListener('click', () => handleRemoteAction('push'));
+    pullButton.addEventListener('click', () => handleRemoteAction('pull'));
+    // --- End of Remote Section Listeners ---
+    
     const commitMessage = this.contentContainer.querySelector('#git-commit-message');
     if (commitMessage && !commitMessage.dataset.listenerAttached) {
         commitMessage.dataset.listenerAttached = 'true';
@@ -225,6 +319,7 @@ export const gitActions = {
                 commitButton.textContent = 'Committing...';
                 await this.gitClient.commit(message);
                 this.editor.hideDiff();
+                messageInput.value = '';
                 await this.refresh();
             } catch (err) {
                 console.error('Commit failed:', err);

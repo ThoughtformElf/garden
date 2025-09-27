@@ -2,6 +2,7 @@
 
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
+import http from 'isomorphic-git/http/web';
 
 /**
  * @class Git
@@ -134,6 +135,36 @@ export class Git {
     });
     this.markGardenAsDirty(false);
     return sha;
+  }
+  
+  async push(url, token, onProgress) {
+    return await git.push({
+      fs: this.fs,
+      http,
+      dir: '/',
+      // corsProxy: url, // <-- REMOVED THIS LINE
+      url: url,
+      onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
+      onAuth: () => ({ username: token }),
+    });
+  }
+
+  async pull(url, token, onProgress) {
+    return await git.pull({
+      fs: this.fs,
+      http,
+      dir: '/',
+      // corsProxy: url, // <-- REMOVED THIS LINE
+      url: url,
+      onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
+      onAuth: () => ({ username: token }),
+      author: {
+        name: 'User',
+        email: 'user@thoughtform.garden',
+      },
+      singleBranch: true,
+      fastForward: true,
+    });
   }
 
   async log() {
