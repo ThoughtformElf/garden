@@ -85,12 +85,11 @@ export function initializeDragAndDrop(gitClient, sidebar) {
         let content;
         const extension = file.name.split('.').pop()?.toLowerCase();
         
+        // THE FIX: Only image files are treated as binary. Everything else is raw text.
         if (imageExtensions.includes(extension)) {
             content = await file.arrayBuffer();
         } else {
-            const textContent = await file.text();
-            const fileData = { content: textContent, lastModified: new Date().toISOString() };
-            content = JSON.stringify(fileData, null, 2);
+            content = await file.text();
         }
         return gitClient.writeFile(path, content);
     });

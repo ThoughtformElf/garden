@@ -9,6 +9,7 @@ import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
+import { runMigration } from './util/migration.js'; // <-- ADD THIS LINE
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
@@ -35,6 +36,7 @@ const gitClient = new Git(gardenName);
 // This will populate window.thoughtform.ui with methods
 initializeAppInteractions();
 initializeDevTools();
+window.thoughtform.runMigration = runMigration; // <-- ADD THIS LINE
 
 // --- Global Error Handling ---
 window.onerror = function(message, source, lineno, colno, error) {

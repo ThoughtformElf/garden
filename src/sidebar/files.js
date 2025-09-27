@@ -45,11 +45,8 @@ export const fileActions = {
       await this.showAlert({ title: 'File Exists', message: `File "${newName}" already exists.` });
     } catch (e) {
       if (e.code === 'ENOENT') {
-        const fileData = {
-          content: '',
-          lastModified: new Date().toISOString()
-        };
-        await this.gitClient.writeFile(newPath, JSON.stringify(fileData, null, 2));
+        // THE FIX: Create an empty file with no wrapper.
+        await this.gitClient.writeFile(newPath, '');
         window.location.hash = `#${newPath}`;
       } else {
         console.error('Error checking for file:', e);
@@ -108,25 +105,9 @@ export const fileActions = {
     if (!newFilename) return;
     const newPath = `${directory}/${newFilename}`;
     try {
-      const rawContent = await this.gitClient.pfs.readFile(filepath, 'utf8');
-      let contentToDuplicate = rawContent;
-
-      // Check if the source file is in the new format and extract its content
-      try {
-        const parsed = JSON.parse(rawContent);
-        if (parsed && typeof parsed.content !== 'undefined') {
-            contentToDuplicate = parsed.content;
-        }
-      } catch (e) {
-        // Not a JSON object, treat as raw content
-      }
-
-      const newData = {
-        content: contentToDuplicate,
-        lastModified: new Date().toISOString()
-      };
-      
-      await this.gitClient.writeFile(newPath, JSON.stringify(newData, null, 2));
+      // THE FIX: Read the raw content and write the raw content. No wrappers.
+      const rawContent = await this.gitClient.readFile(filepath);
+      await this.gitClient.writeFile(newPath, rawContent);
       await this.refresh();
     } catch (e) {
       console.error('Error duplicating file:', e);
