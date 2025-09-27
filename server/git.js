@@ -54,8 +54,8 @@ const server = http.createServer((req, res) => {
     CONTENT_TYPE: req.headers['content-type'] || '',
     CONTENT_LENGTH: req.headers['content-length'] || '0',
     SERVER_NAME: 'localhost',
-    SERVER_PORT: '8080',
-    HTTP_HOST: req.headers.host || 'localhost:8080',
+    SERVER_PORT: '8081',
+    HTTP_HOST: req.headers.host || 'localhost:8081',
     REMOTE_ADDR: '127.0.0.1',
     REQUEST_URI: req.url
   };
@@ -99,6 +99,6 @@ const server = http.createServer((req, res) => {
   req.pipe(backend.stdin);
 });
 
-server.listen(8080, () => {
-  console.log('Git server running on http://localhost:8080');
+server.listen(8081, () => {
+  console.log('Git server running on http://localhost:8081');
 });
