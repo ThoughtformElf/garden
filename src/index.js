@@ -1,3 +1,5 @@
+import './util/passive-events.js'; // Apply passive event listener patch globally
+
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 window.process = { env: {} }; 

@@ -23,7 +23,7 @@ class WikilinkPlugin {
     this.view.dom.addEventListener('mouseup', this.onMouseUp);
     this.view.dom.addEventListener('touchstart', this.onTouchStart, { passive: false });
     this.view.dom.addEventListener('touchend', this.onTouchEnd);
-    this.view.dom.addEventListener('touchmove', this.onTouchMove);
+    this.view.dom.addEventListener('touchmove', this.onTouchMove, { passive: true });
   }
 
   destroy() {
