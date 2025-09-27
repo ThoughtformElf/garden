@@ -63,7 +63,24 @@ export class Git {
 
   async stage(filepath) {
     const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
-    await git.add({ fs: this.fs, dir: '/', filepath: cleanPath });
+    const matrix = await this.getStatuses();
+    const statusEntry = matrix.find(row => row[0] === cleanPath);
+
+    if (!statusEntry) {
+      console.error(`Could not find status for "${cleanPath}". Cannot stage.`);
+      return;
+    }
+
+    // workdirStatus codes: 0 for deleted, 2 for modified/new
+    const workdirStatus = statusEntry[2];
+
+    if (workdirStatus === 0) {
+      // File is deleted in the working directory, so stage the deletion
+      await git.remove({ fs: this.fs, dir: '/', filepath: cleanPath });
+    } else {
+      // File is new or modified, so stage the addition/modification
+      await git.add({ fs: this.fs, dir: '/', filepath: cleanPath });
+    }
   }
 
   async unstage(filepath) {
