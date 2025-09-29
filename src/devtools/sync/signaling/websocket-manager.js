@@ -23,10 +23,7 @@ export class WebSocketManager {
 
             this.signaling.ws.onclose = () => {
                 debug.log('Disconnected from signaling server');
-                // Only revert to disconnected state if we aren't in a stable P2P session.
-                if (this.signaling.sync.connectionState !== 'connected-p2p') {
-                    this.signaling.sync.updateConnectionState('disconnected', 'Signaling server disconnected.');
-                }
+                this.signaling.sync.disconnect();
             };
 
             this.signaling.ws.onerror = (error) => {
@@ -48,24 +45,27 @@ export class WebSocketManager {
         });
     }
 
-    sendCreateSessionRequest(syncName) {
+    sendJoinSessionRequest(syncName) {
         const ws = this.signaling.ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
+            console.log(`[SYNC-CLIENT] Sending 'join_session' request for session: ${syncName}`);
             ws.send(JSON.stringify({
-                type: 'create_session',
-                // This is the key change for the server to support persistent names
+                type: 'join_session',
                 sessionId: syncName 
             }));
         } else {
-            debug.error("Cannot send create session request, WebSocket is not open.");
-            this.signaling.sync.updateConnectionState('error', 'Cannot create session, not connected.');
+            debug.error("Cannot send join session request, WebSocket is not open.");
         }
     }
 
-    sendSignal(data) {
+    sendSignal(data, targetPeerId) {
         const ws = this.signaling.ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'signal', data: data }));
+            ws.send(JSON.stringify({
+                type: 'signal',
+                target: targetPeerId,
+                data: data
+            }));
         }
     }
 }

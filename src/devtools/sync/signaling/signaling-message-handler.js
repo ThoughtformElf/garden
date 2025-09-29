@@ -11,39 +11,41 @@ export class SignalingMessageHandler {
         switch (data.type) {
             case 'welcome':
                 this.signaling.peerId = data.peerId;
-                console.log(`[SYNC-COMMON] Received welcome. My Peer ID is: ${data.peerId}`);
-                break;
-            case 'session_created':
-                if (this.signaling.isNegotiating) this.signaling.startSession(data.sessionId);
-                break;
-            case 'host_changed':
-                syncInstance.handleHostChange(data.newInitiatorPeerId);
-                break;
-            case 'peer_joined':
-                console.log(`[SYNC-COMMON] Server reports a peer joined: ${data.peerId}.`);
-                syncInstance.updateConnectionState('connected-signal', 'Peer joined. Establishing P2P connection...');
-                if (syncInstance.isInitiator) this.signaling._webrtcInitiator.createOfferAfterPeerJoined();
-                break;
-            case 'signal':
-                this.signaling.handleSignal(data.data);
-                break;
-            case 'peer_left':
-                if (data.peerId) syncInstance.handlePeerLeft(data.peerId);
-                break;
-            case 'error':
-                if (this.signaling.isNegotiating && data.message.includes('already exists')) {
-                    this.signaling.attemptToJoinSession();
-                } else {
-                    syncInstance.updateConnectionState('error', `Signaling error: ${data.message}`);
-                }
+                console.log(`[SYNC-COMMON] Welcome from server. My Peer ID: ${data.peerId}`);
+                // ***** THIS IS THE FIX *****
+                // The moment we are welcomed by the server, we are in a stable,
+                // connected-but-waiting state. This prevents the "failed to connect" error.
+                syncInstance.updateConnectionState('connected-signal', 'Connected to tracker, waiting for peers...');
+                // ***** END OF FIX *****
                 break;
             
-            // --- THIS IS THE FIX ---
-            // Unwraps the payload and routes it to the new central handler.
-            case 'direct_sync_message':
-                if (data.payload && syncInstance) {
-                    syncInstance._handleIncomingSyncMessage(data.payload, 'WS');
+            case 'peer_list': // Server is introducing us to existing peers
+                console.log(`[SYNC-COMMON] Received list of ${data.peers.length} peers to connect to.`);
+                data.peers.forEach(peerId => {
+                    this.signaling.connectToPeer(peerId);
+                });
+                break;
+
+            case 'peer_joined': // A new peer has joined the swarm
+                console.log(`[SYNC-COMMON] Swarm announcement: New peer joined - ${data.peerId}.`);
+                // Attempt to connect to the new peer if we have capacity
+                this.signaling.connectToPeer(data.peerId);
+                break;
+
+            case 'signal':
+                if (data.from && data.data) {
+                    this.signaling.handleSignal(data.from, data.data);
                 }
+                break;
+
+            case 'peer_left':
+                if (data.peerId) {
+                    syncInstance.handlePeerLeft(data.peerId);
+                }
+                break;
+
+            case 'error':
+                syncInstance.updateConnectionState('error', `Signaling error: ${data.message}`);
                 break;
         }
     }

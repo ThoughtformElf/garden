@@ -2,9 +2,33 @@
 import debug from '../../../util/debug.js';
 import { WebSocketManager } from './websocket-manager.js';
 import { SignalingMessageHandler } from './signaling-message-handler.js';
-import { WebRtcInitiator } from './webrtc-initiator.js';
-import { WebRtcJoiner } from './webrtc-joiner.js';
 import { SyncMessageRouter } from './sync-message-router.js';
+
+class WebRtcInitiator {
+    constructor(signalingInstance) {
+        this.signaling = signalingInstance;
+    }
+
+    async connectToPeer(peerId) {
+        const syncInstance = this.signaling.sync;
+        const pc = syncInstance.createPeerConnection(peerId, true); // true for initiator
+        if (!pc) return; // Max connections reached or connection already exists
+
+        try {
+            console.log(`[SYNC-INITIATOR] Creating data channel for ${peerId.substring(0,8)}...`);
+            const dataChannel = pc.createDataChannel('syncChannel');
+            syncInstance.setupDataChannel(peerId, dataChannel);
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            
+            console.log(`[SYNC-INITIATOR] Sending offer to ${peerId.substring(0,8)}...`);
+            this.signaling.sendSignal({ type: 'offer', sdp: offer.sdp }, peerId);
+        } catch (error) {
+            debug.error(`Failed to initiate connection to ${peerId}:`, error);
+        }
+    }
+}
 
 export class SyncSignaling {
     constructor(syncInstance) {
@@ -12,102 +36,90 @@ export class SyncSignaling {
         this.ws = null;
         this.signalingServerUrl = localStorage.getItem('thoughtform_signaling_server') || 'wss://socket.thoughtform.garden';
         this.peerId = null; 
-        this.targetPeerId = null;
-
-        this.isNegotiating = false;
-        this.negotiationSyncName = null;
-
+        
         this._webSocketManager = new WebSocketManager(this);
         this._signalingMessageHandler = new SignalingMessageHandler(this);
         this._webrtcInitiator = new WebRtcInitiator(this);
-        this._webrtcJoiner = new WebRtcJoiner(this);
         this._syncMessageRouter = new SyncMessageRouter(this);
     }
-
-    updateSignalingServerUrl(url) {
-        this.signalingServerUrl = url;
-        localStorage.setItem('thoughtform_signaling_server', url);
-    }
     
-    async negotiateSession(syncName) {
-        if (this.isNegotiating) return;
-
-        this.isNegotiating = true;
-        this.negotiationSyncName = syncName;
-        this.sync.isInitiator = false;
-
+    async joinSession(syncName) {
         try {
-            await this.connectToSignalingServer();
-            console.log(`[SYNC-NEGOTIATE] Attempting to create session with persistent name: ${syncName}`);
-            
-            this._webSocketManager.sendCreateSessionRequest(syncName);
-            
+            await this._webSocketManager.connectToSignalingServer();
+            this._webSocketManager.sendJoinSessionRequest(syncName);
         } catch (error) {
             this.sync.updateConnectionState('error', `Failed to connect to signaling server.`);
-            this.isNegotiating = false;
         }
     }
 
-    attemptToJoinSession() {
-        console.log(`[SYNC-JOINER] Step 2: Create failed, now attempting to join session: ${this.negotiationSyncName}`);
-        this.joinSession(this.negotiationSyncName);
+    // ***** THIS IS THE FIX *****
+    // This function now contains the glare-resolution logic.
+    connectToPeer(peerId) {
+        // Do not attempt to connect to ourselves.
+        if (peerId === this.peerId) return;
+        
+        // The peer with the GREATER ID is responsible for initiating the connection.
+        // Both peers will run this check and come to the same conclusion.
+        if (this.peerId > peerId) {
+            console.log(`[SYNC-GLARE] My ID (${this.peerId.substring(0,4)}...) is greater than ${peerId.substring(0,4)}... I will initiate.`);
+            this._webrtcInitiator.connectToPeer(peerId);
+        } else {
+            console.log(`[SYNC-GLARE] My ID (${this.peerId.substring(0,4)}...) is less than ${peerId.substring(0,4)}... I will wait for their offer.`);
+        }
     }
+    // ***** END OF FIX *****
     
-    async startSession(syncName) {
-        console.log(`[SYNC-INITIATOR] Step 2: Session created on server. Initializing as initiator.`);
-        this.isNegotiating = false;
-        return this._webrtcInitiator.startSession(syncName);
+    sendSignal(data, targetPeerId) {
+        this._webSocketManager.sendSignal(data, targetPeerId);
     }
 
-    async joinSession(syncName) {
-        console.log(`[SYNC-JOINER] Step 3: Proceeding to join session as non-initiator.`);
-        this.isNegotiating = false;
-        return this._webrtcJoiner.joinSession(syncName);
-    }
-    
-    connectToSignalingServer() {
-        return this._webSocketManager.connectToSignalingServer();
-    }
-
-    sendSignal(data) {
-        return this._webSocketManager.sendSignal(data);
-    }
-
-    sendSyncMessage(data, targetPeerId = null) {
-        return this._syncMessageRouter.sendSyncMessage(data, targetPeerId);
-    }
-    
-    async handleSignal(data) {
+    async handleSignal(fromPeerId, data) {
         const syncInstance = this.sync;
         try {
-            if (!syncInstance.peerConnection) {
-                debug.error("Received signal but peerConnection is not initialized.");
-                return;
+            let pc = syncInstance.peerConnections.get(fromPeerId);
+            
+            if (!pc) {
+                if (data.type === 'offer') {
+                    pc = syncInstance.createPeerConnection(fromPeerId, false); // false for non-initiator
+                    if (!pc) {
+                        console.warn(`[SYNC-SIGNAL] Received offer from ${fromPeerId.substring(0,8)} but at connection limit. Ignoring.`);
+                        return;
+                    }
+                } else {
+                     debug.warn(`[SYNC-SIGNAL] Received signal from unknown peer ${fromPeerId.substring(0,8)} before an offer. Discarding.`);
+                     return;
+                }
             }
 
             if (data.type === 'offer') {
-                await syncInstance.peerConnection.setRemoteDescription(new RTCSessionDescription(data));
-                const answer = await syncInstance.peerConnection.createAnswer();
-                await syncInstance.peerConnection.setLocalDescription(answer);
-                this.sendSignal({ type: 'answer', sdp: answer.sdp });
+                console.log(`[SYNC-SIGNAL] Received offer from ${fromPeerId.substring(0,8)}...`);
+                await pc.setRemoteDescription(new RTCSessionDescription(data));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                this.sendSignal({ type: 'answer', sdp: answer.sdp }, fromPeerId);
             } else if (data.type === 'answer') {
-                await syncInstance.peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                console.log(`[SYNC-SIGNAL] Received answer from ${fromPeerId.substring(0,8)}...`);
+                await pc.setRemoteDescription(new RTCSessionDescription(data));
             } else if (data.type === 'candidate') {
-                await syncInstance.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         } catch (error) {
-            debug.error('Error handling signal:', error);
-            syncInstance.addMessage(`WebRTC error: ${error.message}`);
-            this.sync.updateConnectionState('error', `WebRTC Error: ${error.message}`);
+            debug.error(`Error handling signal from ${fromPeerId}:`, error);
         }
     }
 
+    sendSyncMessage(data, targetPeerId, messageId) {
+        this._syncMessageRouter.sendSyncMessage(data, targetPeerId, messageId);
+    }
+    handleIncomingMessage(data, transport) {
+        this._syncMessageRouter.handleIncomingMessage(data, transport);
+    }
+
     destroy() {
-        this.isNegotiating = false;
-        this.negotiationSyncName = null;
         if (this.ws) {
             this.ws.close();
             this.ws = null;
         }
+        this._syncMessageRouter.destroy();
     }
 }

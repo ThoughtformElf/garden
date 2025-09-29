@@ -6,11 +6,16 @@ export class WebRtcJoiner {
         this.signaling = signalingInstance;
     }
 
-    async joinSession(syncName) {
+    async joinSession(syncName, hostPeerId) {
         const syncInstance = this.signaling.sync;
         try {
             syncInstance.isInitiator = false;
             syncInstance.syncName = syncName;
+
+            // This is primarily for re-joining after a host change.
+            if (hostPeerId) {
+                syncInstance.hostPeerId = hostPeerId;
+            }
 
             if (this.signaling.ws && this.signaling.ws.readyState === WebSocket.OPEN) {
                  console.log(`[SYNC-JOINER] Step 4: Sending 'join_session' message to server for session '${syncName}'.`);
@@ -24,51 +29,10 @@ export class WebRtcJoiner {
                  return;
             }
 
-            syncInstance.peerConnection = new RTCPeerConnection({
-                iceServers: [
-                  { urls: 'stun:stun.l.google.com:19302' },
-                  { urls: 'stun:stun1.l.google.com:19302' }
-                ]
-            });
-            
-            syncInstance.peerConnection.onconnectionstatechange = () => {
-                debug.log("P2P Connection state:", syncInstance.peerConnection.connectionState);
-                 if (syncInstance.peerConnection.connectionState === 'failed') {
-                    syncInstance.updateConnectionState('connected-signal', 'P2P connection failed. Using fallback.');
-                }
-            };
-
-            syncInstance.peerConnection.ondatachannel = (event) => {
-                debug.log("Data channel received");
-                syncInstance.dataChannel = event.channel;
-
-                syncInstance.dataChannel.onopen = () => {
-                    syncInstance.updateConnectionState('connected-p2p', 'P2P connection established.');
-                    if (syncInstance.fileSync) {
-                        syncInstance.fileSync.setupDataChannel(syncInstance.dataChannel);
-                    }
-                };
-                
-                syncInstance.dataChannel.onclose = () => {
-                    if (syncInstance.connectionState === 'connected-p2p') {
-                        syncInstance.updateConnectionState('connected-signal', 'P2P channel closed. Using fallback.');
-                    }
-                };
-                
-                syncInstance.dataChannel.onerror = (error) => {
-                    debug.error("Data channel error:", error);
-                    syncInstance.addMessage(`Data channel error: ${error.message}`);
-                    syncInstance.updateConnectionState('connected-signal', 'P2P channel error. Using fallback.');
-                };
-            };
-
-            syncInstance.peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    this.signaling.sendSignal({ type: 'candidate', candidate: event.candidate });
-                }
-            };
-
-            syncInstance.updateConnectionState('connected-signal', 'Joining session, waiting for offer...');
+            // A joiner now simply waits for an 'offer' signal from the host.
+            // All PeerConnection and DataChannel setup is handled dynamically in the
+            // main `handleSignal` function when the offer arrives.
+            syncInstance.updateConnectionState('connected-signal', 'Joined session. Waiting for host offer...');
 
         } catch (error) {
             debug.error('Error joining session:', error);
