@@ -4,7 +4,7 @@ import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';
 import debug from '../../util/debug.js';
 
-const MAX_PEER_CONNECTIONS = 5; // The key to scalability. Each peer connects to a max of 5 others.
+const MAX_PEER_CONNECTIONS = 5;
 
 export class Sync {
   constructor() {
@@ -87,7 +87,6 @@ export class Sync {
         }
     };
     
-    // If we are NOT the one who initiated, we need to be ready to receive a data channel.
     if (!isInitiator) {
         pc.ondatachannel = (event) => {
             console.log(`[SYNC-PC] Data channel received from ${peerId.substring(0,8)}...`);
@@ -101,13 +100,11 @@ export class Sync {
   setupDataChannel(peerId, channel) {
       const pc = this.peerConnections.get(peerId);
       if (!pc) return;
-
       pc.dataChannel = channel;
       console.log(`[SYNC-DC] Setting up data channel for ${peerId.substring(0,8)}...`);
-
       channel.onopen = () => {
           console.log(`[SYNC-DC] Data channel is OPEN with ${peerId.substring(0,8)}...`);
-          this._announcePresence(peerId); // Announce presence to this specific new peer
+          this._announcePresence(peerId);
       };
       channel.onmessage = async (e) => {
           try {
@@ -118,7 +115,21 @@ export class Sync {
           }
       };
       channel.onclose = () => this.handlePeerLeft(peerId);
-      channel.onerror = (err) => console.error(`Data channel error with ${peerId.substring(0,8)}...:`, err);
+
+      // --- THIS IS THE FIX ---
+      // This handler now specifically checks for the expected "abort" error
+      // and treats it as a normal part of the disconnect process.
+      channel.onerror = (event) => {
+          const error = event.error;
+          if (error && error.name === 'OperationError' && error.message.includes('User-Initiated Abort')) {
+              // This is an expected error during a clean shutdown. Log it gracefully for debugging.
+              debug.log(`Data channel for peer ${peerId.substring(0,8)} closed intentionally.`);
+          } else {
+              // For any other unexpected error, log it as a real problem.
+              console.error(`Data channel error with ${peerId.substring(0,8)}...:`, event);
+          }
+      };
+      // --- END OF FIX ---
   }
 
   updateConnectionState(newState, statusMessage) {
@@ -132,11 +143,9 @@ export class Sync {
   }
 
   _handleIncomingSyncMessage(data, transport) {
-      // The message router (gossip protocol) now lives in SyncSignaling
       this.signaling.handleIncomingMessage(data, transport);
   }
   
-  // Announce presence to a specific peer, or to all if targetPeerId is null
   _announcePresence(targetPeerId = null) {
       if (!this.signaling.peerId) return;
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
@@ -163,12 +172,16 @@ export class Sync {
           this.connectedPeers.delete(peerId);
           this.addMessage(`Peer ${peerId.substring(0, 8)}... disconnected.`);
       }
+      
       const pc = this.peerConnections.get(peerId);
-      if (pc) {
+      if (pc && pc.signalingState !== 'closed') {
           pc.close();
           this.peerConnections.delete(peerId);
           console.log(`[SYNC-PC] Cleaned up connection for peer ${peerId.substring(0,8)}...`);
+      } else if (this.peerConnections.has(peerId)) {
+          this.peerConnections.delete(peerId);
       }
+      
       if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} total)`);
   }
 
