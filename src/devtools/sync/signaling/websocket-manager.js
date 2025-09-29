@@ -48,7 +48,6 @@ export class WebSocketManager {
     sendJoinSessionRequest(syncName) {
         const ws = this.signaling.ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
-            console.log(`[SYNC-CLIENT] Sending 'join_session' request for session: ${syncName}`);
             ws.send(JSON.stringify({
                 type: 'join_session',
                 sessionId: syncName 

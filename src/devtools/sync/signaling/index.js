@@ -15,14 +15,12 @@ class WebRtcInitiator {
         if (!pc) return; // Max connections reached or connection already exists
 
         try {
-            console.log(`[SYNC-INITIATOR] Creating data channel for ${peerId.substring(0,8)}...`);
             const dataChannel = pc.createDataChannel('syncChannel');
             syncInstance.setupDataChannel(peerId, dataChannel);
 
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             
-            console.log(`[SYNC-INITIATOR] Sending offer to ${peerId.substring(0,8)}...`);
             this.signaling.sendSignal({ type: 'offer', sdp: offer.sdp }, peerId);
         } catch (error) {
             debug.error(`Failed to initiate connection to ${peerId}:`, error);
@@ -43,6 +41,14 @@ export class SyncSignaling {
         this._syncMessageRouter = new SyncMessageRouter(this);
     }
     
+    // --- THIS IS THE FIX ---
+    // This function was removed during a refactor and is now restored.
+    updateSignalingServerUrl(url) {
+        this.signalingServerUrl = url;
+        localStorage.setItem('thoughtform_signaling_server', url);
+    }
+    // --- END OF FIX ---
+    
     async joinSession(syncName) {
         try {
             await this._webSocketManager.connectToSignalingServer();
@@ -52,22 +58,14 @@ export class SyncSignaling {
         }
     }
 
-    // ***** THIS IS THE FIX *****
-    // This function now contains the glare-resolution logic.
     connectToPeer(peerId) {
-        // Do not attempt to connect to ourselves.
         if (peerId === this.peerId) return;
-        
-        // The peer with the GREATER ID is responsible for initiating the connection.
-        // Both peers will run this check and come to the same conclusion.
         if (this.peerId > peerId) {
-            console.log(`[SYNC-GLARE] My ID (${this.peerId.substring(0,4)}...) is greater than ${peerId.substring(0,4)}... I will initiate.`);
             this._webrtcInitiator.connectToPeer(peerId);
         } else {
-            console.log(`[SYNC-GLARE] My ID (${this.peerId.substring(0,4)}...) is less than ${peerId.substring(0,4)}... I will wait for their offer.`);
+            // console.log(`[SYNC-GLARE] My ID (${this.peerId.substring(0,4)}...) is less than ${peerId.substring(0,4)}... I will wait for their offer.`);
         }
     }
-    // ***** END OF FIX *****
     
     sendSignal(data, targetPeerId) {
         this._webSocketManager.sendSignal(data, targetPeerId);
@@ -92,13 +90,11 @@ export class SyncSignaling {
             }
 
             if (data.type === 'offer') {
-                console.log(`[SYNC-SIGNAL] Received offer from ${fromPeerId.substring(0,8)}...`);
                 await pc.setRemoteDescription(new RTCSessionDescription(data));
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
                 this.sendSignal({ type: 'answer', sdp: answer.sdp }, fromPeerId);
             } else if (data.type === 'answer') {
-                console.log(`[SYNC-SIGNAL] Received answer from ${fromPeerId.substring(0,8)}...`);
                 await pc.setRemoteDescription(new RTCSessionDescription(data));
             } else if (data.type === 'candidate') {
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));

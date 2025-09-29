@@ -18,7 +18,6 @@ export class WebRtcJoiner {
             }
 
             if (this.signaling.ws && this.signaling.ws.readyState === WebSocket.OPEN) {
-                 console.log(`[SYNC-JOINER] Step 4: Sending 'join_session' message to server for session '${syncName}'.`);
                  this.signaling.ws.send(JSON.stringify({
                     type: 'join_session',
                     sessionId: syncName

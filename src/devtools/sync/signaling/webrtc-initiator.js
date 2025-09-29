@@ -12,12 +12,10 @@ export class WebRtcInitiator {
         syncInstance.isInitiator = true;
         syncInstance.syncName = syncName;
         syncInstance.updateConnectionState('connected-signal', 'Session created. Waiting for peers to join...');
-        console.log(`[SYNC-HOST] Now acting as host for session '${syncName}'.`);
     }
 
     // Called by the signaling handler for EACH new peer that joins the session.
     async initiateConnection(peerId) {
-        console.log(`[SYNC-HOST] New peer joined: ${peerId.substring(0,8)}... Initiating P2P connection.`);
         const syncInstance = this.signaling.sync;
         try {
             const pc = syncInstance.createPeerConnection(peerId);
@@ -26,7 +24,6 @@ export class WebRtcInitiator {
             pc.dataChannel = dataChannel; // Attach data channel to the peer connection object
 
             dataChannel.onopen = () => {
-                console.log(`[SYNC-HOST] Data channel OPEN for peer ${peerId.substring(0,8)}...`);
                 syncInstance.updateConnectionState('connected-p2p', `P2P link active with ${peerId.substring(0,8)}...`);
             };
 
@@ -39,7 +36,6 @@ export class WebRtcInitiator {
                 }
             };
             dataChannel.onclose = () => {
-                console.log(`[SYNC-HOST] Data channel CLOSED for peer ${peerId.substring(0,8)}...`);
             };
             dataChannel.onerror = (error) => {
                 debug.error(`Data channel error for peer ${peerId.substring(0,8)}...:`, error);
@@ -48,7 +44,6 @@ export class WebRtcInitiator {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             
-            console.log(`[SYNC-HOST] Sending offer to ${peerId.substring(0,8)}...`);
             this.signaling.sendSignal({ type: 'offer', sdp: offer.sdp }, peerId);
 
         } catch (error) {

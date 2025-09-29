@@ -11,7 +11,6 @@ export class SignalingMessageHandler {
         switch (data.type) {
             case 'welcome':
                 this.signaling.peerId = data.peerId;
-                console.log(`[SYNC-COMMON] Welcome from server. My Peer ID: ${data.peerId}`);
                 // ***** THIS IS THE FIX *****
                 // The moment we are welcomed by the server, we are in a stable,
                 // connected-but-waiting state. This prevents the "failed to connect" error.
@@ -20,14 +19,12 @@ export class SignalingMessageHandler {
                 break;
             
             case 'peer_list': // Server is introducing us to existing peers
-                console.log(`[SYNC-COMMON] Received list of ${data.peers.length} peers to connect to.`);
                 data.peers.forEach(peerId => {
                     this.signaling.connectToPeer(peerId);
                 });
                 break;
 
             case 'peer_joined': // A new peer has joined the swarm
-                console.log(`[SYNC-COMMON] Swarm announcement: New peer joined - ${data.peerId}.`);
                 // Attempt to connect to the new peer if we have capacity
                 this.signaling.connectToPeer(data.peerId);
                 break;

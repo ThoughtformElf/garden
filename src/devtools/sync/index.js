@@ -48,7 +48,6 @@ export class Sync {
 
   disconnect() {
       this.signaling.destroy();
-      console.log(`[SYNC-DISCONNECT] Closing ${this.peerConnections.size} peer connections.`);
       this.peerConnections.forEach(pc => pc.close());
       this.peerConnections.clear();
       this.isConnected = false;
@@ -59,14 +58,12 @@ export class Sync {
 
   createPeerConnection(peerId, isInitiator = false) {
     if (this.peerConnections.has(peerId)) {
-        console.log(`[SYNC-PC] Connection with ${peerId.substring(0,8)}... already exists or is in progress.`);
         return this.peerConnections.get(peerId);
     }
     if (this.peerConnections.size >= MAX_PEER_CONNECTIONS) {
         console.warn(`[SYNC-PC] Max connections (${MAX_PEER_CONNECTIONS}) reached. Not connecting to ${peerId.substring(0,8)}...`);
         return null;
     }
-    console.log(`[SYNC-PC] Creating new RTCPeerConnection for peer: ${peerId.substring(0,8)}... (Initiator: ${isInitiator})`);
     
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     this.peerConnections.set(peerId, pc);
@@ -79,7 +76,6 @@ export class Sync {
 
     pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
-        console.log(`[SYNC-PC] Connection state for ${peerId.substring(0,8)}... changed to: ${state}`);
         if (state === 'connected') {
             this.updateConnectionState('connected-p2p', `P2P Connected (${this.peerConnections.size} peers)`);
         } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
@@ -89,7 +85,6 @@ export class Sync {
     
     if (!isInitiator) {
         pc.ondatachannel = (event) => {
-            console.log(`[SYNC-PC] Data channel received from ${peerId.substring(0,8)}...`);
             this.setupDataChannel(peerId, event.channel);
         };
     }
@@ -101,9 +96,7 @@ export class Sync {
       const pc = this.peerConnections.get(peerId);
       if (!pc) return;
       pc.dataChannel = channel;
-      console.log(`[SYNC-DC] Setting up data channel for ${peerId.substring(0,8)}...`);
       channel.onopen = () => {
-          console.log(`[SYNC-DC] Data channel is OPEN with ${peerId.substring(0,8)}...`);
           this._announcePresence(peerId);
       };
       channel.onmessage = async (e) => {
@@ -170,7 +163,6 @@ export class Sync {
       if (pc && pc.signalingState !== 'closed') {
           pc.close();
           this.peerConnections.delete(peerId);
-          console.log(`[SYNC-PC] Cleaned up connection for peer ${peerId.substring(0,8)}...`);
       } else if (this.peerConnections.has(peerId)) {
           this.peerConnections.delete(peerId);
       }

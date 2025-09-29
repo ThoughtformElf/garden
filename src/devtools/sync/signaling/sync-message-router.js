@@ -32,8 +32,6 @@ export class SyncMessageRouter {
             this.seenMessages.delete(oldestMessage);
         }
         
-        console.log(`[SYNC-GOSSIP-RECV ◄ ${transport}] Mid: ${data.messageId.substring(0,4)}... Type: ${data.payload.type}`);
-        
         // --- Forward the message to all other peers (GOSSIP) ---
         this.sendSyncMessage(data.payload, null, data.messageId);
 
@@ -69,12 +67,10 @@ export class SyncMessageRouter {
             // Direct message to a single peer
             const pc = this.sync.peerConnections.get(targetPeerId);
             if (pc && pc.dataChannel && pc.dataChannel.readyState === 'open') {
-                console.log(`[SYNC-GOSSIP-SEND ► P2P-TARGET] To: ${targetPeerId.substring(0,8)}... Mid: ${id.substring(0,4)}...`);
                 pc.dataChannel.send(message);
             }
         } else {
             // Broadcast to all connected peers
-            console.log(`[SYNC-GOSSIP-SEND ► P2P-BROADCAST] To: ${this.sync.peerConnections.size} peers. Mid: ${id.substring(0,4)}...`);
             this.sync.peerConnections.forEach((pc) => {
                 if (pc.dataChannel && pc.dataChannel.readyState === 'open') {
                     pc.dataChannel.send(message);
