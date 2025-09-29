@@ -1,12 +1,13 @@
 {
   "name": "garden",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "",
   "main": "index.js",
   "scripts": {
     "start": "vite",
     "dev": "vite --host",
     "build": "vite build && shx cp docs/index.html docs/404.html",
+    "deploy:ws": "fly deploy",
     "ws": "node server/index.js",
     "git": "node server/git.js",
     "preview": "vite preview"
