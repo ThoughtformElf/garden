@@ -9,11 +9,11 @@ import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
-import { runMigration } from './util/migration.js'; // <-- ADD THIS LINE
+import { runMigration } from './util/migration.js';
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
-  ui: {}, // Create a namespace for UI control functions
+  ui: {},
 };
 
 // --- Main Application Logic ---
@@ -33,10 +33,9 @@ console.log(`Loading garden: "${gardenName}"`);
 
 const gitClient = new Git(gardenName);
 
-// This will populate window.thoughtform.ui with methods
 initializeAppInteractions();
 initializeDevTools();
-window.thoughtform.runMigration = runMigration; // <-- ADD THIS LINE
+window.thoughtform.runMigration = runMigration;
 
 // --- Global Error Handling ---
 window.onerror = function(message, source, lineno, colno, error) {
@@ -49,7 +48,6 @@ window.onunhandledrejection = function(event) {
   console.error("Caught unhandled promise rejection:", event.reason);
   window.thoughtform.ui.toggleDevtools?.(true, 'console');
 };
-// --- End of Error Handling ---
 
 const editor = new Editor({
   target: 'main',
@@ -64,12 +62,23 @@ const checkEditorReady = setInterval(() => {
     const commandPalette = new CommandPalette({ gitClient, editor });
     window.thoughtform.commandPalette = commandPalette;
 
-    // --- MASTER KEYDOWN LISTENER ---
+    // --- THIS IS THE FIX ---
     window.addEventListener('keydown', (e) => {
       const activeEl = document.activeElement;
-      const isInputFocused = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      
+      // A more robust check to prevent shortcuts from firing when typing in any input-like field.
+      const isInputFocused = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.isContentEditable
+      );
+
+      // We only want to run our shortcuts if the focus is on the main body or the editor itself.
+      // The `!activeEl.closest('.command-container')` check is crucial to ignore the command palette's own input.
       if (isInputFocused && !activeEl.classList.contains('cm-content')) {
-        return;
+        if (!activeEl.closest('.command-container')) {
+             return;
+        }
       }
 
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -100,6 +109,6 @@ const checkEditorReady = setInterval(() => {
           window.thoughtform.ui.toggleDevtools?.(null, null);
           break;
       }
-    }, { capture: true });
+    }); // The problematic `{ capture: true }` option has been removed.
   }
 }, 100);
