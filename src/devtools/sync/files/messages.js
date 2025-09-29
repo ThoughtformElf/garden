@@ -31,39 +31,44 @@ export class MessageHandler {
         try {
             for (const gardenName of gardens) {
                 const tempGitClient = new Git(gardenName);
-                
-                // --- THIS IS THE FIX ---
-                // Use the listAllFilesForClone method which includes the .git directory.
                 const files = await tempGitClient.listAllFilesForClone('/');
                 
-                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Found ${files.length} total files (including history) in ${gardenName}. Streaming...`, type: 'info' } }));
+                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Found ${files.length} files in ${gardenName}. Starting stream...`, type: 'info' } }));
 
+                // --- THIS IS THE PERFORMANCE FIX (Part 2) ---
+                // We process the file list in manageable chunks to avoid memory overload.
+                const CHUNK_SIZE = 200; 
                 let sentCount = 0;
-                for (const file of files) {
-                    try {
-                        const content = await tempGitClient.readFileAsBuffer(file);
-                        instance.sync.sendSyncMessage({
-                            type: 'file_update',
-                            gardenName: gardenName,
-                            path: file,
-                            content: Buffer.from(content).toString('base64'),
-                            isBase64: true,
-                            isFullSync: true
-                        });
 
-                        sentCount++;
-                        if (sentCount % 200 === 0 || sentCount === files.length) { // Log less frequently for large repos
-                            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Streaming ${gardenName}... (${sentCount}/${files.length})`, type: 'info' } }));
+                for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+                    const chunk = files.slice(i, i + CHUNK_SIZE);
+                    
+                    // Read the small batch of files in parallel.
+                    const fileContents = await Promise.all(
+                        chunk.map(file => tempGitClient.readFileAsBuffer(file).then(content => ({ file, content })))
+                    );
+
+                    // Send the in-memory batch in a tight, non-blocking loop.
+                    for (const { file, content } of fileContents) {
+                        if (content) {
+                            instance.sync.sendSyncMessage({
+                                type: 'file_update',
+                                gardenName: gardenName,
+                                path: file,
+                                content: Buffer.from(content).toString('base64'),
+                                isBase64: true,
+                                isFullSync: true
+                            });
                         }
-                    } catch (e) {
-                        debug.warn(`Could not send file ${file} from garden ${gardenName}:`, e);
                     }
+                    sentCount += chunk.length;
+                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Sent ${sentCount} of ${files.length} files for ${gardenName}...`, type: 'info' } }));
                 }
             }
             
             instance.sync.sendSyncMessage({ type: 'full_sync_complete' });
             
-            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Finished sending all requested gardens.`, type: 'info' } }));
+            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `All file data sent.`, type: 'info' } }));
         } catch (error) {
             console.error('Error handling garden request:', error);
             instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error handling garden request: ${error.message}`, type: 'error' } }));

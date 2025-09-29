@@ -10,7 +10,7 @@ export class FileOperations {
         try {
             const items = await pfs.readdir(dir);
             for (const item of items) {
-                if (item === '.git') continue; // This lister is for non-clone operations
+                if (item === '.git') continue;
                 const path = dir === '/' ? `/${item}` : `${dir}/${item}`;
                 try {
                     const stat = await pfs.stat(path);
@@ -29,44 +29,39 @@ export class FileOperations {
         instance.incrementPendingWrites();
 
         try {
-            let gitClientToUse;
-            if (data.gardenName) {
-                gitClientToUse = new Git(data.gardenName);
-                await gitClientToUse.initRepo();
-            } else {
-                gitClientToUse = instance._getGitClient();
-            }
-            
-            if (!gitClientToUse) {
-                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: Git client not available`, type: 'error' } }));
-                return;
+            if (!data.gardenName) {
+                throw new Error("Received file update without a gardenName during a full sync.");
             }
 
+            // Always instantiate the git client for the target garden.
+            const gitClientToUse = new Git(data.gardenName);
+
             if (data.isFullSync) {
-                // --- THIS IS THE FIX ---
-                // Check if we have already deleted the .git dir for this garden in this session.
-                if (data.gardenName && !instance.deletedGitDirs.has(data.gardenName)) {
-                    // Mark it as deleted for this session so we only do this once.
-                    instance.deletedGitDirs.add(data.gardenName);
-                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Replacing git history for garden: ${data.gardenName}...`, type: 'info' } }));
-                    try {
-                        // This is the atomic deletion of the old history.
-                        await gitClientToUse.rmrf('/.git');
-                        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Old history for ${data.gardenName} removed.`, type: 'info' } }));
-                    } catch (e) {
-                        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error removing old history: ${e.message}`, type: 'error' } }));
-                    }
+                // --- THIS IS THE PERFORMANCE FIX (Part 1) ---
+                // This block performs the slow, one-time setup operations only when the
+                // first file for a garden arrives during this sync session.
+                if (!instance.deletedGitDirs.has(data.gardenName)) {
+                    instance.deletedGitDirs.add(data.gardenName); // Mark it so this block never runs again for this garden.
+                    
+                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Preparing to receive garden: ${data.gardenName}...`, type: 'info' } }));
+                    await gitClientToUse.initRepo(); // Ensure the garden is registered and DB is ready.
+                    
+                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Replacing git history for ${data.gardenName}...`, type: 'info' } }));
+                    await gitClientToUse.rmrf('/.git'); // Atomically delete the old history.
                 }
                 
-                // Now, write the incoming file, which could be a regular file or part of the new .git history.
+                // --- UI FEEDBACK RESTORED ---
+                // This code now runs for every file, providing the real-time feedback you wanted.
                 instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Writing: ${data.path.substring(1)} (${data.gardenName})`, type: 'info' } }));
+                
                 const contentToWrite = Buffer.from(data.content, 'base64');
                 await gitClientToUse.writeFile(data.path, contentToWrite);
 
             } else {
+                // Non-full-sync logic for single file updates remains the same.
                 const contentToWrite = data.isBase64 ? Buffer.from(data.content, 'base64') : data.content;
                 await gitClientToUse.writeFile(data.path, contentToWrite);
-                instance.sync.addMessage(`Updated file: ${data.path} in garden ${data.gardenName || gitClientToUse.gardenName}`);
+                instance.sync.addMessage(`Updated file: ${data.path} in garden ${data.gardenName}`);
             }
         } catch (error) {
             console.error('Error handling file update for path:', data.path, error);
