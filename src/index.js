@@ -2,7 +2,7 @@ import './util/passive-events.js'; // Apply passive event listener patch globall
 
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
-window.process = { env: {} }; 
+window.process = { env: {} };
 
 import { Editor } from './editor/editor.js';
 import { Git } from './util/git-integration.js';
@@ -49,66 +49,70 @@ window.onunhandledrejection = function(event) {
   window.thoughtform.ui.toggleDevtools?.(true, 'console');
 };
 
+const commandPalette = new CommandPalette({ gitClient: null, editor: null });
+window.thoughtform.commandPalette = commandPalette;
+
 const editor = new Editor({
   target: 'main',
-  gitClient: gitClient
+  gitClient: gitClient,
+  commandPalette: commandPalette
 });
 
-// --- Initialize Command Palette & API ---
 const checkEditorReady = setInterval(() => {
   if (editor.isReady) {
     clearInterval(checkEditorReady);
+    
+    commandPalette.gitClient = gitClient;
+    commandPalette.editor = editor;
 
-    const commandPalette = new CommandPalette({ gitClient, editor });
-    window.thoughtform.commandPalette = commandPalette;
-
-    // --- THIS IS THE FIX ---
+    // --- THE DEFINITIVE GLOBAL SHORTCUT HANDLER ---
+    // This listener uses the `capture` phase to ensure it runs before any other
+    // listeners (like the editor's). This guarantees our global shortcuts
+    // will always fire, regardless of which element has focus.
     window.addEventListener('keydown', (e) => {
-      const activeEl = document.activeElement;
-      
-      // A more robust check to prevent shortcuts from firing when typing in any input-like field.
-      const isInputFocused = activeEl && (
-        activeEl.tagName === 'INPUT' || 
-        activeEl.tagName === 'TEXTAREA' ||
-        activeEl.isContentEditable
-      );
-
-      // We only want to run our shortcuts if the focus is on the main body or the editor itself.
-      // The `!activeEl.closest('.command-container')` check is crucial to ignore the command palette's own input.
-      if (isInputFocused && !activeEl.classList.contains('cm-content')) {
-        if (!activeEl.closest('.command-container')) {
-             return;
-        }
+      // If the command palette is already open, let it handle its own keyboard events.
+      if (commandPalette.isOpen) {
+        return;
       }
-
+      
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifierKey = isMac ? e.metaKey : e.ctrlKey;
 
-      if (!modifierKey) return;
+      if (!modifierKey) {
+        // If no modifier is pressed, we don't care about this event at all.
+        // This is the key to not interfering with regular typing or Vim commands.
+        return;
+      }
 
+      let handled = false;
       switch (e.key.toLowerCase()) {
         case 'p':
-          e.preventDefault();
-          e.stopPropagation();
           if (e.shiftKey) {
             commandPalette.open('execute');
           } else {
             commandPalette.open('search');
           }
+          handled = true;
           break;
 
         case '[':
-          e.preventDefault();
-          e.stopPropagation();
           window.thoughtform.ui.toggleSidebar?.();
+          handled = true;
           break;
 
         case '`':
-          e.preventDefault();
-          e.stopPropagation();
           window.thoughtform.ui.toggleDevtools?.(null, null);
+          handled = true;
           break;
       }
-    }); // The problematic `{ capture: true }` option has been removed.
+
+      // If we handled the shortcut, we MUST prevent the event from
+      // continuing to the editor or browser, which would cause unwanted
+      // side effects (like the cursor moving or a print dialog opening).
+      if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, { capture: true }); // Using `{ capture: true }` is the essential part of this fix.
   }
 }, 100);

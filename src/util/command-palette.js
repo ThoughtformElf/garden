@@ -2,10 +2,7 @@
 import { Git } from './git-integration.js';
 
 export class CommandPalette {
-  constructor({ gitClient, editor }) { // Simplified constructor
-    if (!gitClient || !editor) {
-      throw new Error('CommandPalette requires a gitClient and editor instance.');
-    }
+  constructor({ gitClient, editor }) {
     this.gitClient = gitClient;
     this.editor = editor;
 
@@ -71,6 +68,11 @@ export class CommandPalette {
   }
 
   async open(mode = 'search') {
+    if (!this.gitClient || !this.editor) {
+      console.error("CommandPalette cannot open: gitClient or editor is not initialized.");
+      return;
+    }
+
     if (this.isOpen) return;
     this.isOpen = true;
     this.mode = mode;
@@ -86,7 +88,6 @@ export class CommandPalette {
     this.overlay.classList.remove('hidden');
     this.input.focus();
     
-    // This local listener is only for inside the palette (arrows, enter, escape)
     document.addEventListener('keydown', this.handleKeyDown);
 
     if (!this.crossGardenFileCache) {
@@ -115,6 +116,13 @@ export class CommandPalette {
     this.selectedIndex = 0;
     
     document.removeEventListener('keydown', this.handleKeyDown);
+
+    // --- THIS IS THE FIX ---
+    // Return keyboard focus to the editor so the user can immediately resume typing
+    // and use editor-bound shortcuts again.
+    if (this.editor && this.editor.editorView) {
+      this.editor.editorView.focus();
+    }
   }
 
   search(query) {
@@ -189,16 +197,15 @@ export class CommandPalette {
     const file = this.results[index];
     
     if (this.mode === 'execute') {
-      console.log(`Executing: ${file.path}`);
       this.close();
       try {
         const fileContent = await this.gitClient.readFile(file.path);
-        const executable = new Function(fileContent);
-        const result = executable();
+        // Pass editor and git globals into the executed script's scope
+        const executable = new Function('editor', 'git', fileContent);
+        const result = await executable(this.editor, this.gitClient);
         console.log(`Execution successful for ${file.path}. Result:`, result);
       } catch (error) {
         console.error(`Execution failed for ${file.path}:`, error);
-        // Force open devtools to the console on error
         window.thoughtform.ui.toggleDevtools?.(true, 'console');
       }
     } else { // 'search' mode
@@ -253,4 +260,3 @@ export class CommandPalette {
     }
   }
 }
-

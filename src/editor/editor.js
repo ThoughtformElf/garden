@@ -4,8 +4,8 @@ import { EditorState, Compartment, Annotation } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { indentWithTab } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative'; // Corrected import
-import debounce from 'lodash/debounce'; // Corrected import
+import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
+import debounce from 'lodash/debounce';
 
 import { Sidebar } from '../sidebar/sidebar.js';
 import { basicDark } from '../util/theme.js';
@@ -21,8 +21,10 @@ const programmaticChange = Annotation.define();
 export class Editor {
   static editors = [];
 
-  constructor({ url, target = 'body main', editorConfig = {}, gitClient }) { // No more commandPalette
+  constructor({ url, target = 'body main', editorConfig = {}, gitClient, commandPalette }) {
     if (!gitClient) throw new Error('Editor requires a gitClient instance.');
+    if (!commandPalette) throw new Error('Editor requires a commandPalette instance.');
+
     if (!window.location.hash) {
       window.location.hash = '#home';
     }
@@ -31,6 +33,7 @@ export class Editor {
     this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
     this.gitClient = gitClient;
+    this.commandPalette = commandPalette;
     
     this.editorView = null;
     this.sidebar = null;
@@ -58,7 +61,7 @@ export class Editor {
     await this.gitClient.initRepo();
 
     this.sidebar = new Sidebar({
-      target: '#sidebar', // Corrected selector
+      target: '#sidebar',
       gitClient: this.gitClient,
       editor: this
     });
@@ -72,7 +75,6 @@ export class Editor {
     if(loadingIndicator) loadingIndicator.remove();
     this.mainContainer.style.display = 'flex';
 
-    // --- Create and inject the image viewer element ---
     this.imageViewerElement = document.createElement('div');
     this.imageViewerElement.className = 'image-viewer-container';
     this.mainContainer.appendChild(this.imageViewerElement);
@@ -92,6 +94,7 @@ export class Editor {
           gitClient: this.gitClient,
           sidebar: this.sidebar,
         })),
+        // --- The conflicting appKeymap has been completely REMOVED ---
         linkNavigationKeymap,
         keymap.of([indentWithTab]),
         vim(),
@@ -112,18 +115,17 @@ export class Editor {
     Editor.editors.push(this);
     this.isReady = true;
     this.listenForNavigation();
-    this.loadFile(this.filePath); // Initial load to handle potential images
+    this.loadFile(this.filePath);
     this.editorView.focus();
   }
 
   async loadFileContent(filepath) {
     try {
-      // THE FIX: Read the raw content directly. No more JSON parsing.
       const rawContent = await this.gitClient.readFile(filepath);
       return rawContent;
     } catch (e) {
       console.warn(`Could not read file ${filepath}, starting with empty content.`, e);
-      return ''; // Return empty string if file doesn't exist
+      return '';
     }
   }
   
@@ -178,7 +180,6 @@ export class Editor {
     const extension = filepath.split('.').pop()?.toLowerCase();
 
     if (imageExtensions.includes(extension)) {
-      console.log(`Displaying image: ${filepath}`);
       this.hideDiff();
 
       this.mainContainer.classList.remove('is-editor');
@@ -235,14 +236,12 @@ export class Editor {
   }
   
   async forceReloadFile(filepath) {
-      console.log(`forceReloadFile: Forcibly reloading ${filepath} from disk.`);
       await this.loadFile(filepath);
   }
 
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     if (this.filePath !== this.getFilePath(window.location.hash)) {
-      console.log('In preview mode, not saving changes.');
       return;
     }
     
