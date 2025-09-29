@@ -11,10 +11,9 @@ export class SyncSignaling {
         this.sync = syncInstance;
         this.ws = null;
         this.signalingServerUrl = localStorage.getItem('thoughtform_signaling_server') || 'wss://socket.thoughtform.garden';
-        this.peerId = null;
+        this.peerId = null; 
         this.targetPeerId = null;
 
-        // State for negotiation flow
         this.isNegotiating = false;
         this.negotiationSyncName = null;
 
@@ -35,14 +34,12 @@ export class SyncSignaling {
 
         this.isNegotiating = true;
         this.negotiationSyncName = syncName;
-        this.sync.isInitiator = false; // Assume not initiator until confirmed
+        this.sync.isInitiator = false;
 
         try {
             await this.connectToSignalingServer();
-            debug.log(`Attempting to create session with persistent name: ${syncName}`);
+            console.log(`[SYNC-NEGOTIATE] Attempting to create session with persistent name: ${syncName}`);
             
-            // The message handler will now take over based on the server's response
-            // ('session_created' or 'error') to this request.
             this._webSocketManager.sendCreateSessionRequest(syncName);
             
         } catch (error) {
@@ -51,20 +48,19 @@ export class SyncSignaling {
         }
     }
 
-    // Called by the message handler if creating a session fails because it already exists.
     attemptToJoinSession() {
-        debug.log(`Create failed, now attempting to join session: ${this.negotiationSyncName}`);
+        console.log(`[SYNC-JOINER] Step 2: Create failed, now attempting to join session: ${this.negotiationSyncName}`);
         this.joinSession(this.negotiationSyncName);
     }
     
-    // Internal method to set up this peer as the session initiator.
     async startSession(syncName) {
+        console.log(`[SYNC-INITIATOR] Step 2: Session created on server. Initializing as initiator.`);
         this.isNegotiating = false;
         return this._webrtcInitiator.startSession(syncName);
     }
 
-    // Internal method to set up this peer as a session joiner.
     async joinSession(syncName) {
+        console.log(`[SYNC-JOINER] Step 3: Proceeding to join session as non-initiator.`);
         this.isNegotiating = false;
         return this._webrtcJoiner.joinSession(syncName);
     }
@@ -77,8 +73,8 @@ export class SyncSignaling {
         return this._webSocketManager.sendSignal(data);
     }
 
-    sendSyncMessage(data) {
-        return this._syncMessageRouter.sendSyncMessage(data);
+    sendSyncMessage(data, targetPeerId = null) {
+        return this._syncMessageRouter.sendSyncMessage(data, targetPeerId);
     }
     
     async handleSignal(data) {

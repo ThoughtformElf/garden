@@ -4,10 +4,7 @@ import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';
 import debug from '../../util/debug.js';
 
-// ***** THIS IS THE FIX *****
-// The Emitter class and "extends Emitter" have been removed as they are obsolete.
 export class Sync {
-// ***** END OF FIX *****
   constructor() {
     this.name = 'sync';
     this._container = null;
@@ -16,12 +13,9 @@ export class Sync {
     this.isInitiator = false;
     this.isConnected = false;
     this.gitClient = null;
-    
-    // Central state management
-    this.connectionState = 'disconnected'; // 'disconnected', 'connecting', 'connected-signal', 'connected-p2p', 'error'
+    this.connectionState = 'disconnected';
     this.syncName = null;
-    
-    // Initialize components
+    this.connectedPeers = new Map();
     this.signaling = new SyncSignaling(this);
     this.fileSync = new SyncFiles(this);
     this.ui = new SyncUI(this);
@@ -36,95 +30,126 @@ export class Sync {
     this.ui.updateControls(this.connectionState);
     this.ui.updateConnectionIndicator(this.connectionState);
 
-    if (this.fileSync && this.ui && typeof this.ui.updateSyncProgress === 'function') {
+    if (this.fileSync && this.ui) {
         this.fileSync.addEventListener('syncProgress', this.ui.updateSyncProgress.bind(this.ui));
-        debug.log("DEBUG: Connected SyncFiles syncProgress event to SyncUI handler");
     }
 
-    // Auto-connect logic
     const autoConnect = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
     const savedSyncName = localStorage.getItem('thoughtform_sync_name');
 
     if (autoConnect && savedSyncName) {
-        debug.log(`Auto-connecting with sync name: ${savedSyncName}`);
         this.connect(savedSyncName);
     }
   }
 
   async connect(syncName) {
-      if (this.connectionState !== 'disconnected' && this.connectionState !== 'error') {
-          debug.warn(`Connect called while not in a disconnected state (${this.connectionState}). Ignoring.`);
-          return;
-      }
+      if (this.connectionState !== 'disconnected' && this.connectionState !== 'error') return;
       this.syncName = syncName;
       this.updateConnectionState('connecting', 'Connecting...');
-      
       await this.signaling.negotiateSession(this.syncName);
   }
 
   disconnect() {
-      debug.log("Disconnecting...");
       this.signaling.destroy();
-      if (this.peerConnection) {
-          this.peerConnection.close();
-          this.peerConnection = null;
-      }
-      if (this.dataChannel) {
-          this.dataChannel.close();
-          this.dataChannel = null;
-      }
+      if (this.peerConnection) this.peerConnection.close();
       this.isConnected = false;
       this.isInitiator = false;
       this.syncName = null;
+      this.connectedPeers.clear();
       this.updateConnectionState('disconnected', 'Disconnected');
   }
 
   updateConnectionState(newState, statusMessage) {
       if (this.connectionState === newState) return;
-
-      debug.log(`Connection state changed: ${this.connectionState} -> ${newState}`);
+      const oldState = this.connectionState;
       this.connectionState = newState;
-      
       this.isConnected = (newState === 'connected-p2p' || newState === 'connected-signal');
-
+      const wasConnected = oldState === 'connected-p2p' || oldState === 'connected-signal';
+      if (this.isConnected && !wasConnected) {
+          this._announcePresence();
+      }
       if (this.ui) {
-          if (statusMessage) {
-              this.ui.updateStatus(statusMessage);
-          }
+          if (statusMessage) this.ui.updateStatus(statusMessage);
           this.ui.updateConnectionIndicator(newState);
           this.ui.updateControls(newState);
       }
   }
 
-  setGitClient(gitClient) {
-    this.gitClient = gitClient;
-    this.fileSync.setGitClient(gitClient);
+  // --- NEW: CENTRAL MESSAGE HANDLER ---
+  _handleIncomingSyncMessage(data, transport) {
+      console.log(`[SYNC-RECV ◄ ${transport}] Type: ${data.type}`, data);
+      switch (data.type) {
+          case 'peer_introduction':
+              this.handlePeerIntroduction(data);
+              break;
+          // All other message types are assumed to be for file sync.
+          default:
+              if (this.fileSync) {
+                  this.fileSync.handleSyncMessage(data);
+              }
+              break;
+      }
   }
 
-  addMessage(text) {
-    this.ui.addMessage(text);
+  _announcePresence() {
+      setTimeout(() => {
+          if (!this.signaling.peerId) {
+              console.error("[SYNC-ERROR] Cannot announce presence, peerId is not known.");
+              return;
+          }
+          const gardensRaw = localStorage.getItem('thoughtform_gardens');
+          const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
+          this.sendSyncMessage({
+              type: 'peer_introduction',
+              peerId: this.signaling.peerId,
+              gardens: gardens
+          });
+      }, 1000);
   }
 
-  sendSyncMessage(data) {
-    this.signaling.sendSyncMessage(data);
+  handlePeerIntroduction(payload) {
+      if (!payload.peerId || payload.peerId === this.signaling.peerId) return;
+      const isNewPeer = !this.connectedPeers.has(payload.peerId);
+      this.connectedPeers.set(payload.peerId, { gardens: payload.gardens });
+      if (isNewPeer) {
+        this.addMessage(`Peer ${payload.peerId.substring(0, 8)}... connected.`);
+        // Reply directly to ensure mutual discovery
+        const gardensRaw = localStorage.getItem('thoughtform_gardens');
+        const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
+        this.sendSyncMessage({
+            type: 'peer_introduction',
+            peerId: this.signaling.peerId,
+            gardens: gardens
+        }, payload.peerId);
+      }
+      if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} peer${this.connectedPeers.size === 1 ? '' : 's'})`);
+  }
+  
+  handlePeerLeft(peerId) {
+      if (this.connectedPeers.has(peerId)) {
+          this.connectedPeers.delete(peerId);
+          this.addMessage(`Peer ${peerId.substring(0, 8)}... disconnected.`);
+          if (this.ui) this.ui.updateStatus(`Peer disconnected. (${this.connectedPeers.size} total)`);
+      }
   }
 
-  sendFileUpdate(path, content, timestamp) {
-    this.fileSync.sendFileUpdate(path, content, timestamp);
-  }
-
-  show() {
-    this._container.style.display = 'block';
-  }
-
-  hide() {
-    this._container.style.display = 'none';
-  }
-
-  destroy() {
-    this.disconnect();
-    if (this.fileSync) {
-        this.fileSync.destroy();
+  handleHostChange(newInitiatorPeerId) {
+    this.addMessage(`Network host changed. New host: ${newInitiatorPeerId.substring(0,8)}...`);
+    if (this.peerConnection) this.peerConnection.close();
+    if (this.signaling.peerId === newInitiatorPeerId) {
+        this.isInitiator = true;
+        this.signaling._webrtcInitiator.setupPeerConnection();
+        this.updateConnectionState('connected-signal', 'Waiting for peers to rejoin...');
+    } else {
+        this.isInitiator = false;
+        this.signaling._webrtcJoiner.joinSession(this.syncName);
     }
   }
+
+  setGitClient(gitClient) { this.gitClient = gitClient; this.fileSync.setGitClient(gitClient); }
+  addMessage(text) { if(this.ui) this.ui.addMessage(text); }
+  sendSyncMessage(data, targetPeerId = null) { this.signaling.sendSyncMessage(data, targetPeerId); }
+  show() { if(this._container) this._container.style.display = 'block'; }
+  hide() { if(this._container) this._container.style.display = 'none'; }
+  destroy() { this.disconnect(); if (this.fileSync) this.fileSync.destroy(); }
 }

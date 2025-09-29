@@ -13,11 +13,13 @@ export class WebRtcJoiner {
             syncInstance.syncName = syncName;
 
             if (this.signaling.ws && this.signaling.ws.readyState === WebSocket.OPEN) {
+                 console.log(`[SYNC-JOINER] Step 4: Sending 'join_session' message to server for session '${syncName}'.`);
                  this.signaling.ws.send(JSON.stringify({
                     type: 'join_session',
                     sessionId: syncName
                  }));
             } else {
+                 console.error("[SYNC-JOINER-ERROR] Cannot join session, WebSocket is not connected.");
                  syncInstance.updateConnectionState('error', 'Error: WebSocket not connected.');
                  return;
             }

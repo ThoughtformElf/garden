@@ -24,7 +24,6 @@ export class SyncActions {
                 return;
             }
 
-            // Use the lister that correctly skips the .git folder.
             const files = await instance.getAllFiles(gitClientToUse);
             instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Found ${files.length} content files to sync.`, type: 'info' } }));
 
@@ -35,7 +34,7 @@ export class SyncActions {
                     timestamp = JSON.parse(content).lastupdated || 0;
                 } catch (e) { /* is raw file */ }
 
-                instance.sync.signaling.sendSyncMessage({
+                instance.sync.sendSyncMessage({
                     type: 'file_update',
                     path: file,
                     content: content,
@@ -49,23 +48,38 @@ export class SyncActions {
         }
     }
 
-    // THIS IS THE ONE YOU CARE ABOUT
-    static requestAllFiles(instance) {
-        // This call will now succeed. It resets the state on the receiver's side.
-        instance.resetFullSyncState();
-
-        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Requesting a full clone from peer...', type: 'info' } }));
+    /**
+     * Takes a selection object and sends targeted requests to the appropriate peers.
+     * @param {SyncFiles} instance The SyncFiles instance.
+     * @param {object} selection - The selection from the modal, e.g., { 'peerId-123': ['gardenA', 'gardenB'] }
+     */
+    static requestSpecificGardens(instance, selection) {
+        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Requesting selected gardens from peers...', type: 'info' } }));
         
-        // Send the request message to the other machine.
-        instance.sync.signaling.sendSyncMessage({
-            type: 'request_all_files'
+        Object.entries(selection).forEach(([peerId, gardens]) => {
+            const shortId = peerId.substring(0, 8);
+            instance.dispatchEvent(new CustomEvent('syncProgress', {
+                detail: {
+                    message: `Sending request to peer ${shortId}... for gardens: ${gardens.join(', ')}`,
+                    type: 'info'
+                }
+            }));
+            
+            // Send a targeted message to each selected peer
+            instance.sync.sendSyncMessage(
+                {
+                    type: 'request_gardens',
+                    gardens: gardens
+                },
+                peerId // The targetPeerId argument
+            );
         });
-        
-        instance.sync.addMessage('Requested all files from peer');
+
+        instance.sync.addMessage(`Sent requests for ${Object.keys(selection).length} peer(s).`);
     }
 
     static sendFileUpdate(instance, path, content, timestamp) {
-        instance.sync.signaling.sendSyncMessage({
+        instance.sync.sendSyncMessage({
             type: 'file_update',
             path: path,
             content: content,

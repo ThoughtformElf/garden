@@ -3,35 +3,22 @@ const WebSocket = require('ws');
 const http = require('http');
 const crypto = require('crypto');
 
-/**
- * Gets the real client IP address from a request object.
- * It checks a chain of common headers used by proxies and load balancers,
- * making the IP detection hosting-provider-agnostic.
- * @param {http.IncomingMessage} req The request object.
- * @returns {string} The client's IP address.
- */
 function getRealClientIp(req) {
-  // 'x-forwarded-for' is the de-facto standard header. It can contain a comma-separated
-  // list of IPs, e.g., "client, proxy1, proxy2". The original client is always the first one.
   const xForwardedFor = req.headers['x-forwarded-for'];
   if (xForwardedFor) {
     return Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor.split(',')[0].trim();
   }
-
-  // Check other common headers used by various platforms like Fly.io, Cloudflare, etc.
   return req.headers['fly-client-ip'] ||
          req.headers['cf-connecting-ip'] ||
          req.headers['x-real-ip'] ||
          req.headers['true-client-ip'] ||
-         req.socket.remoteAddress; // Fallback to the direct connection IP
+         req.socket.remoteAddress;
 }
 
-// --- Rate Limiting Configuration ---
 const connectionTracker = new Map();
-const MAX_CONNECTIONS_PER_MINUTE = 20; // Allow 20 new connections per minute per IP
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const MAX_CONNECTIONS_PER_MINUTE = 20;
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
-// Periodically clean up old connection timestamps to prevent memory leaks
 setInterval(() => {
     const now = Date.now();
     for (const [ip, timestamps] of connectionTracker.entries()) {
@@ -42,151 +29,117 @@ setInterval(() => {
             connectionTracker.set(ip, recentTimestamps);
         }
     }
-}, RATE_LIMIT_WINDOW_MS * 2); // Cleanup every 2 minutes
+}, RATE_LIMIT_WINDOW_MS * 2);
 
-
-// --- HTTP and WebSocket Server Setup ---
-
-// Create an HTTP server
 const server = http.createServer((req, res) => {
-    // Handle health check endpoint
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'OK', timestamp: Date.now() }));
         return;
     }
-
-    // Default response for other routes
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
 });
 
-// Create WebSocket server
 const wss = new WebSocket.Server({ server });
-
-// Store active sessions and peers
 const sessions = new Map();
 const peers = new Map();
 
+// --- HEARTBEAT MECHANISM (PART 1) ---
+// This function will be called periodically to check for dead connections.
+function heartbeat() {
+  this.isAlive = true;
+}
+
 wss.on('connection', (ws, req) => {
-    // --- Apply Rate Limiting ---
+    // --- HEARTBEAT MECHANISM (PART 2) ---
+    // A client is considered alive when it first connects.
+    ws.isAlive = true;
+    // The server listens for 'pong' messages, which are the client's response to its 'ping'.
+    ws.on('pong', heartbeat);
+
     const ip = getRealClientIp(req);
     const now = Date.now();
     const timestamps = connectionTracker.get(ip) || [];
     const recentTimestamps = timestamps.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
 
     if (recentTimestamps.length >= MAX_CONNECTIONS_PER_MINUTE) {
-        console.warn(`Rate limit exceeded for IP: ${ip}. Terminating connection.`);
-        ws.terminate(); // Forcefully close the connection
-        return; // Stop processing this connection
+        ws.terminate();
+        return;
     }
-
-    // Record the new connection attempt
     recentTimestamps.push(now);
     connectionTracker.set(ip, recentTimestamps);
-
-
-    // --- Connection Handling ---
 
     const peerId = crypto.randomUUID();
     ws.peerId = peerId;
     peers.set(peerId, ws);
-
+    
+    ws.send(JSON.stringify({ type: 'welcome', peerId: peerId }));
     console.log(`New connection established from ${ip}: ${peerId}`);
 
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-
             switch (data.type) {
                 case 'create_session':
-                    let sessionId;
                     const requestedSessionId = data.sessionId ? String(data.sessionId).toUpperCase() : null;
-
-                    if (requestedSessionId) {
-                        if (sessions.has(requestedSessionId)) {
-                             ws.send(JSON.stringify({ type: 'error', message: `Session '${requestedSessionId}' already exists.` }));
-                             return;
-                        }
-                        sessionId = requestedSessionId;
-                    } else {
-                        let attempts = 0;
-                        const maxAttempts = 100;
-                        do {
-                            sessionId = crypto.randomBytes(3).toString('hex').toUpperCase();
-                            attempts++;
-                        } while (sessions.has(sessionId) && attempts < maxAttempts);
-
-                        if (attempts >= maxAttempts) {
-                            ws.send(JSON.stringify({ type: 'error', message: 'Failed to create a unique session ID. Please try again.' }));
-                            return;
-                        }
-                    }
-
-                    sessions.set(sessionId, { initiator: ws, peers: [ws] });
-                    ws.sessionId = sessionId;
-                    ws.send(JSON.stringify({ type: 'session_created', sessionId: sessionId }));
-                    console.log(`Session created: ${sessionId} by peer ${peerId}`);
-                    break;
-
-                case 'join_session':
-                    if (!data.sessionId) {
-                        ws.send(JSON.stringify({ type: 'error', message: 'Missing sessionId in join request.' }));
+                    if (!requestedSessionId) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Session ID is required.' }));
                         return;
                     }
-
+                    if (sessions.has(requestedSessionId)) {
+                         ws.send(JSON.stringify({ type: 'error', message: `Session '${requestedSessionId}' already exists.` }));
+                         return;
+                    }
+                    sessions.set(requestedSessionId, { initiator: ws, peers: [ws] });
+                    ws.sessionId = requestedSessionId;
+                    ws.send(JSON.stringify({ type: 'session_created', sessionId: requestedSessionId }));
+                    console.log(`Session created: ${requestedSessionId} by peer ${peerId}`);
+                    break;
+                case 'join_session':
+                    if (!data.sessionId) return;
                     const sessionIdToJoin = data.sessionId.toUpperCase();
                     const sessionToJoin = sessions.get(sessionIdToJoin);
-
                     if (sessionToJoin) {
                         sessionToJoin.peers.push(ws);
                         ws.sessionId = sessionIdToJoin;
-                        if (sessionToJoin.initiator && sessionToJoin.initiator.readyState === WebSocket.OPEN) {
-                            sessionToJoin.initiator.send(JSON.stringify({ type: 'peer_joined', peerId: ws.peerId }));
-                        }
+                        sessionToJoin.peers.forEach(peer => {
+                            if (peer !== ws && peer.readyState === WebSocket.OPEN) {
+                                peer.send(JSON.stringify({ type: 'peer_joined', peerId: ws.peerId }));
+                            }
+                        });
                         console.log(`Peer ${peerId} joined session ${sessionIdToJoin}`);
                     } else {
                         ws.send(JSON.stringify({ type: 'error', message: `Session ${sessionIdToJoin} not found.` }));
                     }
                     break;
-
-                case 'signal':
+                case 'signal': // Simplified signal forwarding
                     const sessionForSignal = sessions.get(ws.sessionId);
                     if (sessionForSignal) {
-                        const targetPeers = sessionForSignal.peers.filter(peer => peer !== ws);
-                        targetPeers.forEach(targetPeer => {
-                            if (targetPeer && targetPeer.readyState === WebSocket.OPEN) {
-                                targetPeer.send(JSON.stringify({ type: 'signal', data: data.data }));
+                        sessionForSignal.peers.forEach(peer => {
+                            if (peer !== ws && peer.readyState === WebSocket.OPEN) {
+                                peer.send(JSON.stringify({ type: 'signal', data: data.data }));
                             }
                         });
-                    } else {
-                        console.warn(`Signal received from peer ${peerId} not in a session.`);
                     }
                     break;
-                
-                // *** FIX 3: ADDED this case to handle the WebSocket fallback for file sync. ***
                 case 'direct_sync_message':
                     const sessionForSync = sessions.get(ws.sessionId);
                     if (sessionForSync) {
-                        // Relay sync message to all other peers in the session.
-                        const targetPeers = sessionForSync.peers.filter(peer => peer !== ws);
+                        const targetPeers = data.targetPeerId
+                            ? sessionForSync.peers.filter(p => p.peerId === data.targetPeerId)
+                            : sessionForSync.peers.filter(peer => peer !== ws);
+                        
                         targetPeers.forEach(targetPeer => {
                             if (targetPeer && targetPeer.readyState === WebSocket.OPEN) {
-                                // The original 'data' object is what needs to be relayed.
                                 targetPeer.send(JSON.stringify(data));
                             }
                         });
-                    } else {
-                        console.warn(`Sync message received from peer ${peerId} not in a session.`);
                     }
                     break;
-
-                default:
-                    console.warn(`Unknown message type received from ${peerId}:`, data.type);
             }
         } catch (err) {
             console.error(`Error processing message from peer ${peerId}:`, err);
-            ws.send(JSON.stringify({ type: 'error', 'message': 'Invalid message format or processing error.' }));
         }
     });
 
@@ -196,38 +149,42 @@ wss.on('connection', (ws, req) => {
 
         if (ws.sessionId) {
             const session = sessions.get(ws.sessionId);
-            if (session) {
-                const peerIndex = session.peers.indexOf(ws);
-                if (peerIndex > -1) {
-                    session.peers.splice(peerIndex, 1);
-                }
-
-                if (session.initiator === ws || session.peers.length === 0) {
-                    session.peers.forEach(peer => {
-                         if (peer.readyState === WebSocket.OPEN) {
-                             peer.send(JSON.stringify({ type: 'error', message: 'Session closed by initiator.' }));
-                         }
-                    });
-                    sessions.delete(ws.sessionId);
-                    console.log(`Session ${ws.sessionId} deleted.`);
-                } else {
-                    session.peers.forEach(peer => {
-                         if (peer.readyState === WebSocket.OPEN) {
-                             peer.send(JSON.stringify({ type: 'peer_left', peerId: ws.peerId }));
-                         }
-                    });
-                    console.log(`Peer ${ws.peerId} left session ${ws.sessionId}.`);
-                }
+            if (!session) return;
+            session.peers = session.peers.filter(peer => peer !== ws);
+            if (session.peers.length === 0) {
+                sessions.delete(ws.sessionId);
+            } else if (session.initiator === ws) {
+                session.initiator = session.peers[0]; // Elect new initiator
+                session.peers.forEach(peer => {
+                    peer.send(JSON.stringify({ type: 'host_changed', newInitiatorPeerId: session.initiator.peerId }));
+                });
+            } else {
+                session.peers.forEach(peer => {
+                    peer.send(JSON.stringify({ type: 'peer_left', peerId: ws.peerId }));
+                });
             }
         }
     });
 
-    ws.on('error', (err) => {
-        console.error(`WebSocket error for peer ${peerId}:`, err);
-    });
+    ws.on('error', (err) => console.error(`WebSocket error for peer ${peerId}:`, err));
+});
+
+// --- HEARTBEAT MECHANISM (PART 3) ---
+// Set an interval to run every 30 seconds.
+const interval = setInterval(function ping() {
+  wss.clients.forEach(function each(ws) {
+    // If the client did not respond to the last ping, its connection is terminated.
+    if (ws.isAlive === false) return ws.terminate();
+
+    // Reset the status and send a new ping.
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', function close() {
+  clearInterval(interval);
 });
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-    console.log(`Server is listening on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server is listening on port ${PORT}`));

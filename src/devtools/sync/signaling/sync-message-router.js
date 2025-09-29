@@ -6,32 +6,37 @@ export class SyncMessageRouter {
         this.signaling = signalingInstance;
     }
 
-    sendSyncMessage(data) {
+    sendSyncMessage(data, targetPeerId = null) {
         const syncInstance = this.signaling.sync;
         const dataChannel = syncInstance.dataChannel;
 
         if (dataChannel && dataChannel.readyState === 'open') {
-            debug.log("Sent sync message via data channel");
-            dataChannel.send(JSON.stringify(data));
+            const message = JSON.stringify(data);
+            console.log(`[SYNC-SEND ► P2P] Type: ${data.type}`, data);
+            dataChannel.send(message);
         } else {
-            debug.log("Data channel not open, falling back to signaling for sync message");
-            this.sendSyncMessageViaSignaling(data);
+            this.sendSyncMessageViaSignaling(data, targetPeerId);
         }
     }
 
-    sendSyncMessageViaSignaling(data) {
+    sendSyncMessageViaSignaling(data, targetPeerId) {
         const ws = this.signaling.ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
-            debug.log("Sent sync message via signaling (broadcast)");
-            ws.send(JSON.stringify({
+            const wrapper = {
                 type: 'direct_sync_message',
-                message: data
-            }));
+                payload: data
+            };
+
+            if (targetPeerId) {
+                wrapper.targetPeerId = targetPeerId;
+                console.log(`[SYNC-SEND ► WS-TARGET] To: ${targetPeerId.substring(0,8)}... Type: ${data.type}`, data);
+            } else {
+                console.log(`[SYNC-SEND ► WS-BROADCAST] Type: ${data.type}`, data);
+            }
+            
+            ws.send(JSON.stringify(wrapper));
         } else {
             debug.warn('Signaling WebSocket not open, could not send sync message.');
-            if (this.signaling.sync) {
-                 this.signaling.sync.addMessage('Error: Not connected to signaling server for message send.');
-            }
         }
     }
 }

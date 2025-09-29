@@ -1,5 +1,6 @@
 // src/devtools/sync/files/operations.js
 import debug from '../../../util/debug.js';
+import { Git } from '../../../util/git-integration.js';
 
 export class FileOperations {
     static async _listAllFiles(gitClientToUse, dir) {
@@ -9,7 +10,7 @@ export class FileOperations {
         try {
             const items = await pfs.readdir(dir);
             for (const item of items) {
-                if (item === '.git') continue;
+                if (item === '.git') continue; // This lister is for non-clone operations
                 const path = dir === '/' ? `/${item}` : `${dir}/${item}`;
                 try {
                     const stat = await pfs.stat(path);
@@ -25,71 +26,53 @@ export class FileOperations {
     }
 
     static async handleFileUpdate(instance, data) {
-        const gitClientToUse = instance._getGitClient();
-        if (!gitClientToUse) {
-            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: Git client not available`, type: 'error' } }));
-            return;
-        }
+        instance.incrementPendingWrites();
 
         try {
+            let gitClientToUse;
+            if (data.gardenName) {
+                gitClientToUse = new Git(data.gardenName);
+                await gitClientToUse.initRepo();
+            } else {
+                gitClientToUse = instance._getGitClient();
+            }
+            
+            if (!gitClientToUse) {
+                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: Git client not available`, type: 'error' } }));
+                return;
+            }
+
             if (data.isFullSync) {
-                if (instance.deletionPromise) {
-                    instance.fileBuffer.push(data);
-                    return;
-                }
-
-                if (!instance.isFullSyncInProgress) {
-                    instance.isFullSyncInProgress = true;
-                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Full sync initiated. Deleting local .git repository...', type: 'info' } }));
-                    instance.deletionPromise = gitClientToUse.rmrf('/.git');
-                    
-                    instance.deletionPromise.then(async () => {
-                        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: '.git repository deleted. Writing buffered files...', type: 'info' } }));
-                        for (const bufferedData of instance.fileBuffer) {
-                            if (!bufferedData.path.startsWith('/.git/')) {
-                                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Writing: ${bufferedData.path.substring(1)}`, type: 'info' } }));
-                            }
-                            const content = Buffer.from(bufferedData.content, 'base64');
-                            await gitClientToUse.writeFile(bufferedData.path, content);
-                        }
-                        instance.fileBuffer = [];
-                        instance.deletionPromise = null;
-                    }).catch(err => {
-                        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `FATAL: Failed to delete .git directory: ${err.message}`, type: 'error' } }));
-                    });
-
-                    instance.fileBuffer.push(data);
-                    return;
+                // --- THIS IS THE FIX ---
+                // Check if we have already deleted the .git dir for this garden in this session.
+                if (data.gardenName && !instance.deletedGitDirs.has(data.gardenName)) {
+                    // Mark it as deleted for this session so we only do this once.
+                    instance.deletedGitDirs.add(data.gardenName);
+                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Replacing git history for garden: ${data.gardenName}...`, type: 'info' } }));
+                    try {
+                        // This is the atomic deletion of the old history.
+                        await gitClientToUse.rmrf('/.git');
+                        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Old history for ${data.gardenName} removed.`, type: 'info' } }));
+                    } catch (e) {
+                        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error removing old history: ${e.message}`, type: 'error' } }));
+                    }
                 }
                 
-                // This part runs for all files that arrive after the deletion is complete.
-                if (!data.path.startsWith('/.git/')) {
-                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Writing: ${data.path.substring(1)}`, type: 'info' } }));
-                }
+                // Now, write the incoming file, which could be a regular file or part of the new .git history.
+                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Writing: ${data.path.substring(1)} (${data.gardenName})`, type: 'info' } }));
                 const contentToWrite = Buffer.from(data.content, 'base64');
                 await gitClientToUse.writeFile(data.path, contentToWrite);
 
             } else {
-                // Standard logic for single file updates.
                 const contentToWrite = data.isBase64 ? Buffer.from(data.content, 'base64') : data.content;
-                let currentTimestamp = -1;
-                try {
-                    const currentContent = await gitClientToUse.readFile(data.path);
-                    const parsed = JSON.parse(currentContent);
-                    if (parsed && parsed.lastupdated) currentTimestamp = parsed.lastupdated;
-                } catch (e) { /* File doesn't exist or isn't JSON */ }
-
-                if (data.timestamp >= currentTimestamp) {
-                    await gitClientToUse.writeFile(data.path, contentToWrite);
-                    instance.sync.addMessage(`Updated file: ${data.path}`);
-                    if (window.thoughtform.editor.filePath === data.path) {
-                        await window.thoughtform.editor.forceReloadFile(data.path);
-                    }
-                }
+                await gitClientToUse.writeFile(data.path, contentToWrite);
+                instance.sync.addMessage(`Updated file: ${data.path} in garden ${data.gardenName || gitClientToUse.gardenName}`);
             }
         } catch (error) {
             console.error('Error handling file update for path:', data.path, error);
             instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error updating file ${data.path}: ${error.message}`, type: 'error' } }));
+        } finally {
+            instance.decrementPendingWrites();
         }
     }
 }

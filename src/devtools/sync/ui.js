@@ -46,13 +46,15 @@ export class SyncUI {
                 <div class="sync-status-grid">
                     <strong>Status:</strong> <span id="sync-status">Disconnected</span>
                     <strong>Method:</strong> <span id="sync-method-indicator">None</span>
+                    <!-- THIS IS THE FIX: Added the missing peer count element -->
+                    <strong>Peers:</strong> <span id="sync-peer-count">0</span>
                 </div>
             </div>
             <div class="sync-panel sync-actions">
               <h4>File Sync Actions</h4>
               <div class="sync-row">
                 <button id="sync-all-files-btn" class="eruda-button">Send All Files</button>
-                <button id="request-all-files-btn" class="eruda-button">Request All Files</button>
+                <button id="request-all-files-btn" class="eruda-button">Request from Peer...</button>
               </div>
             </div>
             <div class="sync-messages-container hidden" id="eruda-sync-messages">
@@ -119,9 +121,19 @@ export class SyncUI {
     }
     
     if (requestAllBtn) {
-      requestAllBtn.addEventListener('click', () => {
-        this.showSyncProgressModal();
-        this.sync.fileSync.requestAllFiles();
+      requestAllBtn.addEventListener('click', async () => {
+        const selection = await Modal.selection({
+          title: 'Request Gardens from Peers',
+          peerData: this.sync.connectedPeers
+        });
+
+        if (selection) {
+          debug.log('User made selection:', selection);
+          this.showSyncProgressModal();
+          this.sync.fileSync.requestSpecificGardens(selection);
+        } else {
+          debug.log('Garden request cancelled by user.');
+        }
       });
     }
   }
@@ -129,6 +141,10 @@ export class SyncUI {
   updateStatus(message) {
     const statusEl = this.sync._container.querySelector('#sync-status');
     if (statusEl) statusEl.textContent = message;
+    
+    // This will now correctly find and update the peer count element.
+    const peerCountEl = this.sync._container.querySelector('#sync-peer-count');
+    if (peerCountEl) peerCountEl.textContent = this.sync.connectedPeers.size;
   }
   
   updateControls(state) {
@@ -241,8 +257,6 @@ export class SyncUI {
         this.syncProgressActionButton.remove();
       }
 
-      // Only show a 'Close' button for manual dismissal on error or cancellation.
-      // The 'complete' state is now fully automatic.
       if (type === 'error' || type === 'cancelled') {
         this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
         if (type === 'error') this.syncProgressActionButton.classList.add('destructive');
@@ -254,9 +268,6 @@ export class SyncUI {
     if (this.syncProgressModal) {
       this.syncProgressModal.destroy();
       this.syncProgressModal = null;
-      this.syncProgressLogArea = null;
-      this.syncProgressFinalMessageArea = null;
-      this.syncProgressActionButton = null;
     }
   }
 }

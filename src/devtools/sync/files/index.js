@@ -12,17 +12,19 @@ export class SyncFiles extends EventEmitterMixin {
         this.sync = syncInstance;
         this.gitClient = null;
 
-        this.isFullSyncInProgress = false;
-        this.deletionPromise = null;
-        this.fileBuffer = [];
-        this.syncCompletionTimeout = null; // Timer to detect end of stream
+        this.pendingWriteCount = 0;
+        this.isSyncCompleteMessageReceived = false;
+        // --- THIS IS THE FIX (Part 1) ---
+        // This Set will track which gardens have had their .git dirs wiped in this session.
+        this.deletedGitDirs = new Set();
     }
     
     resetFullSyncState() {
-        this.isFullSyncInProgress = false;
-        this.deletionPromise = null;
-        this.fileBuffer = [];
-        clearTimeout(this.syncCompletionTimeout);
+        this.pendingWriteCount = 0;
+        this.isSyncCompleteMessageReceived = false;
+        // --- THIS IS THE FIX (Part 2) ---
+        // Clear the tracking set for every new full sync request.
+        this.deletedGitDirs.clear();
     }
 
     _getGitClient() {
@@ -41,20 +43,35 @@ export class SyncFiles extends EventEmitterMixin {
         await MessageHandler.handleSyncMessage(this, data);
     }
 
-    async handleRequestAllFiles() {
-        await MessageHandler.handleRequestAllFiles(this);
-    }
-
     async syncAllFiles() {
+        this.resetFullSyncState();
         await SyncActions.syncAllFiles(this);
     }
-
-    requestAllFiles() {
-        SyncActions.requestAllFiles(this);
+    
+    requestSpecificGardens(selection) {
+        this.resetFullSyncState();
+        SyncActions.requestSpecificGardens(this, selection);
     }
 
-    sendFileUpdate(path, content, timestamp) {
-        SyncActions.sendFileUpdate(this, path, content, timestamp);
+    incrementPendingWrites() {
+        this.pendingWriteCount++;
+    }
+
+    decrementPendingWrites() {
+        this.pendingWriteCount--;
+        this.checkForReload();
+    }
+
+    markSyncStreamAsComplete() {
+        this.isSyncCompleteMessageReceived = true;
+        this.checkForReload();
+    }
+
+    checkForReload() {
+        if (this.isSyncCompleteMessageReceived && this.pendingWriteCount === 0) {
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'All files received and written. Reloading...', type: 'complete' } }));
+            setTimeout(() => window.location.reload(), 1500);
+        }
     }
 
     destroy() {

@@ -126,14 +126,6 @@ export class Modal {
     });
   }
 
-  /**
-   * Shows a modal with multiple custom choices.
-   * @param {Object} options
-   * @param {string} options.title - The title of the modal.
-   * @param {string} options.message - The HTML content/message for the modal.
-   * @param {Array<{id: string, text: string, class?: string}>} options.choices - Array of choice objects for buttons.
-   * @returns {Promise<string|null>} A promise that resolves with the ID of the chosen option, or null if cancelled.
-   */
   static choice({ title, message, choices }) {
     return new Promise((resolve) => {
       const modal = new Modal({ title });
@@ -149,16 +141,86 @@ export class Modal {
         }
       });
       
-      // Allow Esc key to cancel
       const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
-          resolve(null); // Resolve with null on escape
+          resolve(null);
           modal.destroy();
           document.removeEventListener('keydown', handleKeyDown);
         }
       };
       document.addEventListener('keydown', handleKeyDown);
       
+      modal.show();
+    });
+  }
+
+  /**
+   * --- NEW METHOD ---
+   * Shows a modal for selecting items grouped by a category (e.g., peers).
+   * @param {Object} options
+   * @param {string} options.title - The title for the modal.
+   * @param {Map<string, {gardens: string[]}>} options.peerData - A map of peers and their data.
+   * @param {string} options.okText - The text for the confirmation button.
+   * @returns {Promise<Object|null>} A promise that resolves with the selection object or null if cancelled.
+   *                                 Example selection: { 'peerId-123': ['gardenA'], 'peerId-456': ['gardenB'] }
+   */
+  static selection({ title, peerData, okText = 'Request' }) {
+    return new Promise((resolve) => {
+      if (peerData.size === 0) {
+        // Show a simple info modal if there are no peers.
+        const infoModal = new Modal({ title: 'No Peers Found' });
+        infoModal.updateContent('<p>There are no other peers currently connected to this sync session.</p>');
+        infoModal.addFooterButton('OK', () => {
+            infoModal.destroy();
+            resolve(null); // Resolve with null as there's nothing to select
+        });
+        infoModal.show();
+        return;
+      }
+        
+      const modal = new Modal({ title });
+      let contentHTML = '<div class="peer-selection-container">';
+      
+      peerData.forEach((data, peerId) => {
+        const shortId = peerId.substring(0, 8);
+        contentHTML += `
+          <div class="peer-group" data-peer-id="${peerId}">
+            <strong class="peer-title">Peer: ${shortId}...</strong>
+            <div class="garden-checkbox-list">
+              ${data.gardens.map(garden => `
+                <label>
+                  <input type="checkbox" class="garden-select-checkbox" value="${garden}">
+                  <span>${garden}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      });
+      contentHTML += '</div>';
+
+      modal.updateContent(contentHTML);
+
+      const submit = () => {
+        const selection = {};
+        modal.content.querySelectorAll('.peer-group').forEach(group => {
+          const peerId = group.dataset.peerId;
+          const selectedGardens = Array.from(group.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
+          if (selectedGardens.length > 0) {
+            selection[peerId] = selectedGardens;
+          }
+        });
+        resolve(Object.keys(selection).length > 0 ? selection : null);
+        modal.destroy();
+      };
+
+      const cancel = () => {
+        resolve(null);
+        modal.destroy();
+      };
+      
+      modal.addFooterButton(okText, submit);
+      modal.addFooterButton('Cancel', cancel);
       modal.show();
     });
   }
