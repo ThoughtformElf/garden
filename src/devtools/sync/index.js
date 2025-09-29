@@ -115,21 +115,14 @@ export class Sync {
           }
       };
       channel.onclose = () => this.handlePeerLeft(peerId);
-
-      // --- THIS IS THE FIX ---
-      // This handler now specifically checks for the expected "abort" error
-      // and treats it as a normal part of the disconnect process.
       channel.onerror = (event) => {
           const error = event.error;
           if (error && error.name === 'OperationError' && error.message.includes('User-Initiated Abort')) {
-              // This is an expected error during a clean shutdown. Log it gracefully for debugging.
               debug.log(`Data channel for peer ${peerId.substring(0,8)} closed intentionally.`);
           } else {
-              // For any other unexpected error, log it as a real problem.
               console.error(`Data channel error with ${peerId.substring(0,8)}...:`, event);
           }
       };
-      // --- END OF FIX ---
   }
 
   updateConnectionState(newState, statusMessage) {
@@ -182,7 +175,15 @@ export class Sync {
           this.peerConnections.delete(peerId);
       }
       
-      if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} total)`);
+      // --- THIS IS THE FIX ---
+      // After cleanup, check if we are now alone. If so, revert to the "waiting" state.
+      if (this.peerConnections.size === 0 && this.connectionState === 'connected-p2p') {
+          this.updateConnectionState('connected-signal', 'Connected to tracker, waiting for peers...');
+      } else {
+          // Otherwise, just update the peer count.
+          if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} total)`);
+      }
+      // --- END OF FIX ---
   }
 
   setGitClient(gitClient) { this.gitClient = gitClient; this.fileSync.setGitClient(gitClient); }
