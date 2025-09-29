@@ -21,7 +21,7 @@ export class Git {
     this.fs = new FS(`garden-fs-${this.gardenName}`);
     this.pfs = this.fs.promises;
   }
-  
+
   async initRepo() {
     try {
       await this.pfs.stat('/.git');
@@ -48,7 +48,7 @@ export class Git {
       console.error('Error initializing repository:', e);
     }
   }
-  
+
   registerNewGarden() {
     try {
       const gardensRaw = localStorage.getItem('thoughtform_gardens');
@@ -62,6 +62,81 @@ export class Git {
     }
   }
 
+  /**
+   * THIS IS THE BUGFIX.
+   * This version uses a sequential loop instead of Promise.all to guarantee
+   * that a directory's contents are fully deleted before the directory itself is removed.
+   * This prevents the ENOTEMPTY error.
+   */
+  async rmrf(path) {
+    try {
+        const stat = await this.pfs.stat(path);
+        if (stat.isDirectory()) {
+            const entries = await this.pfs.readdir(path);
+            // Use a sequential for...of loop to ensure operations complete in order.
+            for (const entry of entries) {
+                await this.rmrf(`${path}/${entry}`);
+            }
+            // This line will now only run after the directory is truly empty.
+            await this.pfs.rmdir(path);
+        } else {
+            await this.pfs.unlink(path);
+        }
+    } catch (e) {
+        if (e.code !== 'ENOENT') { // Ignore if file/dir doesn't exist
+            console.error(`Error during rmrf for ${path}:`, e);
+            throw e;
+        }
+    }
+  }
+
+  async clearWorkdir() {
+    const entries = await this.pfs.readdir('/');
+    for (const entry of entries) {
+      if (entry !== '.git') {
+        await this.rmrf(`/${entry}`);
+      }
+    }
+  }
+
+  async ensureDir(dirPath) {
+    const parts = dirPath.split('/').filter(p => p);
+    let currentPath = '';
+    for (const part of parts) {
+      currentPath += `/${part}`;
+      try {
+        await this.pfs.stat(currentPath);
+      } catch (e) {
+        if (e.code === 'ENOENT') {
+          try {
+            await this.pfs.mkdir(currentPath);
+          } catch (mkdirError) {
+            if (mkdirError.code !== 'EEXIST') {
+              throw mkdirError;
+            }
+          }
+        } else {
+          throw e;
+        }
+      }
+    }
+  }
+
+  async listAllFilesForClone(dir = '/') {
+    let fileList = [];
+    const items = await this.pfs.readdir(dir);
+    for (const item of items) {
+      const path = `${dir === '/' ? '' : dir}/${item}`;
+      const stat = await this.pfs.stat(path);
+      if (stat.isDirectory()) {
+        fileList = fileList.concat(await this.listAllFilesForClone(path));
+      } else {
+        fileList.push(path);
+      }
+    }
+    return fileList;
+  }
+
   async stage(filepath) {
     const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
     const matrix = await this.getStatuses();
@@ -72,14 +147,11 @@ export class Git {
       return;
     }
 
-    // workdirStatus codes: 0 for deleted, 2 for modified/new
     const workdirStatus = statusEntry[2];
 
     if (workdirStatus === 0) {
-      // File is deleted in the working directory, so stage the deletion
       await git.remove({ fs: this.fs, dir: '/', filepath: cleanPath });
     } else {
-      // File is new or modified, so stage the addition/modification
       await git.add({ fs: this.fs, dir: '/', filepath: cleanPath });
     }
   }
@@ -90,33 +162,16 @@ export class Git {
   }
 
   async discard(filepath) {
-    console.log(`[discard] Starting discard for: ${filepath}`);
     const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
-    
     try {
         const statusMatrix = await this.getStatuses();
         const statusEntry = statusMatrix.find(entry => entry[0] === cleanPath);
-
-        if (!statusEntry) {
-            console.warn(`[discard] Could not find status for "${cleanPath}".`);
-            return;
-        }
-
+        if (!statusEntry) return;
         const headStatus = statusEntry[1];
-        
         if (headStatus === 0) {
-            console.log(`[discard] File is untracked. Deleting: ${filepath}`);
             await this.pfs.unlink(filepath);
-            console.log(`[discard] Successfully unlinked ${filepath}.`);
         } else {
-            console.log(`[discard] File is tracked. Force checking out from HEAD: ${cleanPath}`);
-            await git.checkout({
-                fs: this.fs,
-                dir: '/',
-                filepaths: [cleanPath],
-                force: true
-            });
-            console.log(`[discard] Successfully checked out ${cleanPath}.`);
+            await git.checkout({ fs: this.fs, dir: '/', filepaths: [cleanPath], force: true });
         }
     } catch (error) {
         console.error(`[discard] An error occurred for ${filepath}:`, error);
@@ -128,10 +183,7 @@ export class Git {
       fs: this.fs,
       dir: '/',
       message,
-      author: {
-        name: 'User',
-        email: 'user@thoughtform.garden'
-      }
+      author: { name: 'User', email: 'user@thoughtform.garden' }
     });
     this.markGardenAsDirty(false);
     return sha;
@@ -139,11 +191,7 @@ export class Git {
   
   async push(url, token, onProgress) {
     return await git.push({
-      fs: this.fs,
-      http,
-      dir: '/',
-      // corsProxy: url, // <-- REMOVED THIS LINE
-      url: url,
+      fs: this.fs, http, dir: '/', url: url,
       onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
       onAuth: () => ({ username: token }),
     });
@@ -151,68 +199,37 @@ export class Git {
 
   async pull(url, token, onProgress) {
     return await git.pull({
-      fs: this.fs,
-      http,
-      dir: '/',
-      // corsProxy: url, // <-- REMOVED THIS LINE
-      url: url,
+      fs: this.fs, http, dir: '/', url: url,
       onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
       onAuth: () => ({ username: token }),
-      author: {
-        name: 'User',
-        email: 'user@thoughtform.garden',
-      },
-      singleBranch: true,
-      fastForward: true,
+      author: { name: 'User', email: 'user@thoughtform.garden' },
+      singleBranch: true, fastForward: true,
     });
   }
 
   async log() {
     try {
-      return await git.log({
-        fs: this.fs,
-        dir: '/',
-        depth: 20
-      });
+      return await git.log({ fs: this.fs, dir: '/', depth: 20 });
     } catch (e) {
-      console.log('No commit history found.');
       return [];
     }
   }
 
   async getChangedFiles(oid) {
     try {
-      const commit = await git.readCommit({ fs: this.fs, dir: '/', oid });
-      const parentOid = commit.commit.parent[0];
-      
-      if (!parentOid) {
-        // For the initial commit, list all files (which are guaranteed to be blobs)
-        const files = await git.listFiles({ fs: this.fs, dir: '/', ref: oid });
-        return files.map(f => `/${f}`);
-      }
-
+      const { commit } = await git.readCommit({ fs: this.fs, dir: '/', oid });
+      const parentOid = commit.parent[0];
+      if (!parentOid) return (await git.listFiles({ fs: this.fs, dir: '/', ref: oid })).map(f => `/${f}`);
       const files = [];
       await git.walk({
-        fs: this.fs,
-        dir: '/',
-        trees: [git.TREE({ ref: parentOid }), git.TREE({ ref: oid })],
-        map: async function(filepath, [A, B]) {
+        fs: this.fs, dir: '/', trees: [git.TREE({ ref: parentOid }), git.TREE({ ref: oid })],
+        map: async (filepath, [A, B]) => {
           if (filepath === '.') return;
-
-          const aOid = A ? await A.oid() : null;
-          const bOid = B ? await B.oid() : null;
-          
-          if (aOid === bOid) return; // Unchanged, ignore.
-
-          // THE FIX:
-          // Determine the type of the entry. If B exists, use its type. 
-          // If B doesn't exist (deletion), use A's type.
-          const type = B ? await B.type() : (A ? await A.type() : null);
-
-          // Only include blobs (files) in the final list. Ignore trees (directories).
-          if (type === 'blob') {
-            files.push(`/${filepath}`);
-          }
+          const aOid = A && await A.oid();
+          const bOid = B && await B.oid();
+          if (aOid === bOid) return;
+          const type = B ? await B.type() : await A.type();
+          if (type === 'blob') files.push(`/${filepath}`);
         }
       });
       return files;
@@ -227,61 +244,34 @@ export class Git {
   }
 
   async readBlobFromCommit(oid, filepath) {
-    // This is the critical fix: always remove leading slashes.
     const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
-    if (!oid) return ''; // A commit with no parent has no content to read.
-    
+    if (!oid) return '';
     try {
       const commitOid = oid === 'HEAD' ? await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' }) : oid;
-      
-      const { blob } = await git.readBlob({
-        fs: this.fs,
-        dir: '/',
-        oid: commitOid,
-        filepath: cleanPath
-      });
+      const { blob } = await git.readBlob({ fs: this.fs, dir: '/', oid: commitOid, filepath: cleanPath });
       return new TextDecoder().decode(blob);
     } catch (e) {
-      if (e.name === 'NotFoundError') {
-        return '';
-      }
-      console.error(`Could not read blob for ${cleanPath} from commit ${oid}:`, e);
+      if (e.name === 'NotFoundError') return '';
       return null;
     }
   }
 
   async readFile(filepath) {
     try {
-      const content = await this.pfs.readFile(filepath, 'utf8');
-      return content;
+      return await this.pfs.readFile(filepath, 'utf8');
     } catch (e) {
-      console.warn(`File not found: ${filepath}`);
       return `// "${filepath}" does not exist yet, type anywhere to create it.`;
     }
   }
   
-  /**
-   * Reads a file from the working directory as a Uint8Array buffer.
-   * @param {string} filepath The path to the file.
-   * @returns {Promise<Uint8Array|null>}
-   */
   async readFileAsBuffer(filepath) {
     try {
-      // Omitting the 'encoding' option makes it return a Uint8Array
-      const content = await this.pfs.readFile(filepath);
-      return content;
+      return await this.pfs.readFile(filepath);
     } catch (e) {
-      console.warn(`File not found, cannot read as buffer: ${filepath}`);
       return null;
     }
   }
 
-  /**
-   * Writes content to a file, creating parent directories if needed.
-   * Now handles both string and ArrayBuffer/Uint8Array content.
-   * @param {string} filepath The path to the file (e.g., '/prompt/youtube-summary').
-   * @param {string|ArrayBuffer|Uint8Array} content The content to write.
-   */
   async writeFile(filepath, content) {
     const options = typeof content === 'string' ? 'utf8' : undefined;
     try {
@@ -289,27 +279,19 @@ export class Git {
       this.markGardenAsDirty(true);
     } catch (e) {
       if (e.code === 'ENOENT') {
-        try {
-          const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
-          if (dirname && dirname !== '/') {
-            // --- FIX: Robustly handle concurrent directory creation ---
-            await this.pfs.mkdir(dirname, { recursive: true });
-            // --- END FIX ---
-            
-            // Retry writing the file now that we are sure the directory exists.
+        const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
+        if (dirname && dirname !== '/') {
+          try {
+            await this.ensureDir(dirname);
             await this.pfs.writeFile(filepath, content, options);
             this.markGardenAsDirty(true);
-          } else {
-             console.error(`Unexpected ENOENT error for filepath '${filepath}' where dirname is '${dirname}':`, e);
-             throw e;
+          } catch (retryError) {
+            throw retryError;
           }
-        } catch (retryError) {
-          console.error(`Error after retrying write for ${filepath}. Original error:`, e.message || e);
-          console.error(`Retry error:`, retryError.message || retryError);
-          throw retryError;
+        } else {
+           throw e;
         }
       } else {
-        console.error(`Error writing file ${filepath}:`, e);
         throw e;
       }
     }
@@ -320,13 +302,11 @@ export class Git {
       const dirtyRaw = localStorage.getItem('dirty_gardens');
       const dirtyGardens = dirtyRaw ? JSON.parse(dirtyRaw) : [];
       const gardenIndex = dirtyGardens.indexOf(this.gardenName);
-
       if (isDirty && gardenIndex === -1) {
         dirtyGardens.push(this.gardenName);
       } else if (!isDirty && gardenIndex !== -1) {
         dirtyGardens.splice(gardenIndex, 1);
       }
-      
       localStorage.setItem('dirty_gardens', JSON.stringify(dirtyGardens));
     } catch (e) {
       console.error('Failed to update dirty garden registry:', e);

@@ -9,9 +9,8 @@ export class SyncUI {
     this.syncProgressModal = null;
     this.syncProgressLogArea = null;
     this.syncProgressFinalMessageArea = null;
-    this.syncProgressCloseButton = null;
+    this.syncProgressActionButton = null;
     
-    // Cache DOM elements for frequent access
     this.connectBtn = null;
     this.nameInput = null;
     this.autoConnectCheckbox = null;
@@ -62,7 +61,6 @@ export class SyncUI {
             </div>
         </div>
       `;
-      // Cache elements after rendering
       this.syncMethodIndicatorEl = this.sync._container.querySelector('#sync-method-indicator');
       this.connectBtn = this.sync._container.querySelector('#sync-connect-btn');
       this.nameInput = this.sync._container.querySelector('#sync-name-input');
@@ -76,34 +74,26 @@ export class SyncUI {
       return;
     }
     
-    // Load saved settings from localStorage to populate the form
     this.nameInput.value = localStorage.getItem('thoughtform_sync_name') || '';
     this.autoConnectCheckbox.checked = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
     
-    // Connect/Disconnect button listener
     this.connectBtn.addEventListener('click', () => {
       const currentState = this.sync.connectionState;
       if (currentState === 'disconnected' || currentState === 'error') {
         const syncName = this.nameInput.value.trim();
         const autoConnect = this.autoConnectCheckbox.checked;
-        
         if (!syncName) {
           this.addMessage("Please enter a Sync Name.");
           return;
         }
-        
         localStorage.setItem('thoughtform_sync_name', syncName);
         localStorage.setItem('thoughtform_sync_auto_connect', autoConnect);
-        
-        debug.log("UI: Connect button clicked");
         this.sync.connect(syncName);
       } else {
-        debug.log("UI: Disconnect button clicked");
         this.sync.disconnect();
       }
     });
     
-    // THIS IS THE FIX: Added event listener for the server config save button
     const saveConfigBtn = this.sync._container.querySelector('#save-signaling-config');
     if (saveConfigBtn) {
       saveConfigBtn.addEventListener('click', () => {
@@ -112,20 +102,17 @@ export class SyncUI {
         if (newUrl) {
           this.sync.signaling.updateSignalingServerUrl(newUrl);
           this.addMessage(`Signaling server updated to: ${newUrl}`);
-          debug.log("UI: Save Config button clicked with URL:", newUrl);
         } else {
           this.addMessage('Please enter a valid signaling server URL.');
         }
       });
     }
-    // END OF FIX
     
     const syncAllBtn = this.sync._container.querySelector('#sync-all-files-btn');
     const requestAllBtn = this.sync._container.querySelector('#request-all-files-btn');
     
     if (syncAllBtn) {
       syncAllBtn.addEventListener('click', async () => {
-        debug.log("UI: Send All Files button clicked");
         this.showSyncProgressModal();
         await this.sync.fileSync.syncAllFiles();
       });
@@ -133,7 +120,6 @@ export class SyncUI {
     
     if (requestAllBtn) {
       requestAllBtn.addEventListener('click', () => {
-        debug.log("UI: Request All Files button clicked");
         this.showSyncProgressModal();
         this.sync.fileSync.requestAllFiles();
       });
@@ -142,65 +128,51 @@ export class SyncUI {
   
   updateStatus(message) {
     const statusEl = this.sync._container.querySelector('#sync-status');
-    if (statusEl) {
-      statusEl.textContent = message;
-    }
+    if (statusEl) statusEl.textContent = message;
   }
   
   updateControls(state) {
     const isDisconnected = (state === 'disconnected' || state === 'error');
     const isConnecting = (state === 'connecting');
-    
     if (this.connectBtn) {
       this.connectBtn.disabled = isConnecting;
       if (isDisconnected) this.connectBtn.textContent = 'Connect';
       else if (isConnecting) this.connectBtn.textContent = 'Connecting...';
       else this.connectBtn.textContent = 'Disconnect';
     }
-    
     if (this.nameInput) this.nameInput.disabled = !isDisconnected;
     if (this.autoConnectCheckbox) this.autoConnectCheckbox.disabled = !isDisconnected;
-    
-    // Enable/disable file sync buttons based on active connection
-    const fileSyncButtons = this.sync._container.querySelectorAll('.eruda-sync-main .eruda-button');
     const shouldEnableFileSync = (state === 'connected-p2p' || state === 'connected-signal');
-    fileSyncButtons.forEach(btn => btn.disabled = !shouldEnableFileSync);
+    this.sync._container.querySelectorAll('.sync-actions button').forEach(btn => btn.disabled = !shouldEnableFileSync);
   }
   
   updateConnectionIndicator(state) {
     const tabEl = document.querySelector('.luna-tab-item[data-id="Sync"]');
     if (tabEl) {
       tabEl.classList.remove('sync-status-connecting', 'sync-status-p2p', 'sync-status-signal', 'sync-status-error');
-      
       let methodText = 'None';
       let methodColor = 'var(--color-text-secondary)';
-      
       switch (state) {
         case 'connecting':
-        tabEl.classList.add('sync-status-connecting');
-        methodText = 'Connecting...';
-        methodColor = 'var(--base-accent-warning)';
-        break;
+          tabEl.classList.add('sync-status-connecting');
+          methodText = 'Connecting...';
+          methodColor = 'var(--base-accent-warning)';
+          break;
         case 'connected-signal':
-        tabEl.classList.add('sync-status-signal');
-        methodText = 'WebSocket (Fallback)';
-        methodColor = 'var(--base-accent-warning)';
-        break;
+          tabEl.classList.add('sync-status-signal');
+          methodText = 'WebSocket (Fallback)';
+          methodColor = 'var(--base-accent-warning)';
+          break;
         case 'connected-p2p':
-        tabEl.classList.add('sync-status-p2p');
-        methodText = 'WebRTC (P2P)';
-        methodColor = 'var(--base-accent-action)';
-        break;
+          tabEl.classList.add('sync-status-p2p');
+          methodText = 'WebRTC (P2P)';
+          methodColor = 'var(--base-accent-action)';
+          break;
         case 'error':
-        tabEl.classList.add('sync-status-error');
-        methodText = 'Error';
-        methodColor = 'var(--base-accent-destructive)';
-        break;
-        case 'disconnected':
-        default:
-        methodText = 'None';
-        methodColor = 'var(--color-text-secondary)';
-        break;
+          tabEl.classList.add('sync-status-error');
+          methodText = 'Error';
+          methodColor = 'var(--base-accent-destructive)';
+          break;
       }
       if (this.syncMethodIndicatorEl) {
         this.syncMethodIndicatorEl.textContent = methodText;
@@ -239,8 +211,7 @@ export class SyncUI {
     this.syncProgressModal.updateContent(progressContent);
     this.syncProgressLogArea = this.syncProgressModal.content.querySelector('#sync-progress-log');
     this.syncProgressFinalMessageArea = this.syncProgressModal.content.querySelector('#sync-progress-final-message');
-    this.syncProgressCloseButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
-    this.syncProgressCloseButton.disabled = true;
+    this.syncProgressActionButton = null; 
     this.syncProgressModal.show();
   }
   
@@ -259,10 +230,23 @@ export class SyncUI {
     }
     this.syncProgressLogArea.appendChild(logEntry);
     this.syncProgressLogArea.scrollTop = this.syncProgressLogArea.scrollHeight;
+
     if (['complete', 'error', 'cancelled'].includes(type)) {
-      if (this.syncProgressFinalMessageArea) this.syncProgressFinalMessageArea.textContent = message;
-      if (this.syncProgressFinalMessageArea) this.syncProgressFinalMessageArea.style.color = logEntry.style.color;
-      if (this.syncProgressCloseButton) this.syncProgressCloseButton.disabled = false;
+      if (this.syncProgressFinalMessageArea) {
+        this.syncProgressFinalMessageArea.textContent = message;
+        this.syncProgressFinalMessageArea.style.color = logEntry.style.color;
+      }
+      
+      if (this.syncProgressActionButton) {
+        this.syncProgressActionButton.remove();
+      }
+
+      // Only show a 'Close' button for manual dismissal on error or cancellation.
+      // The 'complete' state is now fully automatic.
+      if (type === 'error' || type === 'cancelled') {
+        this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
+        if (type === 'error') this.syncProgressActionButton.classList.add('destructive');
+      }
     }
   }
   
@@ -272,7 +256,7 @@ export class SyncUI {
       this.syncProgressModal = null;
       this.syncProgressLogArea = null;
       this.syncProgressFinalMessageArea = null;
-      this.syncProgressCloseButton = null;
+      this.syncProgressActionButton = null;
     }
   }
 }
