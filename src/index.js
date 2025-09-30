@@ -80,57 +80,50 @@ const checkEditorReady = setInterval(() => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifierKey = isMac ? e.metaKey : e.ctrlKey;
 
-      if (!modifierKey) {
-        // If no modifier is pressed, we don't care about this event at all.
-        // This is the key to not interfering with regular typing or Vim commands.
-        return;
-      }
-
+      // --- FIX: This block handles BOTH AI and other shortcuts ---
       let handled = false;
-      switch (e.key.toLowerCase()) {
-        case 'p':
-          if (e.shiftKey) {
-            commandPalette.open('execute');
-          } else {
-            commandPalette.open('search');
+      if (modifierKey) {
+          switch (e.key.toLowerCase()) {
+            case 'p':
+              if (e.shiftKey) {
+                commandPalette.open('execute');
+              } else {
+                commandPalette.open('search');
+              }
+              handled = true;
+              break;
+
+            case '[':
+              window.thoughtform.ui.toggleSidebar?.();
+              handled = true;
+              break;
+
+            case '`':
+              window.thoughtform.ui.toggleDevtools?.(null, null);
+              handled = true;
+              break;
+            
+            case 'enter':
+              const view = editor.editorView;
+              if (view && view.hasFocus) {
+                const pos = view.state.selection.main.head;
+                const currentLine = view.state.doc.lineAt(pos);
+
+                // Check for AI context and delegate if it matches
+                if (currentLine.text.trim().startsWith('>')) {
+                  window.thoughtform.ai.handleAiChatRequest(view);
+                  handled = true; // Mark as handled to prevent default behavior
+                }
+                // If it's not a blockquote, the linkNavigationKeymap in editor.js will handle it.
+              }
+              break;
           }
-          handled = true;
-          break;
-
-        case '[':
-          window.thoughtform.ui.toggleSidebar?.();
-          handled = true;
-          break;
-
-        case '`':
-          window.thoughtform.ui.toggleDevtools?.(null, null);
-          handled = true;
-          break;
-        
-        case 'enter':
-          const view = editor.editorView;
-          if (!view || !view.hasFocus) {
-            return;
-          }
-
-          const pos = view.state.selection.main.head;
-          const currentLine = view.state.doc.lineAt(pos);
-
-          // Check for the AI chat context and delegate to the AI service
-          if (currentLine.text.trim().startsWith('>')) {
-            window.thoughtform.ai.handleAiChatRequest(view);
-            handled = true;
-          }
-          break;
       }
 
-      // If we handled the shortcut, we MUST prevent the event from
-      // continuing to the editor or browser, which would cause unwanted
-      // side effects (like the cursor moving or a print dialog opening).
       if (handled) {
         e.preventDefault();
         e.stopPropagation();
       }
-    }, { capture: true }); // Using `{ capture: true }` is the essential part of this fix.
+    }, { capture: true }); 
   }
 }, 100);

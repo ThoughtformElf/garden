@@ -44,7 +44,6 @@ class AiService {
    */
   async handleAiChatRequest(view) {
     let thinkingMessagePosition = -1;
-    // --- FIX: The placeholder is now plain text ---
     const thinkingText = '🤖 Thinking...';
 
     try {
@@ -84,22 +83,18 @@ class AiService {
         const { done, value } = await reader.read();
         if (done) break;
         
-        // --- FIX: The chunkText is now the raw value from the AI ---
         const chunkText = value;
 
         if (isFirstChunk) {
-          // Replace the placeholder with the first chunk. No ">" prefix.
           view.dispatch({ changes: { from: currentResponsePos, to: currentResponsePos + thinkingText.length, insert: chunkText } });
           currentResponsePos += chunkText.length;
           isFirstChunk = false;
         } else {
-          // Insert subsequent chunks. No ">" prefix.
           view.dispatch({ changes: { from: currentResponsePos, insert: chunkText } });
           currentResponsePos += chunkText.length;
         }
       }
 
-      // --- FIX: Add two newlines for a clean separation, not a new blockquote ---
       const finalUserPrompt = '\n\n';
       view.dispatch({
         changes: { from: currentResponsePos, insert: finalUserPrompt },
@@ -109,7 +104,6 @@ class AiService {
     } catch (error) {
       console.error("AI Chat Error:", error);
       if (thinkingMessagePosition !== -1) {
-        // --- FIX: The error message is also plain text ---
         view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: `🚨 Error: ${error.message}` } });
       }
     }

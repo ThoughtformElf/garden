@@ -15,6 +15,7 @@ import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, linkNavigationKeymap } from './navigation.js';
+import { aiChatKeymap } from './ai-keymap.js'; // Import the new AI keymap
 
 const programmaticChange = Annotation.define();
 
@@ -94,9 +95,6 @@ export class Editor {
           gitClient: this.gitClient,
           sidebar: this.sidebar,
         })),
-        // --- The conflicting appKeymap has been completely REMOVED ---
-        linkNavigationKeymap,
-        keymap.of([indentWithTab]),
         vim(),
         basicSetup,
         EditorView.lineWrapping,
@@ -108,6 +106,11 @@ export class Editor {
         diffCompartment.of([]),
         this.tokenCounterCompartment.of(createTokenCounterExtension()),
         ...(this.editorConfig.extensions || []),
+
+        // --- THE FIX: Custom keymaps go LAST to have the highest precedence ---
+        aiChatKeymap,         // Will be checked first for Mod-Enter
+        linkNavigationKeymap, // Will be checked second if aiChatKeymap returns false
+        keymap.of([indentWithTab]),
       ],
       parent: this.mainContainer,
     });
