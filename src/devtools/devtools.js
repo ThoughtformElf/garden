@@ -276,5 +276,56 @@ export function initializeDevTools() {
     }
   });
 
+  // --- NEW AI TOOL ---
+  const aiTool = eruda.add({
+    name: 'AI',
+    init($el) {
+      this._$el = $el;
+      $el.html(`
+        <div style="padding: 10px;">
+          <h2>AI Configuration</h2>
+          <div class="sync-panel">
+            <h3>Google Gemini</h3>
+            <div class="sync-row" style="margin-bottom: 10px;">
+              <label for="gemini-api-key" class="sync-label">API Key:</label>
+              <input type="password" id="gemini-api-key" class="eruda-input flex-grow">
+            </div>
+            <div class="sync-row">
+              <label for="gemini-model-name" class="sync-label">Model Name:</label>
+              <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-2.5-flash">
+            </div>
+          </div>
+          <button id="ai-save-config" class="eruda-button" style="margin-top: 15px;">Save</button>
+          <div id="ai-save-status" style="margin-top: 10px; color: var(--base-accent-action);"></div>
+        </div>
+      `);
+
+      const apiKeyInput = $el.find('#gemini-api-key')[0];
+      const modelNameInput = $el.find('#gemini-model-name')[0];
+      const saveBtn = $el.find('#ai-save-config')[0];
+      const saveStatus = $el.find('#ai-save-status')[0];
+
+      // Load existing values from localStorage
+      apiKeyInput.value = localStorage.getItem('thoughtform_gemini_api_key') || '';
+      modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || '';
+
+      saveBtn.addEventListener('click', () => {
+        const apiKey = apiKeyInput.value.trim();
+        const modelName = modelNameInput.value.trim();
+        
+        localStorage.setItem('thoughtform_gemini_api_key', apiKey);
+        localStorage.setItem('thoughtform_gemini_model_name', modelName);
+        
+        // Reload config in the global AI service if it exists
+        window.thoughtform.ai?.loadConfig();
+
+        saveStatus.textContent = 'Configuration saved!';
+        setTimeout(() => { saveStatus.textContent = ''; }, 3000);
+      });
+    },
+    show() { this._$el.show(); },
+    hide() { this._$el.hide(); },
+  });
+
   return eruda;
 }

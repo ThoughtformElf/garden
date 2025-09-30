@@ -10,10 +10,12 @@ import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
 import { runMigration } from './util/migration.js';
+import { initializeAiService } from './ai/index.js'; // Import the new AI service
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
   ui: {},
+  ai: initializeAiService(), // Initialize and attach the AI service
 };
 
 // --- Main Application Logic ---
@@ -103,6 +105,22 @@ const checkEditorReady = setInterval(() => {
         case '`':
           window.thoughtform.ui.toggleDevtools?.(null, null);
           handled = true;
+          break;
+        
+        case 'enter':
+          const view = editor.editorView;
+          if (!view || !view.hasFocus) {
+            return;
+          }
+
+          const pos = view.state.selection.main.head;
+          const currentLine = view.state.doc.lineAt(pos);
+
+          // Check for the AI chat context and delegate to the AI service
+          if (currentLine.text.trim().startsWith('>')) {
+            window.thoughtform.ai.handleAiChatRequest(view);
+            handled = true;
+          }
           break;
       }
 
