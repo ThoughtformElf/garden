@@ -60,6 +60,11 @@ const editor = new Editor({
   commandPalette: commandPalette
 });
 
+// --- THIS IS THE FIX ---
+// Attach the editor instance to the global object so other modules, like the AI service, can access it.
+window.thoughtform.editor = editor;
+// --- END OF FIX ---
+
 const checkEditorReady = setInterval(() => {
   if (editor.isReady) {
     clearInterval(checkEditorReady);

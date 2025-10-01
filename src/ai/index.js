@@ -1,11 +1,12 @@
 // src/ai/index.js
 import { streamChatCompletion as streamGemini } from './models/gemini.js';
+import { Agent } from '../agent/index.js'; // Import the new Agent class
 
 class AiService {
   constructor() {
     this.config = {
       geminiApiKey: '',
-      geminiModelName: 'gemini-2.5-flash'
+      geminiModelName: 'gemini-1.5-flash-latest'
     };
     this.loadConfig();
   }
@@ -13,7 +14,7 @@ class AiService {
   loadConfig() {
     this.config.geminiApiKey = localStorage.getItem('thoughtform_gemini_api_key') || '';
     const savedModel = localStorage.getItem('thoughtform_gemini_model_name');
-    this.config.geminiModelName = savedModel || 'gemini-2.5-flash';
+    this.config.geminiModelName = savedModel || 'gemini-1.5-flash-latest';
   }
 
   saveConfig(apiKey, modelName) {
@@ -34,12 +35,12 @@ class AiService {
       throw new Error('Gemini API key is not set. Please configure it in the AI dev tools panel.');
     }
 
-    // For now, it only calls Gemini. This can be expanded later.
     return streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
   }
 
   /**
    * Handles the entire AI chat interaction lifecycle within the editor.
+   * This now acts as a router, deciding whether to use the simple chat or the agent.
    * @param {EditorView} view - The CodeMirror EditorView instance.
    */
   async handleAiChatRequest(view) {
@@ -49,7 +50,8 @@ class AiService {
     try {
       const pos = view.state.selection.main.head;
       const currentLine = view.state.doc.lineAt(pos);
-
+      const fullContext = view.state.doc.toString();
+      
       // Gather the full blockquote context as the user's prompt.
       let startLineNum = currentLine.number;
       while (startLineNum > 1 && view.state.doc.line(startLineNum - 1).text.trim().startsWith('>')) {
@@ -63,9 +65,10 @@ class AiService {
       const endPos = view.state.doc.line(endLineNum).to;
       let userPrompt = view.state.sliceDoc(startPos, endPos);
       userPrompt = userPrompt.split('\n').map(line => line.trim().substring(1).trim()).join('\n');
-
-      const fullContext = view.state.doc.toString();
-      const finalPrompt = `CONTEXT:\n---\n${fullContext}\n---\n\nBased on the context above, respond to the following prompt:\n\n${userPrompt}`;
+      
+      // --- AGENT ROUTING LOGIC ---
+      const hasWikilinks = /\[\[.+?\]\]/.test(fullContext);
+      let stream;
 
       // Insert a placeholder message.
       const insertPos = endPos;
@@ -73,8 +76,30 @@ class AiService {
       view.dispatch(placeholderTransaction);
       thinkingMessagePosition = insertPos + '\n\n'.length;
 
-      // Call the AI service and process the stream.
-      const stream = await this.getCompletion(finalPrompt);
+      if (hasWikilinks) {
+        // Use the Agent
+        console.log("[AI Service] Wikilinks detected. Invoking agent...");
+        const editor = window.thoughtform.editor; 
+        if (!editor || !editor.gitClient) {
+          throw new Error("Cannot find global editor or gitClient instance for agent.");
+        }
+        
+        const agent = new Agent({
+          gitClient: editor.gitClient,
+          aiService: this,
+          startingFilePath: editor.filePath
+        });
+
+        stream = agent.run(userPrompt);
+
+      } else {
+        // Use simple chat
+        console.log("[AI Service] No wikilinks detected. Using simple chat.");
+        const finalPrompt = `CONTEXT:\n---\n${fullContext}\n---\n\nBased on the context above, respond to the following prompt:\n\n${userPrompt}`;
+        stream = await this.getCompletion(finalPrompt);
+      }
+      
+      // --- STREAM PROCESSING (Identical for both Agent and Simple Chat) ---
       const reader = stream.getReader();
       let isFirstChunk = true;
       let currentResponsePos = thinkingMessagePosition;
@@ -95,7 +120,7 @@ class AiService {
         }
       }
 
-      const finalUserPrompt = '\n\n';
+      const finalUserPrompt = '\n\n> ';
       view.dispatch({
         changes: { from: currentResponsePos, insert: finalUserPrompt },
         selection: { anchor: currentResponsePos + finalUserPrompt.length }
