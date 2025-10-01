@@ -107,3 +107,17 @@ html body .cm-activeLineGutter {
 .cm-hr {
   border: 2px dashed var(--base-accent-emphasis);
 }
+
+/* Response wrapper */
+.cm-response-wrapper {
+  background-color: var(--base-interactive);
+  border-left: 3px solid var(--base-accent-action);
+  padding-left: 10px;
+}
+.cm-response-tag {
+  color: var(--base-accent-warning);
+  font-style: italic;
+  opacity: 0.8;
+  background-color: var(--color-background-hover);
+  vertical-align: middle;
+}

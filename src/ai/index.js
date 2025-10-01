@@ -101,29 +101,28 @@ class AiService {
       
       // --- STREAM PROCESSING (Identical for both Agent and Simple Chat) ---
       const reader = stream.getReader();
-      let isFirstChunk = true;
       let currentResponsePos = thinkingMessagePosition;
 
+      // Replace the "Thinking..." message with the opening tag.
+      const startTag = '\n\n<response>\n';
+      view.dispatch({ changes: { from: currentResponsePos, to: currentResponsePos + thinkingText.length, insert: startTag } });
+      currentResponsePos += startTag.length;
+
+      // Stream the main content of the response.
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         
         const chunkText = value;
-
-        if (isFirstChunk) {
-          view.dispatch({ changes: { from: currentResponsePos, to: currentResponsePos + thinkingText.length, insert: chunkText } });
-          currentResponsePos += chunkText.length;
-          isFirstChunk = false;
-        } else {
-          view.dispatch({ changes: { from: currentResponsePos, insert: chunkText } });
-          currentResponsePos += chunkText.length;
-        }
+        view.dispatch({ changes: { from: currentResponsePos, insert: chunkText } });
+        currentResponsePos += chunkText.length;
       }
 
-      const finalUserPrompt = '\n\n> ';
+      // After the stream is complete, append the closing tag and the next user prompt.
+      const finalInsert = `\n</response>\n\n> `;
       view.dispatch({
-        changes: { from: currentResponsePos, insert: finalUserPrompt },
-        selection: { anchor: currentResponsePos + finalUserPrompt.length }
+        changes: { from: currentResponsePos, insert: finalInsert },
+        selection: { anchor: currentResponsePos + finalInsert.length }
       });
 
     } catch (error) {

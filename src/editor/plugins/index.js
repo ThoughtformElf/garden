@@ -6,7 +6,8 @@ import { timestampPlugin } from './timestamps.js';
 import { externalLinkPlugin } from './external-links.js';
 import { blockquotePlugin } from './blockquotes.js';
 import { rulerPlugin } from './ruler.js';
-import { embedPlugin } from './embeds.js'; // I am adding the new plugin here
+import { embedPlugin } from './embeds.js';
+import { responseWrapperPlugin } from './response-wrapper.js'; // I am adding the new plugin here
 
 // Combine all custom plugins into a single array for export.
 export const allHighlightPlugins = [
@@ -17,5 +18,6 @@ export const allHighlightPlugins = [
   externalLinkPlugin,
   blockquotePlugin,
   rulerPlugin,
-  embedPlugin, // And including it in the exported array
+  embedPlugin,
+  responseWrapperPlugin, // And including it in the exported array
 ];

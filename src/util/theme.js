@@ -1,3 +1,4 @@
+// src/util/theme.js
 import { EditorView } from '@codemirror/view';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags as t, Tag } from '@lezer/highlight';
