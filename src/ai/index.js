@@ -54,17 +54,18 @@ class AiService {
       
       // Gather the full blockquote context as the user's prompt.
       let startLineNum = currentLine.number;
-      while (startLineNum > 1 && view.state.doc.line(startLineNum - 1).text.trim().startsWith('>')) {
+      while (startLineNum > 1 && view.state.doc.line(startLineNum - 1).text.trim().startsWith('>$')) {
         startLineNum--;
       }
       let endLineNum = currentLine.number;
-      while (endLineNum < view.state.doc.lines && view.state.doc.line(endLineNum + 1).text.trim().startsWith('>')) {
+      while (endLineNum < view.state.doc.lines && view.state.doc.line(endLineNum + 1).text.trim().startsWith('>$')) {
         endLineNum++;
       }
       const startPos = view.state.doc.line(startLineNum).from;
       const endPos = view.state.doc.line(endLineNum).to;
       let userPrompt = view.state.sliceDoc(startPos, endPos);
-      userPrompt = userPrompt.split('\n').map(line => line.trim().substring(1).trim()).join('\n');
+      // Adjust substring to remove the '>$' prefix (2 characters + potential space)
+      userPrompt = userPrompt.split('\n').map(line => line.trim().replace(/^>\$\s*/, '')).join('\n');
       
       // --- AGENT ROUTING LOGIC ---
       const hasWikilinks = /\[\[.+?\]\]/.test(fullContext);
@@ -119,7 +120,7 @@ class AiService {
       }
 
       // After the stream is complete, append the closing tag and the next user prompt.
-      const finalInsert = `\n</response>\n\n> `;
+      const finalInsert = `\n</response>\n\n>$ `;
       view.dispatch({
         changes: { from: currentResponsePos, insert: finalInsert },
         selection: { anchor: currentResponsePos + finalInsert.length }

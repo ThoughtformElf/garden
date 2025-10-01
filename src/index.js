@@ -1,3 +1,4 @@
+// src/index.js
 import './util/passive-events.js'; // Apply passive event listener patch globally
 
 import { Buffer } from 'buffer';
@@ -115,7 +116,7 @@ const checkEditorReady = setInterval(() => {
                 const currentLine = view.state.doc.lineAt(pos);
 
                 // Check for AI context and delegate if it matches
-                if (currentLine.text.trim().startsWith('>')) {
+                if (currentLine.text.trim().startsWith('>$')) {
                   window.thoughtform.ai.handleAiChatRequest(view);
                   handled = true; // Mark as handled to prevent default behavior
                 }

@@ -7,7 +7,8 @@ import { externalLinkPlugin } from './external-links.js';
 import { blockquotePlugin } from './blockquotes.js';
 import { rulerPlugin } from './ruler.js';
 import { embedPlugin } from './embeds.js';
-import { responseWrapperPlugin } from './response-wrapper.js'; // I am adding the new plugin here
+import { responseWrapperPlugin } from './response-wrapper.js';
+import { promptWrapperPlugin } from './prompt-wrapper.js'; // I am adding the new plugin here
 
 // Combine all custom plugins into a single array for export.
 export const allHighlightPlugins = [
@@ -19,5 +20,6 @@ export const allHighlightPlugins = [
   blockquotePlugin,
   rulerPlugin,
   embedPlugin,
-  responseWrapperPlugin, // And including it in the exported array
+  responseWrapperPlugin,
+  promptWrapperPlugin, // And including it in the exported array
 ];
