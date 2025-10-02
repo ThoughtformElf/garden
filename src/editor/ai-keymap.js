@@ -8,14 +8,17 @@ export const aiChatKeymap = keymap.of([
       const pos = view.state.selection.main.head;
       const currentLine = view.state.doc.lineAt(pos);
 
-      // Check if we are in the correct context (a blockquote).
-      if (!currentLine.text.trim().startsWith('>')) {
-        // If not, we do NOT handle this event. Let other keymaps (like link navigation) try.
+      // --- THIS IS THE FIX ---
+      // The check is now more specific to the AI prompt '>$' instead of a generic blockquote '>'.
+      // If the context does not match, it explicitly returns `false` to allow
+      // the next keymap (link navigation) to handle the event.
+      if (!currentLine.text.trim().startsWith('>$')) {
+        // If not in an AI prompt context, we DO NOT handle this event.
         return false;
       }
 
-      // If we ARE in a blockquote, we definitively handle this event.
-      // We kick off the async AI logic and immediately return true.
+      // If we ARE in an AI prompt, we definitively handle this event.
+      // We kick off the async AI logic and immediately return true to stop other keymaps.
       window.thoughtform.ai.handleAiChatRequest(view);
       
       return true;

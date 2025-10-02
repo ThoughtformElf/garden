@@ -95,6 +95,14 @@ export class Editor {
           gitClient: this.gitClient,
           sidebar: this.sidebar,
         })),
+
+        // --- THIS IS THE FIX ---
+        // Custom keymaps are placed BEFORE vim() to ensure they have higher precedence.
+        // CodeMirror processes keymaps in the order they appear in this array.
+        aiChatKeymap,
+        linkNavigationKeymap,
+        keymap.of([indentWithTab]),
+        
         vim(),
         basicSetup,
         EditorView.lineWrapping,
@@ -106,11 +114,6 @@ export class Editor {
         diffCompartment.of([]),
         this.tokenCounterCompartment.of(createTokenCounterExtension()),
         ...(this.editorConfig.extensions || []),
-
-        // --- THE FIX: Custom keymaps go LAST to have the highest precedence ---
-        aiChatKeymap,         // Will be checked first for Mod-Enter
-        linkNavigationKeymap, // Will be checked second if aiChatKeymap returns false
-        keymap.of([indentWithTab]),
       ],
       parent: this.mainContainer,
     });

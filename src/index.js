@@ -109,20 +109,6 @@ const checkEditorReady = setInterval(() => {
               handled = true;
               break;
             
-            case 'enter':
-              const view = editor.editorView;
-              if (view && view.hasFocus) {
-                const pos = view.state.selection.main.head;
-                const currentLine = view.state.doc.lineAt(pos);
-
-                // Check for AI context and delegate if it matches
-                if (currentLine.text.trim().startsWith('>$')) {
-                  window.thoughtform.ai.handleAiChatRequest(view);
-                  handled = true; // Mark as handled to prevent default behavior
-                }
-                // If it's not a blockquote, the linkNavigationKeymap in editor.js will handle it.
-              }
-              break;
           }
       }
 
