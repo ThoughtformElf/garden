@@ -85,9 +85,23 @@ const checkEditorReady = setInterval(() => {
       
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modifierKey = isMac ? e.metaKey : e.ctrlKey;
-
-      // --- FIX: This block handles BOTH AI and other shortcuts ---
       let handled = false;
+
+      // --- NEW: Handle Alt + Arrow for browser navigation ---
+      if (e.altKey) {
+        switch (e.key) {
+          case 'ArrowLeft':
+            window.history.back();
+            handled = true;
+            break;
+          case 'ArrowRight':
+            window.history.forward();
+            handled = true;
+            break;
+        }
+      }
+      // --- END NEW ---
+
       if (modifierKey) {
           switch (e.key.toLowerCase()) {
             case 'p':
