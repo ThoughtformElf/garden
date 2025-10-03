@@ -61,10 +61,8 @@ const editor = new Editor({
   commandPalette: commandPalette
 });
 
-// --- THIS IS THE FIX ---
-// Attach the editor instance to the global object so other modules, like the AI service, can access it.
+// Attach the editor instance to the global object so other modules can access it.
 window.thoughtform.editor = editor;
-// --- END OF FIX ---
 
 const checkEditorReady = setInterval(() => {
   if (editor.isReady) {
@@ -73,63 +71,8 @@ const checkEditorReady = setInterval(() => {
     commandPalette.gitClient = gitClient;
     commandPalette.editor = editor;
 
-    // --- THE DEFINITIVE GLOBAL SHORTCUT HANDLER ---
-    // This listener uses the `capture` phase to ensure it runs before any other
-    // listeners (like the editor's). This guarantees our global shortcuts
-    // will always fire, regardless of which element has focus.
-    window.addEventListener('keydown', (e) => {
-      // If the command palette is already open, let it handle its own keyboard events.
-      if (commandPalette.isOpen) {
-        return;
-      }
-      
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modifierKey = isMac ? e.metaKey : e.ctrlKey;
-      let handled = false;
+    // The problematic global keydown listener has been completely removed.
+    // All keyboard handling is now managed correctly within the CodeMirror extensions.
 
-      // --- NEW: Handle Alt + Arrow for browser navigation ---
-      if (e.altKey) {
-        switch (e.key) {
-          case 'ArrowLeft':
-            window.history.back();
-            handled = true;
-            break;
-          case 'ArrowRight':
-            window.history.forward();
-            handled = true;
-            break;
-        }
-      }
-      // --- END NEW ---
-
-      if (modifierKey) {
-          switch (e.key.toLowerCase()) {
-            case 'p':
-              if (e.shiftKey) {
-                commandPalette.open('execute');
-              } else {
-                commandPalette.open('search');
-              }
-              handled = true;
-              break;
-
-            case '[':
-              window.thoughtform.ui.toggleSidebar?.();
-              handled = true;
-              break;
-
-            case '`':
-              window.thoughtform.ui.toggleDevtools?.(null, null);
-              handled = true;
-              break;
-            
-          }
-      }
-
-      if (handled) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    }, { capture: true }); 
   }
 }, 100);

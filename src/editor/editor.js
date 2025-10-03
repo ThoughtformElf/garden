@@ -1,11 +1,14 @@
 // src/editor/editor.js
-import { EditorView, basicSetup } from 'codemirror';
+import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, highlightActiveLine } from '@codemirror/view';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
-import { keymap } from '@codemirror/view';
-import { indentWithTab } from '@codemirror/commands';
+import { history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
 import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
 import debounce from 'lodash/debounce';
+import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
+import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { lintKeymap } from '@codemirror/lint';
 
 import { Sidebar } from '../sidebar/sidebar.js';
 import { basicDark } from '../util/theme.js';
@@ -15,7 +18,7 @@ import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, linkNavigationKeymap } from './navigation.js';
-import { aiChatKeymap } from './ai-keymap.js'; // Import the new AI keymap
+import { aiChatKeymap } from './ai-keymap.js';
 
 const programmaticChange = Annotation.define();
 
@@ -88,6 +91,19 @@ export class Editor {
     
     Vim.map('jj', '<Esc>', 'insert');
 
+    // --- ALL CUSTOM KEYMAPS ARE DEFINED AND ORDERED HERE ---
+
+    const browserNavigationKeymap = keymap.of([
+      { key: 'Alt-ArrowLeft', run: () => { window.history.back(); return true; } },
+      { key: 'Alt-ArrowRight', run: () => { window.history.forward(); return true; } },
+    ]);
+
+    const globalShortcutsKeymap = keymap.of([
+      { key: 'Mod-p', run: () => { window.thoughtform.commandPalette.open('search'); return true; }, shift: () => { window.thoughtform.commandPalette.open('execute'); return true; } },
+      { key: 'Mod-[', run: () => { window.thoughtform.ui.toggleSidebar?.(); return true; } },
+      { key: 'Mod-`', run: () => { window.thoughtform.ui.toggleDevtools?.(null, null); return true; } },
+    ]);
+
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: [
@@ -96,15 +112,46 @@ export class Editor {
           sidebar: this.sidebar,
         })),
 
-        // --- THIS IS THE FIX ---
-        // Custom keymaps are placed BEFORE vim() to ensure they have higher precedence.
-        // CodeMirror processes keymaps in the order they appear in this array.
+        // 1. HIGHEST PRIORITY: App/Browser-level overrides that must always win.
+        globalShortcutsKeymap,
+        browserNavigationKeymap,
+        
+        // 2. CONTEXT-SPECIFIC: Editor actions that have specific contexts.
         aiChatKeymap,
         linkNavigationKeymap,
         keymap.of([indentWithTab]),
         
+        // 3. THE VIM EXTENSION: This now has a clean environment to manage its state.
         vim(),
-        basicSetup,
+        
+        // 4. REPLACEMENT FOR `basicSetup` (omitting the conflicting `defaultKeymap`).
+        //    This provides all the standard editor UI and features.
+        lineNumbers(),
+        highlightActiveLineGutter(),
+        highlightSpecialChars(),
+        history(),
+        foldGutter(),
+        drawSelection(),
+        dropCursor(),
+        EditorState.allowMultipleSelections.of(true),
+        indentOnInput(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        bracketMatching(),
+        closeBrackets(),
+        autocompletion(),
+        rectangularSelection(),
+        highlightActiveLine(),
+        highlightSelectionMatches(),
+        keymap.of([
+            ...closeBracketsKeymap,
+            ...searchKeymap,
+            ...historyKeymap,
+            ...foldKeymap,
+            ...completionKeymap,
+            ...lintKeymap
+        ]),
+
+        // 5. YOUR CUSTOM PLUGINS AND THEME:
         EditorView.lineWrapping,
         lineNumbersRelative,
         basicDark,
