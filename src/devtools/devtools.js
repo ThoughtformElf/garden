@@ -292,7 +292,14 @@ export function initializeDevTools() {
             </div>
             <div class="sync-row">
               <label for="gemini-model-name" class="sync-label">Model Name:</label>
-              <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-2.5-flash">
+              <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-1.5-flash">
+            </div>
+          </div>
+          <div class="sync-panel" style="margin-top: 15px;">
+            <h3>Content Proxy</h3>
+            <div class="sync-row">
+              <label for="proxy-url" class="sync-label">Proxy URL:</label>
+              <input type="text" id="proxy-url" class="eruda-input flex-grow" placeholder="https://proxy.thoughtform.garden">
             </div>
           </div>
           <button id="ai-save-config" class="eruda-button" style="margin-top: 15px;">Save</button>
@@ -302,26 +309,38 @@ export function initializeDevTools() {
 
       const apiKeyInput = $el.find('#gemini-api-key')[0];
       const modelNameInput = $el.find('#gemini-model-name')[0];
+      const proxyUrlInput = $el.find('#proxy-url')[0];
       const saveBtn = $el.find('#ai-save-config')[0];
       const saveStatus = $el.find('#ai-save-status')[0];
 
       // Load existing values from localStorage
       apiKeyInput.value = localStorage.getItem('thoughtform_gemini_api_key') || '';
-      modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || '';
+      modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-1.5-flash-latest';
+      proxyUrlInput.value = localStorage.getItem('thoughtform_proxy_url') || '';
 
-      saveBtn.addEventListener('click', () => {
+      const saveConfig = () => {
         const apiKey = apiKeyInput.value.trim();
-        const modelName = modelNameInput.value.trim();
+        const modelName = modelNameInput.value.trim() || 'gemini-1.5-flash-latest';
+        const proxyUrl = proxyUrlInput.value.trim();
         
         localStorage.setItem('thoughtform_gemini_api_key', apiKey);
         localStorage.setItem('thoughtform_gemini_model_name', modelName);
+        localStorage.setItem('thoughtform_proxy_url', proxyUrl);
         
         // Reload config in the global AI service if it exists
         window.thoughtform.ai?.loadConfig();
 
         saveStatus.textContent = 'Configuration saved!';
         setTimeout(() => { saveStatus.textContent = ''; }, 3000);
-      });
+      };
+
+      // Autosave on input change
+      apiKeyInput.addEventListener('input', saveConfig);
+      modelNameInput.addEventListener('input', saveConfig);
+      proxyUrlInput.addEventListener('input', saveConfig);
+      
+      // The save button is now more for explicit user action, though autosave is active.
+      saveBtn.addEventListener('click', saveConfig);
     },
     show() { this._$el.show(); },
     hide() { this._$el.hide(); },

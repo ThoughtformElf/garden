@@ -6,6 +6,63 @@ import synthesizePromptTemplate from './prompts/synthesize_answer.md?raw';
 const MAX_TRAVERSAL_DEPTH = 2;
 const MAX_CRITIQUE_LOOPS = 2;
 
+// --- NEW HELPER FUNCTIONS ---
+
+/**
+ * Extracts all unique external URLs from a given text content.
+ * Handles both naked URLs and Markdown-style links.
+ * @param {string} content - The text to parse.
+ * @returns {Set<string>} A Set of unique URL strings.
+ */
+function extractExternalLinks(content) {
+    const urls = new Set();
+    // Regex for naked URLs and markdown links
+    const urlRegex = /(https?:\/\/[^\s"'`\]\)]+)|\[[^\]]+\]\((https?:\/\/[^\s"'`\]\)]+)\)/g;
+    let match;
+    while ((match = urlRegex.exec(content))) {
+        // match[2] is the captured group for markdown links, match[1] for naked links.
+        let url = match[2] || match[1];
+        if (url) {
+            // --- THIS IS THE FIX (Part 1) ---
+            // Trim common trailing punctuation that might be accidentally included by the regex.
+            url = url.replace(/[.,;:]$/, '');
+            urls.add(url);
+        }
+    }
+    return urls;
+}
+
+/**
+ * Fetches the content of a URL via the configured proxy.
+ * @param {string} targetUrl - The external URL to fetch.
+ * @returns {Promise<string>} A formatted string for the context buffer.
+ */
+async function fetchExternalContent(targetUrl) {
+    try {
+        const userDefinedProxy = localStorage.getItem('thoughtform_proxy_url');
+        const proxyRoot = userDefinedProxy || 'https://proxy.thoughtform.garden';
+        
+        // Ensure there's no trailing slash on the root and add one before the query
+        const proxyUrl = `${proxyRoot.replace(/\/$/, '')}?url=${encodeURIComponent(targetUrl)}`;
+
+        const response = await fetch(proxyUrl);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Proxy request failed with status ${response.status}: ${errorText}`);
+        }
+        
+        const cleanedText = await response.text();
+        return `<context><website src="${targetUrl}">${cleanedText}</website></context>\n\n---\n\n`;
+
+    } catch (error) {
+        console.error(`[Agent] Failed to fetch URL via proxy: ${targetUrl}`, error);
+        // Return a formatted error message to be included in the context
+        return `<context><website src="${targetUrl}">Error: Could not retrieve content. ${error.message}</website></context>\n\n---\n\n`;
+    }
+}
+
+
 export class Agent {
     constructor({ gitClient, aiService, startingFilePath }) {
         this.gitClient = gitClient;
@@ -48,16 +105,48 @@ export class Agent {
         contextBuffer += `## Context from ${this.startingFilePath}\n\n${initialContent}\n\n---\n\n`;
         visited.add(this.startingFilePath);
         console.log(`[Agent] Reading starting file: ${this.startingFilePath}`);
+        
+        // --- THIS IS THE FIX (Part 2) ---
+        // This set now tracks any URL we have *attempted* to fetch, success or fail.
+        const attemptedExternalFetches = new Set();
 
         while (critiqueLoops < MAX_CRITIQUE_LOOPS) {
             critiqueLoops++;
             console.log(`[Agent] Starting critique loop #${critiqueLoops}`);
 
+            // 1. Traverse internal wikilinks first to gather more local context.
             console.log(`[Agent] Traversing knowledge graph (Depth limit: ${MAX_TRAVERSAL_DEPTH})...`);
-            // --- FIX: Pass the initial content and garden name to start the traversal ---
             const traversalContext = await this._traverse(goal, initialContent, visited, 0, this.gitClient.gardenName);
             contextBuffer += traversalContext;
 
+            // 2. Triage and fetch external links based on the goal and gathered context.
+            const availableExternalLinks = extractExternalLinks(contextBuffer + '\n' + goal);
+            const unfetchedLinks = Array.from(availableExternalLinks).filter(link => !attemptedExternalFetches.has(link));
+
+            if (unfetchedLinks.length > 0) {
+                console.log(`[Agent] Found ${unfetchedLinks.length} un-fetched external link(s). Triaging...`);
+                const triagePrompt = this._fillPrompt(triagePromptTemplate, {
+                    goal,
+                    context_summary: contextBuffer.substring(0, 2000) + '...',
+                    links: JSON.stringify(unfetchedLinks)
+                });
+                const triageResult = await this._getJsonCompletion(triagePrompt);
+                const relevantLinks = triageResult.relevant_links || [];
+                
+                if (relevantLinks.length > 0) {
+                    console.log(`%c[Agent] Found relevant external links: ${relevantLinks.join(', ')}. Fetching sequentially...`, 'color: green');
+                    for (const link of relevantLinks) {
+                        // Add to the set *before* fetching to prevent retries.
+                        attemptedExternalFetches.add(link);
+                        const externalContext = await fetchExternalContent(link);
+                        contextBuffer += externalContext;
+                    }
+                } else {
+                    console.log('[Agent] No relevant external links found by triage.');
+                }
+            }
+
+            // 3. Critique the combined context.
             console.log(`[Agent] Critiquing gathered context...`);
             const critique = await this._critique(goal, contextBuffer);
 
@@ -68,9 +157,6 @@ export class Agent {
                 console.warn(`[Agent] Critique failed. Gaps identified:`, critique.gaps);
                 if (critiqueLoops >= MAX_CRITIQUE_LOOPS) {
                      console.warn(`[Agent] Max critique loops reached. Synthesizing with available info.`);
-                } else {
-                    console.log("[Agent] No re-entry mechanism. Proceeding to synthesis.");
-                    break;
                 }
             }
         }
@@ -90,15 +176,12 @@ export class Agent {
         console.log("%c[Agent] Run finished.", 'font-weight: bold;');
     }
     
-    // --- FIX: Method signature now includes currentGardenName ---
     async _traverse(goal, currentFileContent, visited, depth, currentGardenName) {
         if (depth >= MAX_TRAVERSAL_DEPTH) return '';
 
-        // --- FIX: Links are extracted ONLY from the current file's content ---
         const links = this.traversal.extractWikilinks(currentFileContent);
         if (links.length === 0) return '';
         
-        // Unvisited check is still against the global visited set
         const unvisitedLinks = links.filter(link => !visited.has(link));
         if (unvisitedLinks.length === 0) return '';
 
@@ -122,7 +205,6 @@ export class Agent {
         
         let newContext = '';
         for (const link of relevantLinks) {
-            // --- FIX: Pass the currentGardenName to resolve relative links correctly ---
             const { content, fullIdentifier, gardenName: fileGarden } = await this.traversal.readLinkContent(link, currentGardenName);
             
             if (content !== null && !visited.has(fullIdentifier)) {
@@ -130,7 +212,6 @@ export class Agent {
                 console.log(`[Agent] Reading content from: ${fullIdentifier}`);
                 newContext += `## Context from ${fullIdentifier}\n\n${content}\n\n---\n\n`;
                 
-                // --- FIX: Recurse with the NEW file's content and the garden it came from ---
                 newContext += await this._traverse(goal, content, visited, depth + 1, fileGarden);
             }
         }
