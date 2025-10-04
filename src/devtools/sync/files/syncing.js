@@ -56,6 +56,18 @@ export class SyncActions {
     static requestSpecificGardens(instance, selection) {
         instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Requesting selected gardens from peers...', type: 'info' } }));
         
+        // --- THIS IS THE FIX (Part 1) ---
+        const selfPeerId = instance.sync.signaling.peerId;
+        if (!selfPeerId) {
+            const errorMsg = 'Cannot request gardens: own peer ID is not available.';
+            instance.dispatchEvent(new CustomEvent('syncProgress', {
+                detail: { message: errorMsg, type: 'error' }
+            }));
+            console.error(errorMsg);
+            return;
+        }
+        // --- END OF FIX (Part 1) ---
+
         Object.entries(selection).forEach(([peerId, gardens]) => {
             const shortId = peerId.substring(0, 8);
             instance.dispatchEvent(new CustomEvent('syncProgress', {
@@ -69,7 +81,8 @@ export class SyncActions {
             instance.sync.sendSyncMessage(
                 {
                     type: 'request_gardens',
-                    gardens: gardens
+                    gardens: gardens,
+                    requesterId: selfPeerId // --- THIS IS THE FIX (Part 2) ---
                 },
                 peerId // The targetPeerId argument
             );

@@ -14,17 +14,17 @@ export class SyncFiles extends EventEmitterMixin {
 
         this.pendingWriteCount = 0;
         this.isSyncCompleteMessageReceived = false;
-        // --- THIS IS THE FIX (Part 1) ---
-        // This Set will track which gardens have had their .git dirs wiped in this session.
         this.deletedGitDirs = new Set();
+        
+        // Add transfer tracking for chunked zip transfers
+        this.activeTransfers = new Map();
     }
     
     resetFullSyncState() {
         this.pendingWriteCount = 0;
         this.isSyncCompleteMessageReceived = false;
-        // --- THIS IS THE FIX (Part 2) ---
-        // Clear the tracking set for every new full sync request.
         this.deletedGitDirs.clear();
+        this.activeTransfers.clear();
     }
 
     _getGitClient() {
@@ -68,7 +68,7 @@ export class SyncFiles extends EventEmitterMixin {
     }
 
     checkForReload() {
-        if (this.isSyncCompleteMessageReceived && this.pendingWriteCount === 0) {
+        if (this.isSyncCompleteMessageReceived && this.pendingWriteCount === 0 && this.activeTransfers.size === 0) {
             this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'All files received and written. Reloading...', type: 'complete' } }));
             setTimeout(() => window.location.reload(), 1500);
         }
@@ -76,6 +76,7 @@ export class SyncFiles extends EventEmitterMixin {
 
     destroy() {
         super.destroy();
+        this.activeTransfers.clear();
     }
     
     async getAllFiles(gitClientToUse) {
