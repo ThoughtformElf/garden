@@ -15,7 +15,7 @@ export class SyncMessageRouter {
      * This is the core of the gossip protocol.
      */
     handleIncomingMessage(data, transport) {
-        // All gossiped messages must have a payload and a messageId
+        // All messages must have a payload and a messageId
         if (!data.payload || !data.messageId) {
             debug.warn("Received a message without a payload or messageId, cannot process.", data);
             return;
@@ -23,7 +23,7 @@ export class SyncMessageRouter {
         
         // --- Loop Prevention ---
         if (this.seenMessages.has(data.messageId)) {
-            return; // We have already processed and gossiped this message.
+            return; // We have already processed this message.
         }
         this.seenMessages.add(data.messageId);
         // Prune the cache to prevent memory leaks over long sessions
@@ -32,8 +32,12 @@ export class SyncMessageRouter {
             this.seenMessages.delete(oldestMessage);
         }
         
-        // --- Forward the message to all other peers (GOSSIP) ---
-        this.sendSyncMessage(data.payload, null, data.messageId);
+        // --- THIS IS THE FIX (Part 1): Check if this message should be gossiped ---
+        // If the `noGossip` flag is true, we skip the forwarding block entirely.
+        if (!data.noGossip) {
+            // --- Forward the message to all other peers (GOSSIP) ---
+            this.sendSyncMessage(data.payload, null, data.messageId);
+        }
 
         // --- Process the message locally ---
         const payload = data.payload;
@@ -57,7 +61,13 @@ export class SyncMessageRouter {
      */
     sendSyncMessage(payload, targetPeerId = null, messageId = null) {
         const id = messageId || crypto.randomUUID();
-        const wrapper = { messageId: id, payload: payload };
+        
+        // --- THIS IS THE FIX (Part 2): Add the `noGossip` flag for direct messages ---
+        const wrapper = { 
+            messageId: id, 
+            payload: payload,
+            noGossip: !!targetPeerId // Set `noGossip: true` if it's a direct message
+        };
         const message = JSON.stringify(wrapper);
         
         // Add to seen cache immediately to prevent receiving our own gossip.
@@ -67,13 +77,23 @@ export class SyncMessageRouter {
             // Direct message to a single peer
             const pc = this.sync.peerConnections.get(targetPeerId);
             if (pc && pc.dataChannel && pc.dataChannel.readyState === 'open') {
-                pc.dataChannel.send(message);
+                try {
+                    pc.dataChannel.send(message);
+                } catch (error) {
+                    console.error(`Error sending direct message to ${targetPeerId.substring(0,8)}...:`, error);
+                    // This is where the original 'send queue is full' error could still happen,
+                    // but it's now much less likely because the receiver isn't also trying to send.
+                }
             }
         } else {
             // Broadcast to all connected peers
-            this.sync.peerConnections.forEach((pc) => {
+            this.sync.peerConnections.forEach((pc, peerId) => {
                 if (pc.dataChannel && pc.dataChannel.readyState === 'open') {
-                    pc.dataChannel.send(message);
+                    try {
+                        pc.dataChannel.send(message);
+                    } catch (error) {
+                        console.error(`Error gossiping message to ${peerId.substring(0,8)}...:`, error);
+                    }
                 }
             });
         }

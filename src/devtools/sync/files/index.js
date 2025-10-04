@@ -15,8 +15,8 @@ export class SyncFiles extends EventEmitterMixin {
         this.pendingWriteCount = 0;
         this.isSyncCompleteMessageReceived = false;
         this.deletedGitDirs = new Set();
+        this.isSyncFailed = false; // --- THIS IS THE FIX (Part 1) ---
         
-        // Add transfer tracking for chunked zip transfers
         this.activeTransfers = new Map();
     }
     
@@ -25,6 +25,7 @@ export class SyncFiles extends EventEmitterMixin {
         this.isSyncCompleteMessageReceived = false;
         this.deletedGitDirs.clear();
         this.activeTransfers.clear();
+        this.isSyncFailed = false; // --- THIS IS THE FIX (Part 2) ---
     }
 
     _getGitClient() {
@@ -40,7 +41,19 @@ export class SyncFiles extends EventEmitterMixin {
     }
 
     async handleSyncMessage(data) {
-        await MessageHandler.handleSyncMessage(this, data);
+        try {
+            await MessageHandler.handleSyncMessage(this, data);
+        } catch (error) {
+            // --- THIS IS THE FIX (Part 3) ---
+            console.error('[SyncFiles] Critical error handling sync message:', error);
+            this.isSyncFailed = true;
+            this.dispatchEvent(new CustomEvent('syncProgress', { 
+                detail: { 
+                    message: `A critical error occurred: ${error.message}. Aborting sync.`, 
+                    type: 'error' 
+                } 
+            }));
+        }
     }
 
     async syncAllFiles() {
@@ -68,6 +81,12 @@ export class SyncFiles extends EventEmitterMixin {
     }
 
     checkForReload() {
+        // --- THIS IS THE FIX (Part 4) ---
+        if (this.isSyncFailed) {
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Sync failed. Please close this dialog and check the console for errors.', type: 'error' } }));
+            return;
+        }
+
         if (this.isSyncCompleteMessageReceived && this.pendingWriteCount === 0 && this.activeTransfers.size === 0) {
             this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'All files received and written. Reloading...', type: 'complete' } }));
             setTimeout(() => window.location.reload(), 1500);
