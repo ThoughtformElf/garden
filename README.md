@@ -24,7 +24,7 @@ To run the project on your machine for development:
     This will start a local server (usually at `http://localhost:5173`). The live instance is always available at [**thoughtform.garden**](https://thoughtform.garden), no registration needed.
 
 ### Running the Full Stack (Optional)
-To enable the P2P mesh and remote `git` collaboration, you can run the backend services locally.
+To enable the P2P mesh, remote `git` collaboration, and AI web access, you can run the backend services locally.
 
 #### WebSocket Signaling Server
 The signaling server acts as a "tracker," helping peers discover each other.
@@ -45,6 +45,25 @@ git init --bare my-garden-remote.git
 http-server .
 ```
 You can then use the URL provided by `http-server` (e.g., `http://192.168.1.10:8081/my-garden-remote.git`) as the remote URL in the Git tab for collaboration across devices.
+
+#### AI Content Proxy Server
+The proxy server allows the AI agent to read content from external websites, bypassing CORS and anti-bot measures. It uses a hybrid approach: a fast, lightweight fetch for simple sites, with an automatic fallback to a full headless browser for complex sites protected by services like Cloudflare.
+
+1.  **Install additional dependencies:** The proxy uses Puppeteer, which includes a browser engine.
+```bash
+npm install axios puppeteer
+```
+
+2.  **Run the local proxy server:**
+```bash
+npm run proxy
+```
+    This starts the server (usually at `http://localhost:8082`). This local version has **no allowlist** and can access any URL. The production version (`npm run proxy:prod`) is designed for deployment and uses an allowlist.
+3.  **Configure the Frontend:**
+    -   Open the **DevTools** in Thoughtform Garden (Ctrl+`).
+    -   Go to the **AI** tab.
+    -   In the "Proxy URL" field, enter your local server's address: `http://localhost:8082`.
+    -   The setting saves automatically. The agent will now use your local proxy to read any URLs (`https://...` or `[markdown](links)`) included in its prompts. If the field is left empty, it defaults to the public `https://proxy.thoughtform.garden` endpoint.
 
 ***
 
