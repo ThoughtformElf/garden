@@ -25,7 +25,7 @@ function extractExternalLinks(content) {
         if (url) {
             // --- THIS IS THE FIX (Part 1) ---
             // Trim common trailing punctuation that might be accidentally included by the regex.
-            url = url.replace(/[.,;:]$/, '');
+            url = url.replace(/[.,;:`\])\s]+$/, '');
             urls.add(url);
         }
     }

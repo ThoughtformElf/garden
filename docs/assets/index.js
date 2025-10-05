@@ -261,7 +261,7 @@ You have been gathering information to answer a user's goal. Your task is to det
 {{context_buffer}}
 ---
 
-**Final Answer:**`,re=2,ae=2;function Tn(o){const e=new Set,t=/(https?:\/\/[^\s"'`\]\)]+)|\[[^\]]+\]\((https?:\/\/[^\s"'`\]\)]+)\)/g;let n;for(;n=t.exec(o);){let s=n[2]||n[1];s&&(s=s.replace(/[.,;:]$/,""),e.add(s))}return e}async function Fn(o){try{const n=`${(localStorage.getItem("thoughtform_proxy_url")||"https://proxy.thoughtform.garden").replace(/\/$/,"")}?thoughtformgardenproxy=${encodeURIComponent(o)}`,s=await fetch(n);if(!s.ok){const r=await s.text();throw new Error(`Proxy request failed with status ${s.status}: ${r}`)}const i=await s.text();return`<context><website src="${o}">${i}</website></context>
+**Final Answer:**`,re=2,ae=2;function Tn(o){const e=new Set,t=/(https?:\/\/[^\s"'`\]\)]+)|\[[^\]]+\]\((https?:\/\/[^\s"'`\]\)]+)\)/g;let n;for(;n=t.exec(o);){let s=n[2]||n[1];s&&(s=s.replace(/[.,;:`\])\s]+$/,""),e.add(s))}return e}async function Fn(o){try{const n=`${(localStorage.getItem("thoughtform_proxy_url")||"https://proxy.thoughtform.garden").replace(/\/$/,"")}?thoughtformgardenproxy=${encodeURIComponent(o)}`,s=await fetch(n);if(!s.ok){const r=await s.text();throw new Error(`Proxy request failed with status ${s.status}: ${r}`)}const i=await s.text();return`<context><website src="${o}">${i}</website></context>
 
 ---
 
