@@ -43,7 +43,7 @@ async function fetchExternalContent(targetUrl) {
         const proxyRoot = userDefinedProxy || 'https://proxy.thoughtform.garden';
         
         // Ensure there's no trailing slash on the root and add one before the query
-        const proxyUrl = `${proxyRoot.replace(/\/$/, '')}?url=${encodeURIComponent(targetUrl)}`;
+        const proxyUrl = `${proxyRoot.replace(/\/$/, '')}?thoughtformgardenproxy=${encodeURIComponent(targetUrl)}`;
 
         const response = await fetch(proxyUrl);
         

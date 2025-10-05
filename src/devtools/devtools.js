@@ -292,7 +292,7 @@ export function initializeDevTools() {
             </div>
             <div class="sync-row">
               <label for="gemini-model-name" class="sync-label">Model Name:</label>
-              <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-1.5-flash">
+              <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-2.5-flash">
             </div>
           </div>
           <div class="sync-panel" style="margin-top: 15px;">
@@ -315,12 +315,12 @@ export function initializeDevTools() {
 
       // Load existing values from localStorage
       apiKeyInput.value = localStorage.getItem('thoughtform_gemini_api_key') || '';
-      modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-1.5-flash-latest';
+      modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
       proxyUrlInput.value = localStorage.getItem('thoughtform_proxy_url') || '';
 
       const saveConfig = () => {
         const apiKey = apiKeyInput.value.trim();
-        const modelName = modelNameInput.value.trim() || 'gemini-1.5-flash-latest';
+        const modelName = modelNameInput.value.trim() || 'gemini-2.5-flash';
         const proxyUrl = proxyUrlInput.value.trim();
         
         localStorage.setItem('thoughtform_gemini_api_key', apiKey);

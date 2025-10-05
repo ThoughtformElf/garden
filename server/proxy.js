@@ -4,10 +4,59 @@ const { Readability } = require('@mozilla/readability');
 const url = require('url');
 const axios = require('axios');
 const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
 
-// A simple in-memory cache to avoid re-fetching the same URL multiple times in a short period.
 const cache = new Map();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 10 * 60 * 1000;
+
+function loadAllowlist() {
+  const allowlistPath = path.join(__dirname, 'allowlist.txt');
+  
+  if (!fs.existsSync(allowlistPath)) {
+    console.log('[Proxy] No allowlist.txt found - allowing all domains');
+    return null;
+  }
+  
+  try {
+    const content = fs.readFileSync(allowlistPath, 'utf-8');
+    const domains = content
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .filter(line => !line.startsWith('#'))
+      .map(line => line.toLowerCase());
+    
+    console.log(`[Proxy] Loaded ${domains.length} domains from allowlist`);
+    return new Set(domains);
+  } catch (error) {
+    console.error('[Proxy] Error loading allowlist:', error);
+    return null;
+  }
+}
+
+const allowlist = loadAllowlist();
+
+function isAllowedDomain(targetUrl) {
+  if (!allowlist) return true;
+  
+  try {
+    const parsed = new URL(targetUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    
+    if (allowlist.has(hostname)) return true;
+    
+    for (const domain of allowlist) {
+      if (hostname.endsWith('.' + domain) || hostname === domain) {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
 
 async function fetchAndParse(targetUrl) {
   if (cache.has(targetUrl)) {
@@ -19,7 +68,6 @@ async function fetchAndParse(targetUrl) {
     cache.delete(targetUrl);
   }
 
-  // --- Attempt 1: Lightweight Fetch with Axios ---
   try {
     console.log(`[Proxy] Attempting lightweight fetch: ${targetUrl}`);
     const response = await axios.get(targetUrl, {
@@ -27,7 +75,8 @@ async function fetchAndParse(targetUrl) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-      }
+      },
+      timeout: 15000
     });
     const html = response.data;
 
@@ -47,13 +96,9 @@ async function fetchAndParse(targetUrl) {
     return content;
 
   } catch (error) {
-    // Check if the error is a signal that we're being blocked by a bot detector
     if (error.response && (error.response.status === 429 || error.response.status === 403)) {
       console.warn(`[Proxy] Lightweight fetch failed with status ${error.response.status}. Escalating to headless browser.`);
-      // If it's a block, we don't return; we proceed to the heavyweight method.
     } else {
-      // If it's a different error (404, 500, network timeout, etc.), it's a "hard fail".
-      // Puppeteer won't help, so we fail fast.
       let errorMessage = error.message;
       if (error.response && error.response.status) {
           errorMessage = `Request failed with status ${error.response.status}`;
@@ -63,7 +108,6 @@ async function fetchAndParse(targetUrl) {
     }
   }
 
-  // --- Attempt 2: Heavyweight Fetch with Puppeteer (Fallback) ---
   console.log(`[Proxy] Fetching with headless browser: ${targetUrl}`);
   let browser = null;
   try {
@@ -76,7 +120,7 @@ async function fetchAndParse(targetUrl) {
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
     
-    await page.goto(targetUrl, { waitUntil: 'networkidle2' });
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
     const html = await page.content();
 
@@ -106,9 +150,40 @@ async function fetchAndParse(targetUrl) {
   }
 }
 
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+  
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + RATE_LIMIT_WINDOW;
+    rateLimitMap.set(ip, record);
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  
+  record.count++;
+  rateLimitMap.set(ip, record);
+  return true;
+}
+
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+         req.headers['fly-client-ip'] ||
+         req.headers['cf-connecting-ip'] ||
+         req.headers['x-real-ip'] ||
+         req.socket.remoteAddress;
+}
+
 const server = http.createServer(async (req, res) => {
-  // --- CORS Headers ---
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Allow any origin
+  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -121,11 +196,38 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   
   if (parsedUrl.pathname === '/') {
-    const targetUrl = parsedUrl.query.url;
+    const clientIp = getClientIp(req);
+
+    if (!checkRateLimit(clientIp)) {
+      console.warn(`[Proxy] Rate limit exceeded for ${clientIp}`);
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }));
+      return;
+    }
+
+    const targetUrl = parsedUrl.query.thoughtformgardenproxy;
 
     if (!targetUrl) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing "url" query parameter.' }));
+      res.end(JSON.stringify({ error: 'Missing required parameter.' }));
+      return;
+    }
+
+    try {
+      const parsedTarget = new URL(targetUrl);
+      if (!['http:', 'https:'].includes(parsedTarget.protocol)) {
+        throw new Error('Invalid protocol');
+      }
+    } catch (e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid URL provided.' }));
+      return;
+    }
+
+    if (!isAllowedDomain(targetUrl)) {
+      console.warn(`[Proxy] Blocked request to non-allowlisted domain: ${targetUrl} from ${clientIp}`);
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Domain not allowed.' }));
       return;
     }
 
@@ -143,8 +245,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const PORT = 8082; // Using a different port to avoid conflicts
+const PORT = process.env.PORT || 8082;
 server.listen(PORT, () => {
-  console.log(`[Proxy] Local proxy server running on http://localhost:${PORT}`);
-  console.log('[Proxy] This server has NO allowlist and will fetch from ANY URL.');
+  console.log(`[Proxy] Proxy server running on port ${PORT}`);
+  console.log(`[Proxy] Query parameter: ?t=<url>`);
+  console.log(`[Proxy] Allowlist: ${allowlist ? allowlist.size + ' domains' : 'DISABLED'}`);
+  console.log(`[Proxy] Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW / 1000} seconds per IP`);
 });

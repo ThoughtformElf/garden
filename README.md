@@ -12,31 +12,32 @@ This project is more than a tool; it's an exploration into the **Tao of Digital 
 ## Local Development
 To run the project on your machine for development:
 1.  **Clone the repository and install dependencies:**
-    ```bash
+    ```
     git clone https://github.com/thoughtforms/garden.git
     cd garden
     npm install
     ```
 2.  **Run the development server:**
-    ```bash
+    ```
     npm run dev
     ```
     This will start a local server (usually at `http://localhost:5173`). The live instance is always available at [**thoughtform.garden**](https://thoughtform.garden), no registration needed.
 
-### Running the Full Stack (Optional)
+### Running the Full Stack Locally (Optional)
+
 To enable the P2P mesh, remote `git` collaboration, and AI web access, you can run the backend services locally.
 
 #### WebSocket Signaling Server
 The signaling server acts as a "tracker," helping peers discover each other.
-```bash
+```
 # From the project root, run:
-npm run server
+npm run ws
 ```
 This will start the server (usually at `ws://localhost:8080`). Update the URL in the **Sync** tab of the DevTools to point to your local instance.
 
 #### Git Server for Collaboration
 To enable `git push/pull` from the **Git** tab, you can serve a bare git repository over HTTP.
-```bash
+```
 # 1. Create a bare repository to act as the central remote
 git init --bare my-garden-remote.git
 
@@ -50,20 +51,25 @@ You can then use the URL provided by `http-server` (e.g., `http://192.168.1.10:8
 The proxy server allows the AI agent to read content from external websites, bypassing CORS and anti-bot measures. It uses a hybrid approach: a fast, lightweight fetch for simple sites, with an automatic fallback to a full headless browser for complex sites protected by services like Cloudflare.
 
 1.  **Install additional dependencies:** The proxy uses Puppeteer, which includes a browser engine.
-```bash
+```
 npm install axios puppeteer
 ```
 
 2.  **Run the local proxy server:**
-```bash
+```
 npm run proxy
 ```
-    This starts the server (usually at `http://localhost:8082`). This local version has **no allowlist** and can access any URL. The production version (`npm run proxy:prod`) is designed for deployment and uses an allowlist.
+This starts the server (usually at `http://localhost:8082`). This local version has **no allowlist** and can access any URL.
+
 3.  **Configure the Frontend:**
     -   Open the **DevTools** in Thoughtform Garden (Ctrl+`).
     -   Go to the **AI** tab.
     -   In the "Proxy URL" field, enter your local server's address: `http://localhost:8082`.
-    -   The setting saves automatically. The agent will now use your local proxy to read any URLs (`https://...` or `[markdown](links)`) included in its prompts. If the field is left empty, it defaults to the public `https://proxy.thoughtform.garden` endpoint.
+    -   The setting saves automatically. The agent will now use your local proxy to read any URLs (`https://...` or `[markdown](links)`) included in its prompts.
+
+#### Deploying Servers to Production
+
+For production deployment of the WebSocket and Proxy servers to Fly.io with custom domains, see **[README.servers.md](README.servers.md)**.
 
 ***
 
@@ -82,14 +88,14 @@ Quickly navigate between files and to external websites directly from the editor
     - `[[Wikilinks]]` navigate to other files within your garden.
     - `[Markdown](links)` and `https://naked.urls` open in a new browser tab.
 -   **Toggle Sidebar:** `Ctrl+[`
--   **Toggle DevTools:** `Ctrl+\`` (backtick)
+-   **Toggle DevTools:** `Ctrl+`` (backtick)
 
 ### The Executable Layer: Creating Your Own Commands
 Thoughtform Garden acts as a userscript manager for itself. Scripts have access to `editor` and `git` globals.
 
 1.  **Create a script file:** E.g., `my-command.js`.
 2.  **Write your script:**
-    ```js
+    ```
     // Example: my-command.js
     const currentDoc = editor.editorView.state.doc;
     const newContent = currentDoc.toString() + `\n\nUpdated: ${new Date().toISOString()}`;
@@ -178,4 +184,4 @@ The current editor is the foundation. The future focuses on a fully ambient, mul
 #### Phase 4: Full Embodiment
 - **Visual & Multimodal Editing**: Node-based editors.
 - **Sensor Integration**: Camera, microphone access.
-- **Robotic Embodiment**: Stream context to/from robots.odiment**: Stream context to/from robots.
+- **Robotic Embodiment**: Stream context to/from robots.
