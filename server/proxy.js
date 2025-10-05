@@ -10,11 +10,17 @@ const path = require('path');
 const cache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
+// Change this to something obscure
+const SECRET_PARAM = 'thoughtformgardenproxy';
+
+const args = process.argv.slice(2);
+const isLocalMode = args.includes('--local');
+
 function loadAllowlist() {
   const allowlistPath = path.join(__dirname, 'allowlist.txt');
   
   if (!fs.existsSync(allowlistPath)) {
-    console.log('[Proxy] No allowlist.txt found - allowing all domains');
+    console.log('[Proxy] No allowlist.txt found');
     return null;
   }
   
@@ -35,10 +41,10 @@ function loadAllowlist() {
   }
 }
 
-const allowlist = loadAllowlist();
+const allowlist = isLocalMode ? null : loadAllowlist();
 
 function isAllowedDomain(targetUrl) {
-  if (!allowlist) return true;
+  if (isLocalMode || !allowlist) return true;
   
   try {
     const parsed = new URL(targetUrl);
@@ -155,6 +161,8 @@ const RATE_LIMIT_WINDOW = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 
 function checkRateLimit(ip) {
+  if (isLocalMode) return true;
+  
   const now = Date.now();
   const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
   
@@ -205,7 +213,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const targetUrl = parsedUrl.query.thoughtformgardenproxy;
+    const targetUrl = parsedUrl.query[SECRET_PARAM];
 
     if (!targetUrl) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -225,7 +233,6 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (!isAllowedDomain(targetUrl)) {
-      console.warn(`[Proxy] Blocked request to non-allowlisted domain: ${targetUrl} from ${clientIp}`);
       res.writeHead(403, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Domain not allowed.' }));
       return;
@@ -245,10 +252,13 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 8082;
+const PORT = 8082;
 server.listen(PORT, () => {
-  console.log(`[Proxy] Proxy server running on port ${PORT}`);
-  console.log(`[Proxy] Query parameter: ?t=<url>`);
-  console.log(`[Proxy] Allowlist: ${allowlist ? allowlist.size + ' domains' : 'DISABLED'}`);
-  console.log(`[Proxy] Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW / 1000} seconds per IP`);
+  console.log(`[Proxy] Local proxy server running on http://localhost:${PORT}`);
+  console.log(`[Proxy] Mode: ${isLocalMode ? 'LOCAL (no restrictions)' : 'PRODUCTION (allowlist + rate limiting)'}`);
+  console.log(`[Proxy] Query parameter: ?${SECRET_PARAM}=<url>`);
+  if (!isLocalMode) {
+    console.log(`[Proxy] Rate limit: ${RATE_LIMIT_MAX_REQUESTS} requests per minute per IP`);
+    console.log(`[Proxy] Allowlist: ${allowlist ? allowlist.size + ' domains' : 'DISABLED'}`);
+  }
 });
