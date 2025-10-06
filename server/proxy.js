@@ -119,14 +119,40 @@ async function fetchAndParse(targetUrl) {
   try {
     browser = await puppeteer.launch({
         headless: "new",
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+        args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--no-zygote',
+            '--single-process'  // This is the key one for Docker
+        ]
     });
     const page = await browser.newPage();
     
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
     
-    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    // Block unnecessary resources to speed up loading
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+        if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
+            req.abort();
+        } else {
+            req.continue();
+        }
+    });
+    
+    // Try networkidle2 first, fall back to domcontentloaded if timeout
+    try {
+        await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    } catch (timeoutError) {
+        console.warn(`[Proxy] Timeout with networkidle2, trying domcontentloaded...`);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    }
 
     const html = await page.content();
 
