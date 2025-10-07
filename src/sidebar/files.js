@@ -57,7 +57,7 @@ function renderTreeNodes(nodes, statuses, currentFile, expandedFolders, depth) {
         if (node.type === 'folder') {
             const isExpanded = expandedFolders.has(node.path);
             html += `
-                <li class="file-tree-item is-folder ${isExpanded ? 'expanded' : ''}" data-path="${node.path}" style="${indentStyle}">
+                <li class="file-tree-item is-folder ${isExpanded ? 'expanded' : ''}" data-path="${node.path}" style="${indentStyle}" draggable="true">
                     <span class="folder-name">${key}</span>
                 </li>
                 <ul class="nested-list ${isExpanded ? 'active' : ''}">
@@ -67,12 +67,11 @@ function renderTreeNodes(nodes, statuses, currentFile, expandedFolders, depth) {
         } else { // type is 'file'
             const status = statuses.get(node.path) || 'unmodified';
             const classes = [];
-            // Note: The active class is now applied to the parent <li> for easier styling
             if (node.path === currentFile) {
                 classes.push('active');
             }
             html += `
-                <li class="file-tree-item is-file ${classes.join(' ')}" style="${indentStyle}">
+                <li class="file-tree-item is-file ${classes.join(' ')}" data-path="${node.path}" style="${indentStyle}" draggable="true">
                     <a href="#${node.path}" class="status-${status}" data-filepath="${node.path}">${key}</a>
                 </li>
             `;
@@ -99,26 +98,22 @@ export const fileActions = {
       const expandedFoldersRaw = sessionStorage.getItem(`expanded_folders_${this.gitClient.gardenName}`);
       const expandedFolders = new Set(expandedFoldersRaw ? JSON.parse(expandedFoldersRaw) : []);
       
-      // --- NEW LOGIC STARTS HERE ---
-      // If there's an active file, ensure all its parent folders are expanded.
       if (currentFile) {
-        const parts = currentFile.split('/').filter(p => p); // e.g., ['/projects', 'idea', 'file'] -> ['projects', 'idea', 'file']
+        const parts = currentFile.split('/').filter(p => p);
         let currentPath = '';
-        // Iterate through the parts to build parent folder paths, excluding the filename itself.
         for (let i = 0; i < parts.length - 1; i++) {
-          currentPath += `/${parts[i]}`; // builds up to '/projects' then '/projects/idea'
+          currentPath += `/${parts[i]}`;
           expandedFolders.add(currentPath);
         }
       }
-      // --- NEW LOGIC ENDS HERE ---
 
       const treeHTML = renderTreeNodes(fileTree, statuses, currentFile, expandedFolders, 0);
 
       this.contentContainer.innerHTML = `<ul class="file-tree-root">${treeHTML}</ul>`;
       
-      // Add event listeners to toggle folders on click
       this.contentContainer.querySelectorAll('.is-folder').forEach(folderEl => {
-        folderEl.addEventListener('click', () => {
+        folderEl.addEventListener('click', (e) => {
+            if (e.target.closest('a')) return; // Ignore clicks on links inside
             const path = folderEl.dataset.path;
             const nestedList = folderEl.nextElementSibling;
             
@@ -137,9 +132,101 @@ export const fileActions = {
         });
       });
 
+      // --- DRAG AND DROP EVENT LISTENERS ---
+      let draggedElement = null;
+      const self = this; // Capture 'this' context for event handlers
+
+      this.contentContainer.addEventListener('dragstart', (e) => {
+          const target = e.target.closest('.file-tree-item');
+          if (target) {
+              draggedElement = target;
+              e.dataTransfer.setData('text/plain', target.dataset.path);
+              e.dataTransfer.effectAllowed = 'move';
+              setTimeout(() => target.classList.add('is-dragging'), 0);
+          }
+      });
+
+      this.contentContainer.addEventListener('dragend', (e) => {
+          if (draggedElement) {
+              draggedElement.classList.remove('is-dragging');
+              draggedElement = null;
+          }
+      });
+
+      this.contentContainer.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          const target = e.target.closest('.file-tree-item.is-folder');
+          if (target && target !== draggedElement && !target.dataset.path.startsWith(draggedElement.dataset.path + '/')) {
+              this.contentContainer.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+              target.classList.add('drop-target');
+          }
+      });
+
+      this.contentContainer.addEventListener('dragleave', (e) => {
+          const target = e.target.closest('.drop-target');
+          if (target) {
+              target.classList.remove('drop-target');
+          }
+      });
+
+      this.contentContainer.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          const dropTarget = e.target.closest('.drop-target');
+          this.contentContainer.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+
+          if (dropTarget && draggedElement) {
+              const sourcePath = e.dataTransfer.getData('text/plain');
+              const destFolderPath = dropTarget.dataset.path;
+              await self.handleFileMove(sourcePath, destFolderPath);
+          }
+      });
+
     } catch (e) {
       console.error('Error rendering file list:', e);
       this.contentContainer.innerHTML = `<p class="sidebar-error">Could not load files.</p>`;
+    }
+  },
+
+  async handleFileMove(sourcePath, destFolderPath) {
+    const sourceFilename = sourcePath.split('/').pop();
+    const newPath = `${destFolderPath}/${sourceFilename}`;
+
+    // Safety check: prevent moving a parent into its own child
+    if (destFolderPath.startsWith(sourcePath + '/')) {
+      await this.showAlert({ title: 'Invalid Move', message: 'Cannot move a folder into one of its own sub-folders.' });
+      return;
+    }
+
+    // Safety check: check for name collisions
+    try {
+      await this.gitClient.pfs.stat(newPath);
+      await this.showAlert({ title: 'Move Failed', message: `An item named "${sourceFilename}" already exists in the destination folder.` });
+      return;
+    } catch (e) {
+      // ENOENT is expected, means no collision
+      if (e.code !== 'ENOENT') throw e;
+    }
+
+    const confirmed = await this.showConfirm({
+        title: 'Move Item?',
+        message: `This will move the item to the new location. <br><br><strong>Warning:</strong> This will NOT automatically update wikilinks, which may cause them to break.`,
+        okText: 'Move Item',
+    });
+
+    if (confirmed) {
+        try {
+            await this.gitClient.pfs.rename(sourcePath, newPath);
+            
+            // If we moved the currently active file, update the URL
+            if (decodeURIComponent(window.location.hash) === `#${sourcePath}`) {
+                window.location.hash = `#${newPath}`;
+            }
+
+            await this.refresh();
+        } catch(e) {
+            console.error('Error moving file:', e);
+            await this.showAlert({ title: 'Error', message: 'Failed to move the item. Check the console for details.' });
+        }
     }
   },
 
@@ -155,7 +242,6 @@ export const fileActions = {
       await this.showAlert({ title: 'File Exists', message: `File "${newName}" already exists.` });
     } catch (e) {
       if (e.code === 'ENOENT') {
-        // Create an empty file, writeFile will handle creating parent directories
         await this.gitClient.writeFile(newPath, '');
         window.location.hash = `#${newPath}`;
       } else {
@@ -172,7 +258,6 @@ export const fileActions = {
         defaultValue: oldPath.substring(1)
     });
     if (!newName || newName === oldPath.substring(1)) return;
-
     const newPath = `/${newName}`;
     
     try {

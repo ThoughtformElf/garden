@@ -65,3 +65,19 @@
   background-color: var(--color-background-active);
   font-weight: bold;
 }
+
+.file-tree-item.active {
+  background-color: var(--color-background-active);
+  font-weight: bold;
+}
+
+/* --- DRAG AND DROP STYLES --- */
+.file-tree-item.is-dragging {
+  opacity: 0.4;
+}
+
+.file-tree-item.is-folder.drop-target {
+  background-color: var(--color-background-active);
+  outline: 1px dashed var(--base-accent-action);
+  outline-offset: -2px;
+}
