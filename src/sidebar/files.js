@@ -66,13 +66,14 @@ function renderTreeNodes(nodes, statuses, currentFile, expandedFolders, depth) {
             `;
         } else { // type is 'file'
             const status = statuses.get(node.path) || 'unmodified';
-            const classes = [`status-${status}`];
+            const classes = [];
+            // Note: The active class is now applied to the parent <li> for easier styling
             if (node.path === currentFile) {
                 classes.push('active');
             }
             html += `
-                <li class="file-tree-item is-file" style="${indentStyle}">
-                    <a href="#${node.path}" class="${classes.join(' ')}" data-filepath="${node.path}">${key}</a>
+                <li class="file-tree-item is-file ${classes.join(' ')}" style="${indentStyle}">
+                    <a href="#${node.path}" class="status-${status}" data-filepath="${node.path}">${key}</a>
                 </li>
             `;
         }
@@ -98,6 +99,19 @@ export const fileActions = {
       const expandedFoldersRaw = sessionStorage.getItem(`expanded_folders_${this.gitClient.gardenName}`);
       const expandedFolders = new Set(expandedFoldersRaw ? JSON.parse(expandedFoldersRaw) : []);
       
+      // --- NEW LOGIC STARTS HERE ---
+      // If there's an active file, ensure all its parent folders are expanded.
+      if (currentFile) {
+        const parts = currentFile.split('/').filter(p => p); // e.g., ['/projects', 'idea', 'file'] -> ['projects', 'idea', 'file']
+        let currentPath = '';
+        // Iterate through the parts to build parent folder paths, excluding the filename itself.
+        for (let i = 0; i < parts.length - 1; i++) {
+          currentPath += `/${parts[i]}`; // builds up to '/projects' then '/projects/idea'
+          expandedFolders.add(currentPath);
+        }
+      }
+      // --- NEW LOGIC ENDS HERE ---
+
       const treeHTML = renderTreeNodes(fileTree, statuses, currentFile, expandedFolders, 0);
 
       this.contentContainer.innerHTML = `<ul class="file-tree-root">${treeHTML}</ul>`;
