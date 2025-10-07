@@ -1,0 +1,67 @@
+/* New stylesheet for the file tree */
+.file-tree-root, .nested-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  padding-top: .25rem;
+  padding-bottom: .25rem;
+  padding-right: .5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-tree-item:hover {
+  background-color: var(--color-background-hover);
+}
+
+.file-tree-item.is-folder {
+  font-weight: 500;
+}
+
+.file-tree-item a {
+  text-decoration: none;
+  color: var(--color-text-primary);
+  display: block;
+  width: 100%;
+}
+
+/* The folder toggle icon */
+.file-tree-item.is-folder::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: .5rem;
+  font-size: 0.7rem;
+  transition: transform 0.1s ease-in-out;
+  flex-shrink: 0;
+}
+
+.file-tree-item.is-folder.expanded::before {
+  transform: rotate(90deg);
+}
+
+.nested-list {
+  display: none;
+}
+
+.nested-list.active {
+  display: block;
+}
+
+/* Keep existing status colors and active file styles */
+.file-tree-item a.status-modified {
+  color: var(--base-accent-warning);
+}
+
+.file-tree-item a.active,
+.sidebar-content.files-view .active > a {
+  background-color: var(--color-background-active);
+  font-weight: bold;
+}
