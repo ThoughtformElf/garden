@@ -81,3 +81,9 @@
   outline: 1px dashed var(--base-accent-action);
   outline-offset: -2px;
 }
+
+.file-tree-root.drop-target {
+  outline: 2px dashed var(--base-accent-action);
+  outline-offset: -2px;
+  background-color: var(--color-background-secondary);
+}

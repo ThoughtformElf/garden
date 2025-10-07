@@ -62,28 +62,20 @@ export class Git {
     }
   }
 
-  /**
-   * THIS IS THE BUGFIX.
-   * This version uses a sequential loop instead of Promise.all to guarantee
-   * that a directory's contents are fully deleted before the directory itself is removed.
-   * This prevents the ENOTEMPTY error.
-   */
   async rmrf(path) {
     try {
         const stat = await this.pfs.stat(path);
         if (stat.isDirectory()) {
             const entries = await this.pfs.readdir(path);
-            // Use a sequential for...of loop to ensure operations complete in order.
             for (const entry of entries) {
                 await this.rmrf(`${path}/${entry}`);
             }
-            // This line will now only run after the directory is truly empty.
             await this.pfs.rmdir(path);
         } else {
             await this.pfs.unlink(path);
         }
     } catch (e) {
-        if (e.code !== 'ENOENT') { // Ignore if file/dir doesn't exist
+        if (e.code !== 'ENOENT') {
             console.error(`Error during rmrf for ${path}:`, e);
             throw e;
         }
@@ -105,7 +97,10 @@ export class Git {
     for (const part of parts) {
       currentPath += `/${part}`;
       try {
-        await this.pfs.stat(currentPath);
+        const stat = await this.pfs.stat(currentPath);
+        if (!stat.isDirectory()) {
+          throw new Error(`A file exists at '${currentPath}' which conflicts with the desired directory structure.`);
+        }
       } catch (e) {
         if (e.code === 'ENOENT') {
           try {

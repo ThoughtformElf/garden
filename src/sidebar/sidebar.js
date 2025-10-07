@@ -65,29 +65,6 @@ export class Sidebar {
     });
   }
 
-  async ensureDir(path) {
-    const parts = path.split('/').filter(p => p);
-    let currentPath = '';
-    for (const part of parts) {
-      currentPath += `/${part}`;
-      try {
-        await this.gitClient.pfs.stat(currentPath);
-      } catch (e) {
-        if (e.code === 'ENOENT') {
-          try {
-            await this.gitClient.pfs.mkdir(currentPath);
-          } catch (mkdirError) {
-            if (mkdirError.code !== 'EEXIST') {
-              throw mkdirError;
-            }
-          }
-        } else {
-          throw e;
-        }
-      }
-    }
-  }
-
   setupContextMenus() {
     const commandPaletteItem = [
       { type: 'separator' },
@@ -96,13 +73,13 @@ export class Sidebar {
 
     new ContextMenu({
       targetSelector: '.sidebar-content.files-view',
-      itemSelector: '[data-filepath]',
-      dataAttribute: 'data-filepath',
+      itemSelector: '.file-tree-item', // Updated selector
+      dataAttribute: 'data-path',     // Updated data attribute
       items: [
         { label: 'New File', action: () => this.handleNewFile() },
-        { label: 'Rename', action: (filepath) => this.handleRename(filepath) },
-        { label: 'Duplicate', action: (filepath) => this.handleDuplicate(filepath) },
-        { label: 'Delete', action: (filepath) => this.handleDelete(filepath) },
+        { label: 'Rename', action: (path) => this.handleRename(path) },
+        { label: 'Duplicate', action: (path) => this.handleDuplicate(path) },
+        { label: 'Delete', action: (path) => this.handleDelete(path) },
         ...commandPaletteItem
       ],
       containerItems: [
@@ -173,9 +150,14 @@ export class Sidebar {
     this.tabsContainer.querySelector('[data-tab="Git"]').classList.toggle('dirty', isDirty);
   }
 
-  async listFiles(gitClient, dir) {
+  /**
+   * THIS IS THE BUGFIX.
+   * This function now recursively finds ALL paths, including empty directories,
+   * ensuring the sidebar is a true representation of the file system.
+   */
+  async listAllPaths(gitClient, dir) {
     const pfs = gitClient.pfs;
-    let fileList = [];
+    let allPaths = [];
     try {
       const items = await pfs.readdir(dir);
       for (const item of items) {
@@ -183,14 +165,14 @@ export class Sidebar {
         const path = `${dir === '/' ? '' : dir}/${item}`;
         try {
           const stat = await pfs.stat(path);
+          allPaths.push({ path, isDirectory: stat.isDirectory() });
           if (stat.isDirectory()) {
-            fileList = fileList.concat(await this.listFiles(gitClient, path));
-          } else {
-            fileList.push(path);
+            const subPaths = await this.listAllPaths(gitClient, path);
+            allPaths = allPaths.concat(subPaths);
           }
         } catch (e) { console.warn(`Could not stat ${path}, skipping.`); }
       }
-    } catch (e) { console.log(`Directory not found: ${dir}. No files to list.`); }
-    return fileList;
+    } catch (e) { console.log(`Directory not found: ${dir}. No items to list.`); }
+    return allPaths;
   }
 }
