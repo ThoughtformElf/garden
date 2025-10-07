@@ -2,13 +2,12 @@
 import { Modal } from '../util/modal.js';
 
 /**
- * THIS IS THE BUGFIX.
- * This function now correctly builds a tree from a list that includes
- * both files and explicit directory entries.
+ * Helper to build a hierarchical tree from a flat list of file paths.
+ * @param {object[]} paths - An array of objects with path and isDirectory properties.
+ * @returns {object} A nested object representing the folder structure.
  */
 function buildTree(paths) {
     const tree = {};
-    // Sort paths to ensure parent directories are created before their children
     paths.sort((a, b) => a.path.localeCompare(b.path));
 
     for (const { path, isDirectory } of paths) {
@@ -16,22 +15,20 @@ function buildTree(paths) {
         let currentNode = tree;
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
-            if (i === parts.length - 1) { // This is the final component
+            if (i === parts.length - 1) {
                 if (!currentNode[part]) {
                     currentNode[part] = isDirectory
                         ? { type: 'folder', path: path, children: {} }
                         : { type: 'file', path: path };
                 }
-            } else { // This is a parent directory
+            } else {
                 if (!currentNode[part]) {
-                    // Create it if it doesn't exist from a previous entry
                     currentNode[part] = {
                         type: 'folder',
                         path: '/' + parts.slice(0, i + 1).join('/'),
                         children: {}
                     };
                 }
-                // In case a file entry created a virtual folder, ensure it has children
                 if (!currentNode[part].children) {
                     currentNode[part].children = {};
                 }
@@ -85,7 +82,6 @@ function renderTreeNodes(nodes, statuses, currentFile, expandedFolders, depth) {
 export const fileActions = {
   async renderFiles(statusMatrix) {
     try {
-      // Use the new, comprehensive listing function
       const allPaths = await this.listAllPaths(this.gitClient, '/');
       const statuses = new Map();
       for (const [filepath, head, workdir] of statusMatrix) {
@@ -238,8 +234,11 @@ export const fileActions = {
   },
 
   async handleRename(oldPath) {
+    const stat = await this.gitClient.pfs.stat(oldPath);
+    const itemType = stat.isDirectory() ? 'Folder' : 'File';
+
     const newName = await Modal.prompt({
-        title: 'Rename File',
+        title: `Rename ${itemType}`,
         label: `Enter new name for ${oldPath.substring(1)}:`,
         defaultValue: oldPath.substring(1)
     });
@@ -248,9 +247,9 @@ export const fileActions = {
     const newPath = `/${newName}`;
     
     try {
-      const stat = await this.gitClient.pfs.stat(newPath);
-      const itemType = stat.isDirectory() ? 'folder' : 'file';
-      await this.showAlert({ title: 'Rename Failed', message: `A ${itemType} named "${newName}" already exists.` });
+      const existingStat = await this.gitClient.pfs.stat(newPath);
+      const existingItemType = existingStat.isDirectory() ? 'folder' : 'file';
+      await this.showAlert({ title: 'Rename Failed', message: `A ${existingItemType} named "${newName}" already exists.` });
       return;
     } catch (e) {
       if (e.code !== 'ENOENT') {
@@ -287,46 +286,61 @@ export const fileActions = {
     }
   },
   
-  async handleDuplicate(filepath) {
-    const directory = filepath.substring(0, filepath.lastIndexOf('/'));
-    const originalFilename = filepath.substring(filepath.lastIndexOf('/') + 1);
+  async handleDuplicate(path) {
+    const stat = await this.gitClient.pfs.stat(path);
+    if (stat.isDirectory()) {
+        await this.showAlert({ title: 'Action Not Supported', message: 'Duplicating folders is not yet supported.' });
+        return;
+    }
+
+    const directory = path.substring(0, path.lastIndexOf('/'));
+    const originalFilename = path.substring(path.lastIndexOf('/') + 1);
     const defaultName = `${originalFilename.split('.').slice(0, -1).join('.') || originalFilename} (copy)${originalFilename.includes('.') ? '.' + originalFilename.split('.').pop() : ''}`;
+    
     const newFilename = await Modal.prompt({
         title: 'Duplicate File',
         label: 'Enter name for duplicated file:',
         defaultValue: defaultName
     });
     if (!newFilename) return;
+
     const newPath = `${directory}/${newFilename}`;
     try {
-      const rawContent = await this.gitClient.readFile(filepath);
+      const rawContent = await this.gitClient.readFile(path);
       await this.gitClient.writeFile(newPath, rawContent);
       await this.refresh();
     } catch (e) {
       console.error('Error duplicating file:', e);
-      await this.showAlert({ title: 'Error', message: 'Failed to duplicate file.' });
+      await this.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
     }
   },
 
-  async handleDelete(filepath) {
+  async handleDelete(path) {
+    const stat = await this.gitClient.pfs.stat(path);
+    const itemType = stat.isDirectory() ? 'folder' : 'file';
+
     const confirmed = await this.showConfirm({
-      title: 'Delete File',
-      message: `Are you sure you want to permanently delete "${filepath}"? This cannot be undone.`,
+      title: `Delete ${itemType}`,
+      message: `Are you sure you want to permanently delete the ${itemType} "${path}"? This cannot be undone.`,
       okText: 'Delete',
       destructive: true
     });
+
     if (confirmed) {
       try {
-        const wasViewingDeletedFile = decodeURIComponent(window.location.hash) === `#${filepath}`;
-        await this.gitClient.pfs.unlink(filepath);
+        const wasViewingDeletedFile = decodeURIComponent(window.location.hash).startsWith(`#${path}`);
+        
+        // Use the robust rmrf that handles both files and folders
+        await this.gitClient.rmrf(path);
+
         if (wasViewingDeletedFile) {
           window.location.hash = '#/home';
         } else {
           await this.refresh();
         }
       } catch (e) {
-        console.error(`Error deleting file:`, e);
-        await this.showAlert({ title: 'Error', message: 'Failed to delete file.' });
+        console.error(`Error deleting ${itemType}:`, e);
+        await this.showAlert({ title: 'Error', message: `Failed to delete ${itemType}.` });
       }
     }
   }
