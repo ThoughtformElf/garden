@@ -1,5 +1,6 @@
 // src/util/command-palette.js
 import { Git } from './git-integration.js';
+import { executeFile } from '../executor.js';
 
 export class CommandPalette {
   constructor({ gitClient, editor }) {
@@ -54,13 +55,8 @@ export class CommandPalette {
     
     await Promise.all(gardens.map(async (gardenName) => {
       const tempGitClient = new Git(gardenName);
-      // --- THIS IS THE FIX (Part 1) ---
-      // Call the new `listAllPaths` method which correctly finds all nested files.
       const allPaths = await this.editor.sidebar.listAllPaths(tempGitClient, '/');
       
-      // --- THIS IS THE FIX (Part 2) ---
-      // `listAllPaths` returns objects {path, isDirectory}. We must filter out
-      // directories and then use the `path` property.
       for (const file of allPaths) {
         if (!file.isDirectory) {
             const filePath = file.path;
@@ -88,7 +84,7 @@ export class CommandPalette {
 
     if (this.mode === 'execute') {
       this.titleElement.textContent = 'Executing a File...';
-      this.input.placeholder = 'Find a .js file to execute...';
+      this.input.placeholder = 'Find a .js file to execute across all gardens...';
     } else {
       this.titleElement.textContent = 'Searching Files...';
       this.input.placeholder = 'Find file across all gardens...';
@@ -126,9 +122,6 @@ export class CommandPalette {
     
     document.removeEventListener('keydown', this.handleKeyDown);
 
-    // --- THIS IS THE FIX ---
-    // Return keyboard focus to the editor so the user can immediately resume typing
-    // and use editor-bound shortcuts again.
     if (this.editor && this.editor.editorView) {
       this.editor.editorView.focus();
     }
@@ -140,9 +133,8 @@ export class CommandPalette {
     let sourceFiles = this.crossGardenFileCache;
 
     if (this.mode === 'execute') {
-        sourceFiles = this.crossGardenFileCache.filter(file => 
-            file.garden === this.gitClient.gardenName && file.path.endsWith('.js')
-        );
+        // Find all .js files across ALL gardens
+        sourceFiles = this.crossGardenFileCache.filter(file => file.path.endsWith('.js'));
     }
 
     if (!this.query) {
@@ -207,16 +199,10 @@ export class CommandPalette {
     
     if (this.mode === 'execute') {
       this.close();
-      try {
-        const fileContent = await this.gitClient.readFile(file.path);
-        // Pass editor and git globals into the executed script's scope
-        const executable = new Function('editor', 'git', fileContent);
-        const result = await executable(this.editor, this.gitClient);
-        console.log(`Execution successful for ${file.path}. Result:`, result);
-      } catch (error) {
-        console.error(`Execution failed for ${file.path}:`, error);
-        window.thoughtform.ui.toggleDevtools?.(true, 'console');
-      }
+      // Use the 'garden#path' format that the Universal Executor expects
+      const fullPath = `${file.garden}#${file.path}`;
+      executeFile(fullPath, this.editor, this.gitClient);
+
     } else { // 'search' mode
       if (file.garden !== this.gitClient.gardenName) {
         const fullPath = new URL(import.meta.url).pathname;

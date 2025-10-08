@@ -4,8 +4,6 @@
 // and contains data about the event that triggered the hook.
 // For 'file:create', it looks like: { path: '/path/to/new-file.md' }
 
-(function() {
-  console.log('--- HOOK: file:create ---');
-  console.log('A new file was created at path:', event.path);
-  console.log('You could use the "editor" and "git" globals here to modify it, for example, by adding a template.');
-})();
+console.log('--- HOOK: file:create ---');
+console.log('A new file was created at path:', event.path);
+console.log('You could use the "editor" and "git" globals here to modify it, for example, by adding a template.');

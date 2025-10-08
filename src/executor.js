@@ -26,6 +26,14 @@ export async function executeFile(path, editor, git, event = null) {
 
     const gitClientToUse = (gardenName !== git.gardenName) ? new Git(gardenName) : git;
 
+    // --- THIS IS THE FIX ---
+    // If we created a new client for a different garden, we must ensure its
+    // file system is initialized before proceeding. This prevents race conditions.
+    if (gardenName !== git.gardenName) {
+      await gitClientToUse.initRepo();
+    }
+    // --- END OF FIX ---
+
     console.log(`[Executor] Running file: ${filePath} from garden: ${gardenName}`);
     const fileContent = await gitClientToUse.readFile(filePath);
 
