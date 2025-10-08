@@ -19,7 +19,6 @@ import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, linkNavigationKeymap } from './navigation.js';
 import { aiChatKeymap } from './keymaps/ai.js';
-import { promptInsertionKeymap } from './keymaps/prompt.js';
 
 const programmaticChange = Annotation.define();
 
@@ -90,10 +89,8 @@ export class Editor {
       }
     });
     
-    Vim.map('jj', '<Esc>', 'insert');
-
-    // --- ALL CUSTOM KEYMAPS ARE DEFINED AND ORDERED HERE ---
-
+    const editingMode = await window.thoughtform.config.get('interface.yml', 'editingMode');
+    
     const browserNavigationKeymap = keymap.of([
       { key: 'Alt-ArrowLeft', run: () => { window.history.back(); return true; } },
       { key: 'Alt-ArrowRight', run: () => { window.history.forward(); return true; } },
@@ -105,65 +102,59 @@ export class Editor {
       { key: 'Mod-`', run: () => { window.thoughtform.ui.toggleDevtools?.(null, null); return true; } },
     ]);
 
+    const extensions = [
+      appContextField.init(() => ({
+        gitClient: this.gitClient,
+        sidebar: this.sidebar,
+      })),
+      globalShortcutsKeymap,
+      browserNavigationKeymap,
+      aiChatKeymap,
+      linkNavigationKeymap,
+      keymap.of([indentWithTab]),
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      keymap.of([
+          ...closeBracketsKeymap,
+          ...searchKeymap,
+          ...historyKeymap,
+          ...foldKeymap,
+          ...completionKeymap,
+          ...lintKeymap
+      ]),
+      EditorView.lineWrapping,
+      lineNumbersRelative,
+      basicDark,
+      this.languageCompartment.of(getLanguageExtension(this.filePath)),
+      updateListener,
+      ...allHighlightPlugins,
+      diffCompartment.of([]),
+      this.tokenCounterCompartment.of(createTokenCounterExtension()),
+      ...(this.editorConfig.extensions || []),
+    ];
+
+    if (editingMode === 'vim') {
+      Vim.map('jj', '<Esc>', 'insert');
+      extensions.push(vim());
+    }
+
     this.editorView = new EditorView({
       doc: initialContent,
-      extensions: [
-        appContextField.init(() => ({
-          gitClient: this.gitClient,
-          sidebar: this.sidebar,
-        })),
-
-        // 1. HIGHEST PRIORITY: App/Browser-level overrides that must always win.
-        globalShortcutsKeymap,
-        browserNavigationKeymap,
-        
-        // 2. CONTEXT-SPECIFIC: Editor actions that have specific contexts.
-        aiChatKeymap,
-        linkNavigationKeymap,
-        promptInsertionKeymap, // THIS IS THE FIX: Added the new keymap here.
-        keymap.of([indentWithTab]),
-        
-        // 3. THE VIM EXTENSION: This now has a clean environment to manage its state.
-        vim(),
-        
-        // 4. REPLACEMENT FOR `basicSetup` (omitting the conflicting `defaultKeymap`).
-        //    This provides all the standard editor UI and features.
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        highlightSpecialChars(),
-        history(),
-        foldGutter(),
-        drawSelection(),
-        dropCursor(),
-        EditorState.allowMultipleSelections.of(true),
-        indentOnInput(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        bracketMatching(),
-        closeBrackets(),
-        autocompletion(),
-        rectangularSelection(),
-        highlightActiveLine(),
-        highlightSelectionMatches(),
-        keymap.of([
-            ...closeBracketsKeymap,
-            ...searchKeymap,
-            ...historyKeymap,
-            ...foldKeymap,
-            ...completionKeymap,
-            ...lintKeymap
-        ]),
-
-        // 5. YOUR CUSTOM PLUGINS AND THEME:
-        EditorView.lineWrapping,
-        lineNumbersRelative,
-        basicDark,
-        this.languageCompartment.of(getLanguageExtension(this.filePath)),
-        updateListener,
-        ...allHighlightPlugins,
-        diffCompartment.of([]),
-        this.tokenCounterCompartment.of(createTokenCounterExtension()),
-        ...(this.editorConfig.extensions || []),
-      ],
+      extensions: extensions,
       parent: this.mainContainer,
     });
     

@@ -4,6 +4,12 @@ import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
 
+// --- Vite Raw Imports for Default Settings Scaffolding ---
+import defaultInterfaceYml from '../settings/interface.yml?raw';
+import defaultKeymapsYml from '../settings/keymaps.yml?raw';
+import defaultPromptJs from '../settings/keymaps/prompt.js?raw';
+
+
 /**
  * @class Git
  * @description Encapsulates all isomorphic-git and file system functionality
@@ -39,13 +45,37 @@ export class Git {
         defaultBranch: 'main'
       });
 
-      const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
-      await this.pfs.writeFile('/home', defaultContent, 'utf8');
+      if (this.gardenName === 'Settings') {
+        await this.populateDefaultSettings();
+      } else {
+        const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
+        await this.pfs.writeFile('/home', defaultContent, 'utf8');
+      }
 
       this.registerNewGarden();
       console.log('New garden initialized successfully.');
     } catch (e) {
       console.error('Error initializing repository:', e);
+    }
+  }
+  
+  async populateDefaultSettings() {
+    console.log('[Git] Populating "Settings" garden with default files...');
+    await this.ensureDir('/keymaps');
+    
+    // An array of [path, content] pairs
+    const defaultFiles = [
+      ['/interface.yml', defaultInterfaceYml],
+      ['/keymaps.yml', defaultKeymapsYml],
+      ['/keymaps/prompt.js', defaultPromptJs]
+    ];
+
+    for (const [path, content] of defaultFiles) {
+      try {
+        await this.pfs.writeFile(path, content, 'utf8');
+      } catch (error) {
+        console.error(`[Git] Failed to write default setting file: ${path}`, error);
+      }
     }
   }
 

@@ -11,68 +11,79 @@ import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
 import { runMigration } from './util/migration.js';
-import { initializeAiService } from './ai/index.js'; // Import the new AI service
+import { initializeAiService } from './ai/index.js';
+import { initializeConfigService } from './config.js'; // Import the new Config service
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
   ui: {},
-  ai: initializeAiService(), // Initialize and attach the AI service
+  ai: initializeAiService(),
+  config: initializeConfigService(), // Initialize and attach the Config service
 };
 
 // --- Main Application Logic ---
-const fullPath = new URL(import.meta.url).pathname;
-const srcIndex = fullPath.lastIndexOf('/src/');
-const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
+async function main() {
+  const fullPath = new URL(import.meta.url).pathname;
+  const srcIndex = fullPath.lastIndexOf('/src/');
+  const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
 
-let gardenName = window.location.pathname.startsWith(basePath)
-  ? window.location.pathname.substring(basePath.length)
-  : window.location.pathname;
+  // --- Ensure the Settings garden exists on every load ---
+  const settingsGit = new Git('Settings');
+  await settingsGit.initRepo();
+  // ---
 
-gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
-gardenName = decodeURIComponent(gardenName);
+  let gardenName = window.location.pathname.startsWith(basePath)
+    ? window.location.pathname.substring(basePath.length)
+    : window.location.pathname;
 
-console.log(`Base Path: "${basePath}"`);
-console.log(`Loading garden: "${gardenName}"`);
+  gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
+  gardenName = decodeURIComponent(gardenName);
 
-const gitClient = new Git(gardenName);
+  console.log(`Base Path: "${basePath}"`);
+  console.log(`Loading garden: "${gardenName}"`);
 
-initializeAppInteractions();
-initializeDevTools();
-window.thoughtform.runMigration = runMigration;
+  const gitClient = new Git(gardenName);
 
-// --- Global Error Handling ---
-window.onerror = function(message, source, lineno, colno, error) {
-  console.error("Caught global error:", message, error);
-  window.thoughtform.ui.toggleDevtools?.(true, 'console');
-  return false;
-};
+  initializeAppInteractions();
+  initializeDevTools();
+  window.thoughtform.runMigration = runMigration;
 
-window.onunhandledrejection = function(event) {
-  console.error("Caught unhandled promise rejection:", event.reason);
-  window.thoughtform.ui.toggleDevtools?.(true, 'console');
-};
+  // --- Global Error Handling ---
+  window.onerror = function(message, source, lineno, colno, error) {
+    console.error("Caught global error:", message, error);
+    window.thoughtform.ui.toggleDevtools?.(true, 'console');
+    return false;
+  };
 
-const commandPalette = new CommandPalette({ gitClient: null, editor: null });
-window.thoughtform.commandPalette = commandPalette;
+  window.onunhandledrejection = function(event) {
+    console.error("Caught unhandled promise rejection:", event.reason);
+    window.thoughtform.ui.toggleDevtools?.(true, 'console');
+  };
 
-const editor = new Editor({
-  target: 'main',
-  gitClient: gitClient,
-  commandPalette: commandPalette
-});
+  const commandPalette = new CommandPalette({ gitClient: null, editor: null });
+  window.thoughtform.commandPalette = commandPalette;
 
-// Attach the editor instance to the global object so other modules can access it.
-window.thoughtform.editor = editor;
+  // Now we can create the editor
+  const editor = new Editor({
+    target: 'main',
+    gitClient: gitClient,
+    commandPalette: commandPalette
+  });
 
-const checkEditorReady = setInterval(() => {
-  if (editor.isReady) {
-    clearInterval(checkEditorReady);
-    
-    commandPalette.gitClient = gitClient;
-    commandPalette.editor = editor;
+  // Attach the editor instance to the global object so other modules can access it.
+  window.thoughtform.editor = editor;
 
-    // The problematic global keydown listener has been completely removed.
-    // All keyboard handling is now managed correctly within the CodeMirror extensions.
+  const checkEditorReady = setInterval(() => {
+    if (editor.isReady) {
+      clearInterval(checkEditorReady);
+      
+      commandPalette.gitClient = gitClient;
+      commandPalette.editor = editor;
 
-  }
-}, 100);
+      // Initialize the config service now that the editor is ready
+      window.thoughtform.config.initialize();
+    }
+  }, 100);
+}
+
+main();
