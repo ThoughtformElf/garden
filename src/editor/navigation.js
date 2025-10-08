@@ -20,12 +20,20 @@ export const appContextField = StateField.define({
 async function findFileCaseInsensitive(targetPath, appContext) {
   if (!appContext.sidebar || !appContext.gitClient) return null;
 
-  const allFiles = await appContext.sidebar.listFiles(appContext.gitClient, '/');
+  // --- THIS IS THE FIX (Part 1) ---
+  // Use the new `listAllPaths` function.
+  const allPaths = await appContext.sidebar.listAllPaths(appContext.gitClient, '/');
   
   // Normalize the target path for comparison
   const normalizedTargetPath = targetPath.toLowerCase()
 
-  for (const filePath of allFiles) {
+  // --- THIS IS THE FIX (Part 2) ---
+  // The new function returns objects `{path, isDirectory}`, so we must
+  // destructure the path and ignore directories.
+  for (const { path, isDirectory } of allPaths) {
+    if (isDirectory) continue; // Skip folders
+
+    const filePath = path;
     // Normalize the file from the list for comparison
     const normalizedFilePath = (filePath.startsWith('/') ? filePath.substring(1) : filePath).toLowerCase();
     if (normalizedFilePath === normalizedTargetPath) {

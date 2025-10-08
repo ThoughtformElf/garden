@@ -54,13 +54,22 @@ export class CommandPalette {
     
     await Promise.all(gardens.map(async (gardenName) => {
       const tempGitClient = new Git(gardenName);
-      const files = await this.editor.sidebar.listFiles(tempGitClient, '/');
-      for (const filePath of files) {
-        fileIndex.push({
-          garden: gardenName,
-          path: filePath,
-          searchString: `${gardenName} ${filePath.substring(1)}`.toLowerCase()
-        });
+      // --- THIS IS THE FIX (Part 1) ---
+      // Call the new `listAllPaths` method which correctly finds all nested files.
+      const allPaths = await this.editor.sidebar.listAllPaths(tempGitClient, '/');
+      
+      // --- THIS IS THE FIX (Part 2) ---
+      // `listAllPaths` returns objects {path, isDirectory}. We must filter out
+      // directories and then use the `path` property.
+      for (const file of allPaths) {
+        if (!file.isDirectory) {
+            const filePath = file.path;
+            fileIndex.push({
+              garden: gardenName,
+              path: filePath,
+              searchString: `${gardenName} ${filePath.substring(1)}`.toLowerCase()
+            });
+        }
       }
     }));
     
