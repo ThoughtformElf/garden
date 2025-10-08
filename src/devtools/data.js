@@ -1,6 +1,15 @@
+// src/devtools/data.js
 import JSZip from 'jszip';
 import { Git } from '../util/git-integration.js';
 import { Modal } from '../util/modal.js';
+
+// --- Vite Raw Imports for Default Settings Scaffolding ---
+import defaultInterfaceYml from '../settings/interface.yml?raw';
+import defaultKeymapsYml from '../settings/keymaps.yml?raw';
+import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
+import defaultHookCreateJs from '../settings/hooks/create.js?raw';
+import defaultHookLoadJs from '../settings/hooks/load.js?raw';
+
 
 async function listAllFiles(gitClient, dir) {
   const pfs = gitClient.pfs;
@@ -173,11 +182,8 @@ export async function importGardensFromZip(file, gardensToImport, log) {
     const gardenName = relativePath.split('/')[0];
     if (!gardensToImport.includes(gardenName)) return;
 
-    // --- STRATEGY LOGIC ---
-    // --- FINAL FIX: Correctly check for '.git' with the leading period ---
     const isGitFile = relativePath.substring(gardenName.length + 1).startsWith('.git/');
     if (isGitFile && importStrategy === 'merge' && gardensWithHistoryConflict.includes(gardenName)) {
-        // Skip this git file because we're keeping local history for this garden.
         return;
     }
 
@@ -258,4 +264,36 @@ export async function deleteGardens(gardensToDelete, log) {
         window.location.reload();
     }
   }, 2000);
+}
+
+/**
+ * Overwrites the default setting and hook files in the 'Settings' garden
+ * with the latest hardcoded versions from the application source.
+ * @param {function(string)} log - A logging callback for progress.
+ */
+export async function resetDefaultSettings(log) {
+  log('Starting to reset default settings...');
+
+  const defaultFiles = [
+    ['/interface.yml', defaultInterfaceYml],
+    ['/keymaps.yml', defaultKeymapsYml],
+    ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
+    ['/hooks/create.js', defaultHookCreateJs],
+    ['/hooks/load.js', defaultHookLoadJs]
+  ];
+
+  const settingsGit = new Git('Settings');
+  await settingsGit.initRepo(); // Ensures the garden and directories exist
+
+  for (const [path, content] of defaultFiles) {
+    try {
+      log(`Restoring: ${path}`);
+      await settingsGit.writeFile(path, content);
+    } catch (error) {
+      log(`ERROR: Failed to restore ${path}: ${error.message}`);
+    }
+  }
+
+  log('Default settings restored. Reloading to apply changes...');
+  setTimeout(() => window.location.reload(), 2000);
 }

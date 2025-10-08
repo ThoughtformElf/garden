@@ -7,7 +7,7 @@ import http from 'isomorphic-git/http/web';
 // --- Vite Raw Imports for Default Settings Scaffolding ---
 import defaultInterfaceYml from '../settings/interface.yml?raw';
 import defaultKeymapsYml from '../settings/keymaps.yml?raw';
-import defaultPromptJs from '../settings/keymaps/prompt.js?raw';
+import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 
@@ -70,7 +70,7 @@ export class Git {
     const defaultFiles = [
       ['/interface.yml', defaultInterfaceYml],
       ['/keymaps.yml', defaultKeymapsYml],
-      ['/keymaps/prompt.js', defaultPromptJs],
+      ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
       ['/hooks/create.js', defaultHookCreateJs],
       ['/hooks/load.js', defaultHookLoadJs]
     ];

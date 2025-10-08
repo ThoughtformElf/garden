@@ -1,8 +1,8 @@
 // src/devtools/devtools.js
-import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
+import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens, resetDefaultSettings } from './data.js';
 import { Modal } from '../util/modal.js';
 import eruda from 'eruda';
-import { Sync } from './sync/index.js'; // Import the new Sync class
+import { Sync } from './sync/index.js';
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `
@@ -37,12 +37,10 @@ export function initializeDevTools() {
     useShadowDom: false,
   });
 
-  // --- FIX: Increase the maximum number of console log entries ---
   const consoleTool = eruda.get('console');
   if (consoleTool) {
     consoleTool.config.set('maxLogNum', 2000);
   }
-  // --- END FIX ---
 
   if (window.thoughtform) {
     window.thoughtform.eruda = eruda;
@@ -91,6 +89,11 @@ export function initializeDevTools() {
           <input type="file" id="import-file-input" accept=".zip" style="display: none;">
 
           <hr>
+          
+          <h2>Maintenance</h2>
+          <button id="reset-settings-btn" class="eruda-button">Reset Default Settings...</button>
+          
+          <hr>
 
           <h2>Danger Zone</h2>
           <p>
@@ -103,6 +106,28 @@ export function initializeDevTools() {
       const importBtn = $el.find('#import-btn')[0];
       const fileInput = $el.find('#import-file-input')[0];
       const clearDataBtn = $el.find('#clear-data-btn')[0];
+      const resetSettingsBtn = $el.find('#reset-settings-btn')[0];
+
+      resetSettingsBtn.addEventListener('click', async () => {
+        const confirmed = await Modal.confirm({
+          title: 'Reset Default Settings?',
+          message: `This will overwrite the default configuration and hook files in your 'Settings' garden with the latest versions from the application. <br><br><strong>Your custom scripts and other files will not be affected.</strong>`,
+          okText: 'Reset Files'
+        });
+
+        if (!confirmed) return;
+
+        const progressModal = new Modal({ title: 'Restoring Settings...' });
+        let progressHTML = '';
+        const logCallback = (msg) => {
+          console.log(`[Settings Reset] ${msg}`);
+          progressHTML += `<div>${msg}</div>`;
+          progressModal.updateContent(`<div style="font-family: monospace; max-height: 300px; overflow-y: auto;">${progressHTML}</div>`);
+        };
+        
+        progressModal.show();
+        await resetDefaultSettings(logCallback);
+      });
 
       exportBtn.addEventListener('click', () => {
         const gardensRaw = localStorage.getItem('thoughtform_gardens');
@@ -131,7 +156,7 @@ export function initializeDevTools() {
                 console.log('Export cancelled by user.');
             });
 
-            progressModal.show(); // Show progress modal immediately
+            progressModal.show();
 
             try {
                 await exportGardens(selectedGardens, (msg) => {
@@ -158,7 +183,7 @@ export function initializeDevTools() {
         
         modal.addFooterButton('Export Selected', exportHandler);
         modal.addFooterButton('Cancel', () => modal.destroy());
-        modal.show(); // Now show the selection modal
+        modal.show();
       });
       
       importBtn.addEventListener('click', () => fileInput.click());
@@ -259,11 +284,6 @@ export function initializeDevTools() {
     init($el) {
       this.sync = new Sync();
       this.sync.init($el.get(0));
-
-      // ***** THIS IS THE FIX *****
-      // The obsolete event listeners that caused the crash have been removed.
-      // All UI interaction is now handled inside the Sync/SyncUI classes.
-      // ***** END OF FIX *****
     },
     show() {
       this.sync.show();
@@ -276,7 +296,6 @@ export function initializeDevTools() {
     }
   });
 
-  // --- NEW AI TOOL ---
   const aiTool = eruda.add({
     name: 'AI',
     init($el) {
@@ -313,7 +332,6 @@ export function initializeDevTools() {
       const saveBtn = $el.find('#ai-save-config')[0];
       const saveStatus = $el.find('#ai-save-status')[0];
 
-      // Load existing values from localStorage
       apiKeyInput.value = localStorage.getItem('thoughtform_gemini_api_key') || '';
       modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
       proxyUrlInput.value = localStorage.getItem('thoughtform_proxy_url') || '';
@@ -327,19 +345,16 @@ export function initializeDevTools() {
         localStorage.setItem('thoughtform_gemini_model_name', modelName);
         localStorage.setItem('thoughtform_proxy_url', proxyUrl);
         
-        // Reload config in the global AI service if it exists
         window.thoughtform.ai?.loadConfig();
 
         saveStatus.textContent = 'Configuration saved!';
         setTimeout(() => { saveStatus.textContent = ''; }, 3000);
       };
 
-      // Autosave on input change
       apiKeyInput.addEventListener('input', saveConfig);
       modelNameInput.addEventListener('input', saveConfig);
       proxyUrlInput.addEventListener('input', saveConfig);
       
-      // The save button is now more for explicit user action, though autosave is active.
       saveBtn.addEventListener('click', saveConfig);
     },
     show() { this._$el.show(); },

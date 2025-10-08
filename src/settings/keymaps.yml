@@ -5,4 +5,4 @@
 # or can be a full path like 'Settings#keymaps/some-script.js'.
 
 - key: "Mod-Enter"
-  run: "keymaps/prompt.js"
+  run: "keymaps/navigate-or-prompt.js"
