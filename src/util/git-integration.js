@@ -8,6 +8,8 @@ import http from 'isomorphic-git/http/web';
 import defaultInterfaceYml from '../settings/interface.yml?raw';
 import defaultKeymapsYml from '../settings/keymaps.yml?raw';
 import defaultPromptJs from '../settings/keymaps/prompt.js?raw';
+import defaultHookCreateJs from '../settings/hooks/create.js?raw';
+import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 
 
 /**
@@ -62,12 +64,15 @@ export class Git {
   async populateDefaultSettings() {
     console.log('[Git] Populating "Settings" garden with default files...');
     await this.ensureDir('/keymaps');
+    await this.ensureDir('/hooks');
     
     // An array of [path, content] pairs
     const defaultFiles = [
       ['/interface.yml', defaultInterfaceYml],
       ['/keymaps.yml', defaultKeymapsYml],
-      ['/keymaps/prompt.js', defaultPromptJs]
+      ['/keymaps/prompt.js', defaultPromptJs],
+      ['/hooks/create.js', defaultHookCreateJs],
+      ['/hooks/load.js', defaultHookLoadJs]
     ];
 
     for (const [path, content] of defaultFiles) {

@@ -19,6 +19,7 @@ import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, linkNavigationKeymap } from './navigation.js';
 import { aiChatKeymap } from './keymaps/ai.js';
+import { KeymapService } from '../keymaps.js'; // Import the new KeymapService
 
 const programmaticChange = Annotation.define();
 
@@ -44,6 +45,7 @@ export class Editor {
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
     this.mainContainer = null;
+    this.keymapService = null;
 
     this.languageCompartment = new Compartment();
     this.tokenCounterCompartment = new Compartment();
@@ -102,6 +104,14 @@ export class Editor {
       { key: 'Mod-`', run: () => { window.thoughtform.ui.toggleDevtools?.(null, null); return true; } },
     ]);
 
+    // Create a temporary EditorView to pass to the KeymapService
+    // This feels a bit cyclical, but it's a clean way to get the instance
+    // into the service so it can dispatch reconfigurations.
+    const tempState = EditorState.create({ doc: initialContent });
+    const tempView = new EditorView({ state: tempState });
+    this.keymapService = new KeymapService(tempView);
+    const dynamicKeymapExtension = await this.keymapService.initialize();
+
     const extensions = [
       appContextField.init(() => ({
         gitClient: this.gitClient,
@@ -109,6 +119,8 @@ export class Editor {
       })),
       globalShortcutsKeymap,
       browserNavigationKeymap,
+      // The dynamic keymaps are now loaded first, with high priority
+      dynamicKeymapExtension,
       aiChatKeymap,
       linkNavigationKeymap,
       keymap.of([indentWithTab]),
@@ -158,6 +170,10 @@ export class Editor {
       parent: this.mainContainer,
     });
     
+    // Now that the real EditorView exists, update the service to point to it.
+    this.keymapService.editorView = this.editorView;
+    tempView.destroy(); // Clean up the temporary view
+
     Editor.editors.push(this);
     this.isReady = true;
     this.listenForNavigation();

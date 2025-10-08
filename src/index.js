@@ -12,13 +12,16 @@ import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
 import { runMigration } from './util/migration.js';
 import { initializeAiService } from './ai/index.js';
-import { initializeConfigService } from './config.js'; // Import the new Config service
+import { initializeConfigService } from './config.js';
+import { initializeEventBus } from './events.js';
+import { HookRunner } from './hooks.js';
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
   ui: {},
   ai: initializeAiService(),
-  config: initializeConfigService(), // Initialize and attach the Config service
+  config: initializeConfigService(),
+  events: initializeEventBus(),
 };
 
 // --- Main Application Logic ---
@@ -82,6 +85,14 @@ async function main() {
 
       // Initialize the config service now that the editor is ready
       window.thoughtform.config.initialize();
+
+      // Initialize and start the HookRunner
+      const hookRunner = new HookRunner(window.thoughtform.events);
+      hookRunner.initialize();
+      window.thoughtform.hooks = hookRunner;
+
+      // Publish the app:load event
+      window.thoughtform.events.publish('app:load');
     }
   }, 100);
 }

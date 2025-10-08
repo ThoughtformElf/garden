@@ -226,6 +226,8 @@ export const fileActions = {
 
     try {
         await this.gitClient.writeFile(newPath, '');
+        // Publish the event AFTER the file has been successfully written
+        window.thoughtform.events.publish('file:create', { path: newPath });
         window.location.hash = `#${newPath}`;
     } catch (writeError) {
         console.error('Error creating file:', writeError);
