@@ -18,7 +18,8 @@ import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, linkNavigationKeymap } from './navigation.js';
-import { aiChatKeymap } from './ai-keymap.js';
+import { aiChatKeymap } from './keymaps/ai.js';
+import { promptInsertionKeymap } from './keymaps/prompt.js';
 
 const programmaticChange = Annotation.define();
 
@@ -119,6 +120,7 @@ export class Editor {
         // 2. CONTEXT-SPECIFIC: Editor actions that have specific contexts.
         aiChatKeymap,
         linkNavigationKeymap,
+        promptInsertionKeymap, // THIS IS THE FIX: Added the new keymap here.
         keymap.of([indentWithTab]),
         
         // 3. THE VIM EXTENSION: This now has a clean environment to manage its state.

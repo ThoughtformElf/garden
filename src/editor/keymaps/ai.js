@@ -1,4 +1,4 @@
-// src/editor/ai-keymap.js
+// src/editor/keymaps/keymaps/ai.js
 import { keymap } from '@codemirror/view';
 
 export const aiChatKeymap = keymap.of([

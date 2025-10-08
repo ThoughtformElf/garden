@@ -1,4 +1,4 @@
-// src/devtools/sync/files/message-handler.js
+// src/devtools/sync/files/messages.js
 import debug from '../../../util/debug.js';
 import { FileOperations } from './operations.js';
 import { Git } from '../../../util/git-integration.js';
