@@ -77,6 +77,7 @@ export class Sidebar {
       dataAttribute: 'data-path',     // Updated data attribute
       items: [
         { label: 'New File', action: () => this.handleNewFile() },
+        { label: 'New Folder', action: () => this.handleNewFolder() },
         { label: 'Rename', action: (path) => this.handleRename(path) },
         { label: 'Duplicate', action: (path) => this.handleDuplicate(path) },
         { label: 'Delete', action: (path) => this.handleDelete(path) },
@@ -84,6 +85,7 @@ export class Sidebar {
       ],
       containerItems: [
         { label: 'New File', action: () => this.handleNewFile() },
+        { label: 'New Folder', action: () => this.handleNewFolder() },
         ...commandPaletteItem
       ]
     });

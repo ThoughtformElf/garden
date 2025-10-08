@@ -233,6 +233,37 @@ export const fileActions = {
     }
   },
 
+  async handleNewFolder() {
+    const newName = await Modal.prompt({
+      title: 'New Folder',
+      label: 'Enter new folder name (e.g., "projects/new-topic"):'
+    });
+    if (!newName || !newName.trim()) return;
+
+    const newPath = `/${newName.trim().replace(/\/$/, '')}`;
+
+    try {
+      const stat = await this.gitClient.pfs.stat(newPath);
+      const itemType = stat.isDirectory() ? 'folder' : 'file';
+      await this.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${newName}" already exists.` });
+      return;
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        console.error('Error checking for folder:', e);
+        await this.showAlert({ title: 'Error', message: 'An unexpected error occurred.' });
+        return;
+      }
+    }
+
+    try {
+      await this.gitClient.ensureDir(newPath);
+      await this.refresh();
+    } catch (writeError) {
+      console.error('Error creating folder:', writeError);
+      await this.showAlert({ title: 'Error', message: `Could not create folder: ${writeError.message}` });
+    }
+  },
+
   async handleRename(oldPath) {
     const stat = await this.gitClient.pfs.stat(oldPath);
     const itemType = stat.isDirectory() ? 'Folder' : 'File';
