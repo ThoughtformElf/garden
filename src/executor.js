@@ -30,12 +30,17 @@ export async function executeFile(path, editor, git, event = null) {
     const fileContent = await gitClientToUse.readFile(filePath);
 
     // This is the sandboxing. We wrap the user's raw script text in an IIFE.
+    // The try/catch block is enhanced for clearer error reporting.
     const sandboxedScript = `(function(editor, git, event) {
       try {
         ${fileContent}
       } catch (e) {
-        console.error('[Executor] Error executing script "${path}":', e);
-        // We could add a UI notification here in the future.
+        console.error(
+          'EXECUTION FAILED in script: "${path}"\\n' +
+          '--------------------------------------------------\\n' +
+          'This error was caught and did not crash the application. Please check the script for errors.\\n\\n',
+          e
+        );
       }
     })(...arguments);`;
 

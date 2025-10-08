@@ -30,8 +30,7 @@ class ConfigService {
   }
 
   /**
-   * Gets a configuration value.
-   * This is the main entry point for the rest of the application.
+   * Gets a configuration value from a YAML file.
    * Example: get('interface.yml', 'editingMode')
    * @param {string} file - The configuration file name (e.g., 'interface.yml').
    * @param {string} key - The specific key to retrieve from the file.
@@ -59,6 +58,36 @@ class ConfigService {
     // 4. Hardcoded Default
     return this._getHardcoded(file, key);
   }
+  
+  /**
+   * Finds the correct hook script to run based on the cascade.
+   * @param {string} hookFileName - e.g., 'load.js'
+   * @returns {Promise<string|null>} The full, runnable path (e.g., 'Settings#hooks/load.js') or null.
+   */
+  async getHook(hookFileName) {
+    const currentGarden = window.thoughtform.editor.gitClient.gardenName;
+    const hookSubPath = `hooks/${hookFileName}`;
+
+    // 1. Check Current Garden's settings/hooks/ folder
+    if (currentGarden !== 'Settings') {
+      const gardenSpecificPath = `settings/${hookSubPath}`;
+      const gardenGit = new Git(currentGarden);
+      try {
+        await gardenGit.pfs.stat(`/${gardenSpecificPath}`);
+        return `${currentGarden}#${gardenSpecificPath}`;
+      } catch (e) { /* File does not exist, continue */ }
+    }
+
+    // 2. Check Global Settings/hooks/ folder
+    const globalPath = hookSubPath;
+    const settingsGit = new Git('Settings');
+    try {
+      await settingsGit.pfs.stat(`/${globalPath}`);
+      return `Settings#${globalPath}`;
+    } catch (e) { /* File does not exist */ }
+
+    return null; // No hook found
+  }
 
   async _readAndCache(gardenName, filePath, key) {
     const fullPath = `/${filePath}`;
@@ -73,12 +102,9 @@ class ConfigService {
       const git = new Git(gardenName);
       const content = await git.readFile(fullPath);
       
-      // If file doesn't exist, readFile returns a placeholder.
-      // We must check if it's a real file.
       try {
         await git.pfs.stat(fullPath);
       } catch (statError) {
-        // File does not actually exist, return undefined
         return undefined;
       }
       
@@ -87,9 +113,8 @@ class ConfigService {
       return key ? parsedConfig?.[key] : parsedConfig;
 
     } catch (e) {
-      // Could be a parsing error or a read error.
       console.warn(`[ConfigService] Could not read or parse ${cacheKey}.`, e);
-      this.cache.set(cacheKey, null); // Cache failures to avoid re-reading
+      this.cache.set(cacheKey, null);
       return undefined;
     }
   }
@@ -99,8 +124,6 @@ class ConfigService {
     return key ? defaultConfig?.[key] : defaultConfig;
   }
 
-  // Invalidate cache when a settings file is changed.
-  // This will be called by a file watcher later.
   invalidate(gardenName, filePath) {
     const cacheKey = `${gardenName}#/${filePath}`;
     this.cache.delete(cacheKey);
