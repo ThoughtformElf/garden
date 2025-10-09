@@ -7,14 +7,21 @@ export class KeymapService {
   constructor(editorView) {
     this.editorView = editorView;
     this.keymapCompartment = new Compartment();
-    this.currentKeymap = [];
+    // Initialize with an empty keymap. This is what the editor will use for its initial render.
+    this.currentKeymap = keymap.of([]);
   }
 
-  async initialize() {
-    await this.updateKeymaps();
+  /**
+   * Returns the compartment extension for the initial editor setup.
+   */
+  getCompartment() {
     return this.keymapCompartment.of(this.currentKeymap);
   }
 
+  /**
+   * Reads the configuration, builds the keymap, and updates the editor if changed.
+   * This is now called *after* the initial render.
+   */
   async updateKeymaps() {
     console.log('[KeymapService] Updating keymaps...');
     const { value: keymapConfig, sourceGarden } = await window.thoughtform.config.get('keymaps.yml');
@@ -41,7 +48,6 @@ export class KeymapService {
       }
       
       let fullPath = binding.run;
-      // If the path is relative and we have a source garden, make it absolute.
       if (!fullPath.includes('#') && sourceGarden) {
         fullPath = `${sourceGarden}#${fullPath}`;
       }
@@ -50,7 +56,7 @@ export class KeymapService {
         key: binding.key,
         run: () => {
           executeFile(
-            fullPath, // Use the resolved, absolute path
+            fullPath,
             window.thoughtform.editor,
             window.thoughtform.editor.gitClient
           );

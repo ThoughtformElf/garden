@@ -47,6 +47,7 @@ export class Editor {
     this.keymapService = null;
 
     this.languageCompartment = new Compartment();
+    this.vimCompartment = new Compartment();
     this.tokenCounterCompartment = new Compartment();
     this.imageViewerElement = null;
     this.currentObjectUrl = null;
@@ -90,8 +91,6 @@ export class Editor {
       }
     });
     
-    const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode');
-    
     const browserNavigationKeymap = keymap.of([
       { key: 'Alt-ArrowLeft', run: () => { window.history.back(); return true; } },
       { key: 'Alt-ArrowRight', run: () => { window.history.forward(); return true; } },
@@ -106,7 +105,7 @@ export class Editor {
     const tempState = EditorState.create({ doc: initialContent });
     const tempView = new EditorView({ state: tempState });
     this.keymapService = new KeymapService(tempView);
-    const dynamicKeymapExtension = await this.keymapService.initialize();
+    const dynamicKeymapExtension = this.keymapService.getCompartment();
 
     const extensions = [
       appContextField.init(() => ({
@@ -117,6 +116,7 @@ export class Editor {
       globalShortcutsKeymap,
       browserNavigationKeymap,
       dynamicKeymapExtension,
+      this.vimCompartment.of([]), // Initialize VIM compartment as empty
       keymap.of([indentWithTab]),
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -153,11 +153,6 @@ export class Editor {
       ...(this.editorConfig.extensions || []),
     ];
 
-    if (editingMode === 'vim') {
-      Vim.map('jj', '<Esc>', 'insert');
-      extensions.push(vim());
-    }
-
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: extensions,
@@ -172,6 +167,28 @@ export class Editor {
     this.listenForNavigation();
     this.loadFile(this.filePath);
     this.editorView.focus();
+
+    // --- APPLY USER SETTINGS ASYNCHRONOUSLY ---
+    this._applyUserSettings();
+  }
+
+  async _applyUserSettings() {
+    console.log('[Editor] Applying user settings asynchronously...');
+    
+    // 1. Apply Editing Mode (VIM)
+    const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode');
+    if (editingMode === 'vim') {
+      console.log('[Editor] VIM mode enabled by user settings.');
+      Vim.map('jj', '<Esc>', 'insert');
+      this.editorView.dispatch({
+        effects: this.vimCompartment.reconfigure(vim())
+      });
+    }
+
+    // 2. Apply Dynamic Keymaps
+    await this.keymapService.updateKeymaps();
+
+    console.log('[Editor] User settings applied.');
   }
 
   async navigateTo(linkContent) {
