@@ -295,32 +295,35 @@ export class Git {
   }
 
   async readFile(filepath) {
+    const absolutePath = filepath.startsWith('/') ? filepath : `/${filepath}`;
     try {
-      return await this.pfs.readFile(filepath, 'utf8');
+      return await this.pfs.readFile(absolutePath, 'utf8');
     } catch (e) {
-      return `// "${filepath}" does not exist yet, type anywhere to create it.`;
+      return `// "${absolutePath.substring(1)}" does not exist yet, type anywhere to create it.`;
     }
   }
   
   async readFileAsBuffer(filepath) {
+    const absolutePath = filepath.startsWith('/') ? filepath : `/${filepath}`;
     try {
-      return await this.pfs.readFile(filepath);
+      return await this.pfs.readFile(absolutePath);
     } catch (e) {
       return null;
     }
   }
 
   async writeFile(filepath, content) {
+    const absolutePath = filepath.startsWith('/') ? filepath : `/${filepath}`;
     const options = typeof content === 'string' ? 'utf8' : undefined;
     try {
-      const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
+      const dirname = absolutePath.substring(0, absolutePath.lastIndexOf('/'));
       if (dirname) {
         await this.ensureDir(dirname);
       }
-      await this.pfs.writeFile(filepath, content, options);
+      await this.pfs.writeFile(absolutePath, content, options);
       this.markGardenAsDirty(true);
     } catch (e) {
-      console.error(`[Git.writeFile] Failed to write to ${filepath}:`, e);
+      console.error(`[Git.writeFile] Failed to write to ${absolutePath}:`, e);
       throw e;
     }
   }
