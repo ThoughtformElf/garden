@@ -22,53 +22,43 @@ class ConfigService {
     if (this.isInitialized) return;
     console.log('[ConfigService] Initializing...');
     
-    // For now, we'll implement a simple "read on demand" with caching.
-    // A full "scan all on startup" can be a future optimization.
-    
     this.isInitialized = true;
     console.log('[ConfigService] Initialized.');
   }
 
   /**
-   * Gets a configuration value from a YAML file.
-   * Example: get('interface.yml', 'editingMode')
+   * Gets a configuration value and its source.
    * @param {string} file - The configuration file name (e.g., 'interface.yml').
-   * @param {string} key - The specific key to retrieve from the file.
-   * @returns {Promise<any>} The configuration value.
+   * @param {string} [key] - Optional specific key to retrieve from the file.
+   * @returns {Promise<{value: any, sourceGarden: string|null}>} The configuration value and its source garden.
    */
   async get(file, key) {
     await this.initialize();
 
     const currentGarden = window.thoughtform.editor?.gitClient.gardenName;
-    if (!currentGarden) return this._getHardcoded(file, key);
+    if (!currentGarden) return { value: this._getHardcoded(file, key), sourceGarden: null };
 
     // 1. Frontmatter (To be implemented in a future phase)
 
     // 2. Current Garden's settings/ folder
     if (currentGarden !== 'Settings') {
       const gardenSpecificPath = `settings/${file}`;
-      const gardenValue = await this._readAndCache(currentGarden, gardenSpecificPath, key);
-      if (gardenValue !== undefined) return gardenValue;
+      const { value: gardenValue, sourceGarden } = await this._readAndCache(currentGarden, gardenSpecificPath, key);
+      if (gardenValue !== undefined) return { value: gardenValue, sourceGarden };
     }
 
     // 3. Global Settings Garden
-    const globalValue = await this._readAndCache('Settings', file, key);
-    if (globalValue !== undefined) return globalValue;
+    const { value: globalValue, sourceGarden: globalSource } = await this._readAndCache('Settings', file, key);
+    if (globalValue !== undefined) return { value: globalValue, sourceGarden: globalSource };
 
     // 4. Hardcoded Default
-    return this._getHardcoded(file, key);
+    return { value: this._getHardcoded(file, key), sourceGarden: null };
   }
   
-  /**
-   * Finds the correct hook script to run based on the cascade.
-   * @param {string} hookFileName - e.g., 'load.js'
-   * @returns {Promise<string|null>} The full, runnable path (e.g., 'Settings#hooks/load.js') or null.
-   */
   async getHook(hookFileName) {
     const currentGarden = window.thoughtform.editor.gitClient.gardenName;
     const hookSubPath = `hooks/${hookFileName}`;
 
-    // 1. Check Current Garden's settings/hooks/ folder
     if (currentGarden !== 'Settings') {
       const gardenSpecificPath = `settings/${hookSubPath}`;
       const gardenGit = new Git(currentGarden);
@@ -78,7 +68,6 @@ class ConfigService {
       } catch (e) { /* File does not exist, continue */ }
     }
 
-    // 2. Check Global Settings/hooks/ folder
     const globalPath = hookSubPath;
     const settingsGit = new Git('Settings');
     try {
@@ -86,7 +75,7 @@ class ConfigService {
       return `Settings#${globalPath}`;
     } catch (e) { /* File does not exist */ }
 
-    return null; // No hook found
+    return null;
   }
 
   async _readAndCache(gardenName, filePath, key) {
@@ -95,7 +84,8 @@ class ConfigService {
 
     if (this.cache.has(cacheKey)) {
       const cachedConfig = this.cache.get(cacheKey);
-      return key ? cachedConfig?.[key] : cachedConfig;
+      const value = key ? cachedConfig?.[key] : cachedConfig;
+      return { value, sourceGarden: gardenName };
     }
 
     try {
@@ -105,17 +95,18 @@ class ConfigService {
       try {
         await git.pfs.stat(fullPath);
       } catch (statError) {
-        return undefined;
+        return { value: undefined, sourceGarden: null };
       }
       
       const parsedConfig = parse(content);
       this.cache.set(cacheKey, parsedConfig);
-      return key ? parsedConfig?.[key] : parsedConfig;
+      const value = key ? parsedConfig?.[key] : parsedConfig;
+      return { value, sourceGarden: gardenName };
 
     } catch (e) {
       console.warn(`[ConfigService] Could not read or parse ${cacheKey}.`, e);
       this.cache.set(cacheKey, null);
-      return undefined;
+      return { value: undefined, sourceGarden: null };
     }
   }
 

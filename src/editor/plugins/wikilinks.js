@@ -1,7 +1,7 @@
 // src/editor/plugins/wikilinks.js
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
-import { navigateTo, appContextField } from '../navigation.js';
+import { appContextField } from '../navigation.js';
 
 const wikilinkDecoration = Decoration.mark({ class: 'cm-wikilink' });
 
@@ -38,8 +38,8 @@ class WikilinkPlugin {
   
   handleNavigation(linkEl) {
     const appContext = this.view.state.field(appContextField);
-    if (appContext.gitClient) {
-      navigateTo(linkEl.textContent.slice(2, -2), appContext);
+    if (appContext.editor) {
+      appContext.editor.navigateTo(linkEl.textContent.slice(2, -2));
     }
   }
 

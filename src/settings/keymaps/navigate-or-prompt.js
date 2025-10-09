@@ -35,8 +35,8 @@ for (const { type, regex } of linkRegexes) {
     if (pos >= start && pos <= end) {
       console.log(`[navigate-or-prompt] Found ${type} link. Navigating.`);
       if (type === 'wikilink') {
-        const appContext = view.state.field(window.thoughtform.editor.constructor.appContextField);
-        window.thoughtform.editor.constructor.navigateTo(match[1], appContext);
+        // Use the new, clean method on the editor instance
+        editor.navigateTo(match[1]);
       } else {
         let url = type === 'markdown' ? match[1] : match[0];
         if (url.startsWith('www.')) url = `https://${url}`;

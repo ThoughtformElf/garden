@@ -17,7 +17,7 @@ import { allHighlightPlugins } from './plugins/index.js';
 import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
-import { appContextField, navigateTo } from './navigation.js';
+import { appContextField, findFileCaseInsensitive } from './navigation.js';
 import { KeymapService } from '../keymaps.js';
 
 const programmaticChange = Annotation.define();
@@ -52,10 +52,6 @@ export class Editor {
     this.currentObjectUrl = null;
 
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
-    
-    // Add static references to the class for use in scripts
-    Editor.appContextField = appContextField;
-    Editor.navigateTo = navigateTo;
     
     this.init();
   }
@@ -94,7 +90,7 @@ export class Editor {
       }
     });
     
-    const editingMode = await window.thoughtform.config.get('interface.yml', 'editingMode');
+    const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode');
     
     const browserNavigationKeymap = keymap.of([
       { key: 'Alt-ArrowLeft', run: () => { window.history.back(); return true; } },
@@ -116,6 +112,7 @@ export class Editor {
       appContextField.init(() => ({
         gitClient: this.gitClient,
         sidebar: this.sidebar,
+        editor: this,
       })),
       globalShortcutsKeymap,
       browserNavigationKeymap,
@@ -175,6 +172,39 @@ export class Editor {
     this.listenForNavigation();
     this.loadFile(this.filePath);
     this.editorView.focus();
+  }
+
+  async navigateTo(linkContent) {
+    if (!linkContent) return;
+  
+    let path = linkContent.split('|')[0].trim();
+    let garden = null;
+  
+    if (path.includes('#')) {
+      [garden, path] = path.split('#');
+    }
+  
+    const appContext = { gitClient: this.gitClient, sidebar: this.sidebar };
+
+    if (garden) {
+      if (!path.startsWith('/')) {
+          path = `/${path}`;
+      }
+      const fullPathUrl = new URL(import.meta.url).pathname;
+      const srcIndex = fullPathUrl.lastIndexOf('/src/');
+      const basePath = srcIndex > -1 ? fullPathUrl.substring(0, srcIndex) : '';
+      window.location.href = `${window.location.origin}${basePath}/${encodeURIComponent(garden)}#${encodeURIComponent(path)}`;
+    } else {
+      const foundPath = await findFileCaseInsensitive(path, appContext);
+      let finalPath;
+  
+      if (foundPath) {
+        finalPath = foundPath;
+      } else {
+        finalPath = path.startsWith('/') ? path : `/${path}`;
+      }
+      window.location.hash = `#${encodeURIComponent(finalPath)}`;
+    }
   }
 
   async loadFileContent(filepath) {
