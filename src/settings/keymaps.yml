@@ -4,5 +4,8 @@
 # The 'run' path is relative to the garden where this file resides,
 # or can be a full path like 'Settings#keymaps/some-script.js'.
 
+- key: "Mod-["
+  run: "keymaps/toggle-sidebar.js"
+
 - key: "Mod-Enter"
   run: "keymaps/navigate-or-prompt.js"

@@ -98,7 +98,6 @@ export class Editor {
 
     const globalShortcutsKeymap = keymap.of([
       { key: 'Mod-p', run: () => { window.thoughtform.commandPalette.open('search'); return true; }, shift: () => { window.thoughtform.commandPalette.open('execute'); return true; } },
-      { key: 'Mod-[', run: () => { window.thoughtform.ui.toggleSidebar?.(); return true; } },
       { key: 'Mod-`', run: () => { window.thoughtform.ui.toggleDevtools?.(null, null); return true; } },
     ]);
 
@@ -116,7 +115,7 @@ export class Editor {
       globalShortcutsKeymap,
       browserNavigationKeymap,
       dynamicKeymapExtension,
-      this.vimCompartment.of([]), // Initialize VIM compartment as empty
+      this.vimCompartment.of([]),
       keymap.of([indentWithTab]),
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -168,14 +167,12 @@ export class Editor {
     this.loadFile(this.filePath);
     this.editorView.focus();
 
-    // --- APPLY USER SETTINGS ASYNCHRONOUSLY ---
     this._applyUserSettings();
   }
 
   async _applyUserSettings() {
     console.log('[Editor] Applying user settings asynchronously...');
     
-    // 1. Apply Editing Mode (VIM)
     const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode');
     if (editingMode === 'vim') {
       console.log('[Editor] VIM mode enabled by user settings.');
@@ -185,7 +182,6 @@ export class Editor {
       });
     }
 
-    // 2. Apply Dynamic Keymaps
     await this.keymapService.updateKeymaps();
 
     console.log('[Editor] User settings applied.');

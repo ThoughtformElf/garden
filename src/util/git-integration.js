@@ -8,6 +8,7 @@ import http from 'isomorphic-git/http/web';
 import defaultInterfaceYml from '../settings/interface.yml?raw';
 import defaultKeymapsYml from '../settings/keymaps.yml?raw';
 import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
+import defaultToggleSidebarJs from '../settings/keymaps/toggle-sidebar.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 
@@ -71,6 +72,7 @@ export class Git {
       ['/interface.yml', defaultInterfaceYml],
       ['/keymaps.yml', defaultKeymapsYml],
       ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
+      ['/keymaps/toggle-sidebar.js', defaultToggleSidebarJs],
       ['/hooks/create.js', defaultHookCreateJs],
       ['/hooks/load.js', defaultHookLoadJs]
     ];
@@ -110,7 +112,7 @@ export class Git {
             await this.pfs.unlink(path);
         }
     } catch (e) {
-        if (e.code !== 'ENOENT') {
+        if (e.code !== 'ENOENT') { // Ignore if file/dir doesn't exist
             console.error(`Error during rmrf for ${path}:`, e);
             throw e;
         }

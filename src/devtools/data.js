@@ -7,6 +7,7 @@ import { Modal } from '../util/modal.js';
 import defaultInterfaceYml from '../settings/interface.yml?raw';
 import defaultKeymapsYml from '../settings/keymaps.yml?raw';
 import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
+import defaultToggleSidebarJs from '../settings/keymaps/toggle-sidebar.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 
@@ -274,16 +275,23 @@ export async function deleteGardens(gardensToDelete, log) {
 export async function resetDefaultSettings(log) {
   log('Starting to reset default settings...');
 
+  // --- THIS IS THE FIX ---
+  // The list of files to restore now correctly includes ALL default files.
   const defaultFiles = [
     ['/interface.yml', defaultInterfaceYml],
     ['/keymaps.yml', defaultKeymapsYml],
     ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
+    ['/keymaps/toggle-sidebar.js', defaultToggleSidebarJs],
     ['/hooks/create.js', defaultHookCreateJs],
     ['/hooks/load.js', defaultHookLoadJs]
   ];
 
   const settingsGit = new Git('Settings');
-  await settingsGit.initRepo(); // Ensures the garden and directories exist
+  await settingsGit.initRepo();
+
+  // Also ensure the directories exist, making the function more robust.
+  await settingsGit.ensureDir('/keymaps');
+  await settingsGit.ensureDir('/hooks');
 
   for (const [path, content] of defaultFiles) {
     try {
