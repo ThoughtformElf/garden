@@ -96,10 +96,6 @@ export class Editor {
       { key: 'Alt-ArrowRight', run: () => { window.history.forward(); return true; } },
     ]);
 
-    const globalShortcutsKeymap = keymap.of([
-      { key: 'Mod-p', run: () => { window.thoughtform.commandPalette.open('search'); return true; }, shift: () => { window.thoughtform.commandPalette.open('execute'); return true; } },
-    ]);
-
     const tempState = EditorState.create({ doc: initialContent });
     const tempView = new EditorView({ state: tempState });
     this.keymapService = new KeymapService(tempView);
@@ -111,7 +107,6 @@ export class Editor {
         sidebar: this.sidebar,
         editor: this,
       })),
-      globalShortcutsKeymap,
       browserNavigationKeymap,
       dynamicKeymapExtension,
       this.vimCompartment.of([]),

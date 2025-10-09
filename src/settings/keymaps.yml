@@ -12,3 +12,9 @@
 
 - key: "Mod-`"
   run: "keymaps/toggle-devtools.js"
+
+- key: "Mod-p"
+  run: "keymaps/search-files.js"
+
+- key: "Mod-Shift-p"
+  run: "keymaps/execute-command.js"

@@ -10,6 +10,8 @@ import defaultKeymapsYml from '../settings/keymaps.yml?raw';
 import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
 import defaultToggleSidebarJs from '../settings/keymaps/toggle-sidebar.js?raw';
 import defaultToggleDevtoolsJs from '../settings/keymaps/toggle-devtools.js?raw';
+import defaultSearchFilesJs from '../settings/keymaps/search-files.js?raw';
+import defaultExecuteCommandJs from '../settings/keymaps/execute-command.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 
@@ -75,6 +77,8 @@ export class Git {
       ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
       ['/keymaps/toggle-sidebar.js', defaultToggleSidebarJs],
       ['/keymaps/toggle-devtools.js', defaultToggleDevtoolsJs],
+      ['/keymaps/search-files.js', defaultSearchFilesJs],
+      ['/keymaps/execute-command.js', defaultExecuteCommandJs],
       ['/hooks/create.js', defaultHookCreateJs],
       ['/hooks/load.js', defaultHookLoadJs]
     ];
@@ -309,25 +313,15 @@ export class Git {
   async writeFile(filepath, content) {
     const options = typeof content === 'string' ? 'utf8' : undefined;
     try {
+      const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
+      if (dirname) {
+        await this.ensureDir(dirname);
+      }
       await this.pfs.writeFile(filepath, content, options);
       this.markGardenAsDirty(true);
     } catch (e) {
-      if (e.code === 'ENOENT') {
-        const dirname = filepath.substring(0, filepath.lastIndexOf('/'));
-        if (dirname && dirname !== '/') {
-          try {
-            await this.ensureDir(dirname);
-            await this.pfs.writeFile(filepath, content, options);
-            this.markGardenAsDirty(true);
-          } catch (retryError) {
-            throw retryError;
-          }
-        } else {
-           throw e;
-        }
-      } else {
-        throw e;
-      }
+      console.error(`[Git.writeFile] Failed to write to ${filepath}:`, e);
+      throw e;
     }
   }
   
