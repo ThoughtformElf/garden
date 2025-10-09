@@ -98,7 +98,6 @@ export class Editor {
 
     const globalShortcutsKeymap = keymap.of([
       { key: 'Mod-p', run: () => { window.thoughtform.commandPalette.open('search'); return true; }, shift: () => { window.thoughtform.commandPalette.open('execute'); return true; } },
-      { key: 'Mod-`', run: () => { window.thoughtform.ui.toggleDevtools?.(null, null); return true; } },
     ]);
 
     const tempState = EditorState.create({ doc: initialContent });

@@ -9,6 +9,7 @@ import defaultInterfaceYml from '../settings/interface.yml?raw';
 import defaultKeymapsYml from '../settings/keymaps.yml?raw';
 import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
 import defaultToggleSidebarJs from '../settings/keymaps/toggle-sidebar.js?raw';
+import defaultToggleDevtoolsJs from '../settings/keymaps/toggle-devtools.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 
@@ -73,6 +74,7 @@ export class Git {
       ['/keymaps.yml', defaultKeymapsYml],
       ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
       ['/keymaps/toggle-sidebar.js', defaultToggleSidebarJs],
+      ['/keymaps/toggle-devtools.js', defaultToggleDevtoolsJs],
       ['/hooks/create.js', defaultHookCreateJs],
       ['/hooks/load.js', defaultHookLoadJs]
     ];

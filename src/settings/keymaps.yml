@@ -9,3 +9,6 @@
 
 - key: "Mod-Enter"
   run: "keymaps/navigate-or-prompt.js"
+
+- key: "Mod-`"
+  run: "keymaps/toggle-devtools.js"
