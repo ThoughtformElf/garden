@@ -91,11 +91,6 @@ export class Editor {
       }
     });
     
-    const browserNavigationKeymap = keymap.of([
-      { key: 'Alt-ArrowLeft', run: () => { window.history.back(); return true; } },
-      { key: 'Alt-ArrowRight', run: () => { window.history.forward(); return true; } },
-    ]);
-
     const tempState = EditorState.create({ doc: initialContent });
     const tempView = new EditorView({ state: tempState });
     this.keymapService = new KeymapService(tempView);
@@ -107,7 +102,6 @@ export class Editor {
         sidebar: this.sidebar,
         editor: this,
       })),
-      browserNavigationKeymap,
       dynamicKeymapExtension,
       this.vimCompartment.of([]),
       keymap.of([indentWithTab]),

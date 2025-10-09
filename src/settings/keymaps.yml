@@ -18,3 +18,9 @@
 
 - key: "Mod-Shift-p"
   run: "keymaps/execute-command.js"
+
+- key: "Alt-ArrowLeft"
+  run: "keymaps/browser-back.js"
+
+- key: "Alt-ArrowRight"
+  run: "keymaps/browser-forward.js"
