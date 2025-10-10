@@ -133,3 +133,10 @@ html body .cm-activeLineGutter {
   color: var(--base-interactive);
   font-weight: bold;
 }
+
+.cm-activeLine.cm-prompt-wrapper {
+  color: var(--base-white);
+}
+.cm-activeLine.cm-prompt-wrapper > .cm-string {
+  color: var(--base-white);
+}

@@ -94,8 +94,13 @@ export class Agent {
         return stream;
     }
 
+    _sendStatus(stream, message) {
+        // Prepend a status indicator to distinguish these from the final response.
+        stream.enqueue(`[STATUS] ${message}`);
+    }
+
     async _orchestrate(goal, stream) {
-        console.log(`%c[Agent] Starting run with goal: "${goal}"`, 'font-weight: bold; color: blue;');
+        this._sendStatus(stream, `Starting with goal: "${goal}"`);
 
         let contextBuffer = '';
         const visited = new Set();
@@ -104,19 +109,17 @@ export class Agent {
         const initialContent = await this.gitClient.readFile(this.startingFilePath);
         contextBuffer += `## Context from ${this.startingFilePath}\n\n${initialContent}\n\n---\n\n`;
         visited.add(this.startingFilePath);
-        console.log(`[Agent] Reading starting file: ${this.startingFilePath}`);
+        this._sendStatus(stream, `Reading starting file: ${this.startingFilePath}`);
         
-        // --- THIS IS THE FIX (Part 2) ---
-        // This set now tracks any URL we have *attempted* to fetch, success or fail.
         const attemptedExternalFetches = new Set();
 
         while (critiqueLoops < MAX_CRITIQUE_LOOPS) {
             critiqueLoops++;
-            console.log(`[Agent] Starting critique loop #${critiqueLoops}`);
+            this._sendStatus(stream, `Analyzing context (Critique Loop ${critiqueLoops}/${MAX_CRITIQUE_LOOPS})...`);
 
             // 1. Traverse internal wikilinks first to gather more local context.
-            console.log(`[Agent] Traversing knowledge graph (Depth limit: ${MAX_TRAVERSAL_DEPTH})...`);
-            const traversalContext = await this._traverse(goal, initialContent, visited, 0, this.gitClient.gardenName);
+            this._sendStatus(stream, 'Traversing internal links...');
+            const traversalContext = await this._traverse(goal, initialContent, visited, 0, this.gitClient.gardenName, stream);
             contextBuffer += traversalContext;
 
             // 2. Triage and fetch external links based on the goal and gathered context.
@@ -124,7 +127,8 @@ export class Agent {
             const unfetchedLinks = Array.from(availableExternalLinks).filter(link => !attemptedExternalFetches.has(link));
 
             if (unfetchedLinks.length > 0) {
-                console.log(`[Agent] Found ${unfetchedLinks.length} un-fetched external link(s). Triaging...`);
+                this._sendStatus(stream, `Found ${unfetchedLinks.length} new external link(s). Evaluating relevance...`);
+                
                 const triagePrompt = this._fillPrompt(triagePromptTemplate, {
                     goal,
                     context_summary: contextBuffer.substring(0, 2000) + '...',
@@ -134,34 +138,36 @@ export class Agent {
                 const relevantLinks = triageResult.relevant_links || [];
                 
                 if (relevantLinks.length > 0) {
-                    console.log(`%c[Agent] Found relevant external links: ${relevantLinks.join(', ')}. Fetching sequentially...`, 'color: green');
+                    this._sendStatus(stream, `Found ${relevantLinks.length} relevant external links. Fetching content...`);
+                    
                     for (const link of relevantLinks) {
-                        // Add to the set *before* fetching to prevent retries.
+                        this._sendStatus(stream, `Fetching: ${link}`);
                         attemptedExternalFetches.add(link);
                         const externalContext = await fetchExternalContent(link);
                         contextBuffer += externalContext;
                     }
                 } else {
-                    console.log('[Agent] No relevant external links found by triage.');
+                    this._sendStatus(stream, 'No new relevant external links found.');
                 }
             }
 
             // 3. Critique the combined context.
-            console.log(`[Agent] Critiquing gathered context...`);
+            this._sendStatus(stream, 'Critiquing all gathered context for sufficiency...');
             const critique = await this._critique(goal, contextBuffer);
 
             if (critique.is_sufficient) {
-                console.log("%c[Agent] Critique passed. Context is sufficient.", 'color: green;');
+                this._sendStatus(stream, 'Context is sufficient. Synthesizing final answer...');
                 break;
             } else {
                 console.warn(`[Agent] Critique failed. Gaps identified:`, critique.gaps);
+                this._sendStatus(stream, `Context is not yet sufficient. Gaps: ${critique.gaps.join(', ')}`);
                 if (critiqueLoops >= MAX_CRITIQUE_LOOPS) {
                      console.warn(`[Agent] Max critique loops reached. Synthesizing with available info.`);
+                     this._sendStatus(stream, `Max loops reached. Synthesizing with available information...`);
                 }
             }
         }
 
-        console.log(`%c[Agent] Synthesizing final answer...`, 'font-weight: bold; color: blue;');
         const synthesisPrompt = this._fillPrompt(synthesizePromptTemplate, { goal, context_buffer: contextBuffer });
         const finalAnswerStream = await this.aiService.getCompletion(synthesisPrompt);
         
@@ -173,10 +179,9 @@ export class Agent {
         }
         
         stream.close();
-        console.log("%c[Agent] Run finished.", 'font-weight: bold;');
     }
     
-    async _traverse(goal, currentFileContent, visited, depth, currentGardenName) {
+    async _traverse(goal, currentFileContent, visited, depth, currentGardenName, stream) {
         if (depth >= MAX_TRAVERSAL_DEPTH) return '';
 
         const links = this.traversal.extractWikilinks(currentFileContent);
@@ -185,7 +190,6 @@ export class Agent {
         const unvisitedLinks = links.filter(link => !visited.has(link));
         if (unvisitedLinks.length === 0) return '';
 
-        console.log(`[Agent] Depth ${depth} (in ${currentGardenName}): Found unvisited links:`, unvisitedLinks);
         
         const triagePrompt = this._fillPrompt(triagePromptTemplate, {
             goal,
@@ -197,11 +201,10 @@ export class Agent {
         const relevantLinks = triageResult.relevant_links || [];
         
         if (relevantLinks.length === 0) {
-            console.log(`[Agent] Depth ${depth}: No relevant links found by triage.`);
             return '';
         }
         
-        console.log(`%c[Agent] Depth ${depth}: Found relevant links: ${relevantLinks.join(', ')}`, 'color: green');
+        this._sendStatus(stream, `Found relevant internal links: ${relevantLinks.join(', ')}`);
         
         let newContext = '';
         for (const link of relevantLinks) {
@@ -209,10 +212,10 @@ export class Agent {
             
             if (content !== null && !visited.has(fullIdentifier)) {
                 visited.add(fullIdentifier);
-                console.log(`[Agent] Reading content from: ${fullIdentifier}`);
+                this._sendStatus(stream, `Reading content from: ${fullIdentifier}`);
                 newContext += `## Context from ${fullIdentifier}\n\n${content}\n\n---\n\n`;
                 
-                newContext += await this._traverse(goal, content, visited, depth + 1, fileGarden);
+                newContext += await this._traverse(goal, content, visited, depth + 1, fileGarden, stream);
             }
         }
         return newContext;

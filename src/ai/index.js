@@ -73,13 +73,12 @@ class AiService {
 
       // Insert a placeholder message.
       const insertPos = endPos;
-      const placeholderTransaction = { changes: { from: insertPos, insert: `\n\n${thinkingText}` } };
+      const placeholderTransaction = { changes: { from: insertPos, insert: `\n${thinkingText}` } };
       view.dispatch(placeholderTransaction);
-      thinkingMessagePosition = insertPos + '\n\n'.length;
+      thinkingMessagePosition = insertPos + '\n'.length;
 
       if (hasWikilinks) {
         // Use the Agent
-        console.log("[AI Service] Wikilinks detected. Invoking agent...");
         const editor = window.thoughtform.editor; 
         if (!editor || !editor.gitClient) {
           throw new Error("Cannot find global editor or gitClient instance for agent.");
@@ -95,35 +94,64 @@ class AiService {
 
       } else {
         // Use simple chat
-        console.log("[AI Service] No wikilinks detected. Using simple chat.");
         const finalPrompt = `CONTEXT:\n---\n${fullContext}\n---\n\nBased on the context above, respond to the following prompt:\n\n${userPrompt}`;
         stream = await this.getCompletion(finalPrompt);
       }
       
-      // --- STREAM PROCESSING (Identical for both Agent and Simple Chat) ---
+      // --- STREAM PROCESSING ---
       const reader = stream.getReader();
-      let currentResponsePos = thinkingMessagePosition;
-
+      
       // Replace the "Thinking..." message with the opening tag.
-      const startTag = '\n\n<response>\n';
-      view.dispatch({ changes: { from: currentResponsePos, to: currentResponsePos + thinkingText.length, insert: startTag } });
-      currentResponsePos += startTag.length;
+      const startTag = '\n<response>\n';
+      view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: startTag } });
+      
+      let finalAnswerStarted = false;
+      let statusLogHTML = '';
+      let responseBodyStart = thinkingMessagePosition + startTag.length;
+      let responseBodyEnd = responseBodyStart;
 
-      // Stream the main content of the response.
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         
         const chunkText = value;
-        view.dispatch({ changes: { from: currentResponsePos, insert: chunkText } });
-        currentResponsePos += chunkText.length;
+
+        if (chunkText.startsWith('[STATUS]')) {
+            if (finalAnswerStarted) continue; // Ignore status updates after the final answer begins.
+
+            // Append the new status message to our growing log.
+            statusLogHTML += `  <div class="agent-status">${chunkText.substring(8).trim()}</div>\n`;
+            
+            // Replace the entire previous content with the updated, full log.
+            view.dispatch({
+                changes: { from: responseBodyStart, to: responseBodyEnd, insert: statusLogHTML }
+            });
+            // Update the end pointer to the new end of the log.
+            responseBodyEnd = responseBodyStart + statusLogHTML.length;
+
+        } else {
+            if (!finalAnswerStarted) {
+                finalAnswerStarted = true;
+                // This is the first token of the real answer. Overwrite the entire status log.
+                view.dispatch({
+                    changes: { from: responseBodyStart, to: responseBodyEnd, insert: chunkText }
+                });
+                responseBodyEnd = responseBodyStart + chunkText.length;
+            } else {
+                // This is a subsequent token. Just append it.
+                view.dispatch({
+                    changes: { from: responseBodyEnd, insert: chunkText }
+                });
+                responseBodyEnd += chunkText.length;
+            }
+        }
       }
 
       // After the stream is complete, append the closing tag and the next user prompt.
       const finalInsert = `\n</response>\n\n>$ `;
       view.dispatch({
-        changes: { from: currentResponsePos, insert: finalInsert },
-        selection: { anchor: currentResponsePos + finalInsert.length }
+        changes: { from: responseBodyEnd, insert: finalInsert },
+        selection: { anchor: responseBodyEnd + finalInsert.length }
       });
 
     } catch (error) {
