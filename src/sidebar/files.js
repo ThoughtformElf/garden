@@ -144,7 +144,7 @@ export const fileActions = {
           e.preventDefault();
           this.contentContainer.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
           const folderTarget = e.target.closest('.file-tree-item.is-folder');
-          if (folderTarget && folderTarget !== draggedElement && !folderTarget.dataset.path.startsWith(draggedElement.dataset.path + '/')) {
+          if (folderTarget && draggedElement && folderTarget !== draggedElement && !folderTarget.dataset.path.startsWith(draggedElement.dataset.path + '/')) {
               folderTarget.classList.add('drop-target');
           } else if (!folderTarget) {
               const rootTarget = e.target.closest('.file-tree-root');
