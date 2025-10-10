@@ -320,32 +320,8 @@ export const fileActions = {
   },
   
   async handleDuplicate(path) {
-    const stat = await this.gitClient.pfs.stat(path);
-    if (stat.isDirectory()) {
-        await this.showAlert({ title: 'Action Not Supported', message: 'Duplicating folders is not yet supported.' });
-        return;
-    }
-
-    const directory = path.substring(0, path.lastIndexOf('/'));
-    const originalFilename = path.substring(path.lastIndexOf('/') + 1);
-    const defaultName = `${originalFilename.split('.').slice(0, -1).join('.') || originalFilename} (copy)${originalFilename.includes('.') ? '.' + originalFilename.split('.').pop() : ''}`;
-    
-    const newFilename = await Modal.prompt({
-        title: 'Duplicate File',
-        label: 'Enter name for duplicated file:',
-        defaultValue: defaultName
-    });
-    if (!newFilename) return;
-
-    const newPath = `${directory}/${newFilename}`;
-    try {
-      const rawContent = await this.gitClient.readFile(path);
-      await this.gitClient.writeFile(newPath, rawContent);
-      await this.refresh();
-    } catch (e) {
-      console.error('Error duplicating file:', e);
-      await this.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
-    }
+    // This is now a simple wrapper around the editor's core duplicate method.
+    await this.editor.duplicateFile(path);
   },
 
   async handleDelete(path) {

@@ -19,6 +19,9 @@
 - key: "Mod-Shift-p"
   run: "keymaps/execute-command.js"
 
+- key: "Mod-Shift-d"
+  run: "keymaps/duplicate-current-file.js"
+
 - key: "Alt-ArrowLeft"
   run: "keymaps/browser-back.js"
 

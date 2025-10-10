@@ -17,6 +17,7 @@ import defaultBrowserForwardJs from '../settings/keymaps/browser-forward.js?raw'
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
 import defaultHookDeleteJs from '../settings/hooks/delete.js?raw';
+import defaultDuplicateFileJs from '../settings/keymaps/duplicate-current-file.js?raw';
 
 
 /**
@@ -84,6 +85,7 @@ export class Git {
       ['/keymaps/execute-command.js', defaultExecuteCommandJs],
       ['/keymaps/browser-back.js', defaultBrowserBackJs],
       ['/keymaps/browser-forward.js', defaultBrowserForwardJs],
+      ['/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],
       ['/hooks/create.js', defaultHookCreateJs],
       ['/hooks/load.js', defaultHookLoadJs],
       ['/hooks/delete.js', defaultHookDeleteJs]

@@ -19,6 +19,7 @@ import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
 import { KeymapService } from '../keymaps.js';
+import { Modal } from '../util/modal.js';
 
 const programmaticChange = Annotation.define();
 
@@ -321,6 +322,37 @@ export class Editor {
   
   async forceReloadFile(filepath) {
       await this.loadFile(filepath);
+  }
+  
+  async duplicateFile(path) {
+    if (!path) return;
+    
+    const stat = await this.gitClient.pfs.stat(path);
+    if (stat.isDirectory()) {
+        await this.sidebar.showAlert({ title: 'Action Not Supported', message: 'Duplicating folders is not yet supported.' });
+        return;
+    }
+
+    const directory = path.substring(0, path.lastIndexOf('/'));
+    const originalFilename = path.substring(path.lastIndexOf('/') + 1);
+    const defaultName = `${originalFilename.split('.').slice(0, -1).join('.') || originalFilename} (copy)${originalFilename.includes('.') ? '.' + originalFilename.split('.').pop() : ''}`;
+    
+    const newFilename = await Modal.prompt({
+        title: 'Duplicate File',
+        label: 'Enter name for duplicated file:',
+        defaultValue: defaultName
+    });
+    if (!newFilename) return;
+
+    const newPath = `${directory}/${newFilename}`;
+    try {
+      const rawContent = await this.gitClient.readFile(path);
+      await this.gitClient.writeFile(newPath, rawContent);
+      await this.sidebar.refresh();
+    } catch (e) {
+      console.error('Error duplicating file:', e);
+      await this.sidebar.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
+    }
   }
 
   async handleUpdate(newContent) {
