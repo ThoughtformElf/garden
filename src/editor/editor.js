@@ -159,11 +159,8 @@ export class Editor {
   }
 
   async _applyUserSettings() {
-    console.log('[Editor] Applying user settings asynchronously...');
-    
     const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode');
     if (editingMode === 'vim') {
-      console.log('[Editor] VIM mode enabled by user settings.');
       Vim.map('jj', '<Esc>', 'insert');
       this.editorView.dispatch({
         effects: this.vimCompartment.reconfigure(vim())
@@ -171,8 +168,6 @@ export class Editor {
     }
 
     await this.keymapService.updateKeymaps();
-
-    console.log('[Editor] User settings applied.');
   }
 
   async navigateTo(linkContent) {

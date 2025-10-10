@@ -20,10 +20,8 @@ class ConfigService {
 
   async initialize() {
     if (this.isInitialized) return;
-    console.log('[ConfigService] Initializing...');
     
     this.isInitialized = true;
-    console.log('[ConfigService] Initialized.');
   }
 
   /**
@@ -118,7 +116,6 @@ class ConfigService {
   invalidate(gardenName, filePath) {
     const cacheKey = `${gardenName}#/${filePath}`;
     this.cache.delete(cacheKey);
-    console.log(`[ConfigService] Invalidated cache for ${cacheKey}`);
   }
 }
 

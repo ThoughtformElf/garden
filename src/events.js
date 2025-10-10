@@ -34,7 +34,6 @@ class EventBus {
     if (!this.subscribers[eventName]) {
       return;
     }
-    console.log(`[EventBus] Publishing event: ${eventName}`, data);
     this.subscribers[eventName].forEach((callback) => {
       try {
         callback(data);

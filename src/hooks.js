@@ -14,7 +14,6 @@ export class HookRunner {
   }
 
   initialize() {
-    console.log('[HookRunner] Initializing and subscribing to events...');
     for (const eventName in eventToHookFileMap) {
       this.eventBus.subscribe(eventName, (eventData) => {
         this.handleEvent(eventName, eventData);
@@ -30,7 +29,6 @@ export class HookRunner {
     const hookPath = await this.config.getHook(hookFileName);
     
     if (hookPath) {
-      console.log(`[HookRunner] Found hook for "${eventName}". Executing: ${hookPath}`);
       executeFile(hookPath, window.thoughtform.editor, this.git, eventData);
     }
   }

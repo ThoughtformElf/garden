@@ -34,7 +34,6 @@ export async function executeFile(path, editor, git, event = null) {
     }
     // --- END OF FIX ---
 
-    console.log(`[Executor] Running file: ${filePath} from garden: ${gardenName}`);
     const fileContent = await gitClientToUse.readFile(filePath);
 
     // This is the sandboxing. We wrap the user's raw script text in an IIFE.

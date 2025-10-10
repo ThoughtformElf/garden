@@ -23,7 +23,6 @@ export class KeymapService {
    * This is now called *after* the initial render.
    */
   async updateKeymaps() {
-    console.log('[KeymapService] Updating keymaps...');
     const { value: keymapConfig, sourceGarden } = await window.thoughtform.config.get('keymaps.yml');
 
     if (!Array.isArray(keymapConfig)) {
@@ -37,8 +36,6 @@ export class KeymapService {
     this.editorView.dispatch({
       effects: this.keymapCompartment.reconfigure(this.currentKeymap),
     });
-
-    console.log('[KeymapService] Keymaps updated.');
   }
 
   _buildKeymapExtension(config, sourceGarden) {
