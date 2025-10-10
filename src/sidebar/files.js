@@ -363,6 +363,9 @@ export const fileActions = {
       try {
         const wasViewingDeletedFile = decodeURIComponent(window.location.hash).startsWith(`#${path}`);
         
+        // Publish the event BEFORE the file is actually deleted.
+        window.thoughtform.events.publish('file:delete', { path: path, isDirectory: stat.isDirectory() });
+
         // Use the robust rmrf that handles both files and folders
         await this.gitClient.rmrf(path);
 

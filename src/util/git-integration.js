@@ -16,6 +16,7 @@ import defaultBrowserBackJs from '../settings/keymaps/browser-back.js?raw';
 import defaultBrowserForwardJs from '../settings/keymaps/browser-forward.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
+import defaultHookDeleteJs from '../settings/hooks/delete.js?raw';
 
 
 /**
@@ -84,7 +85,8 @@ export class Git {
       ['/keymaps/browser-back.js', defaultBrowserBackJs],
       ['/keymaps/browser-forward.js', defaultBrowserForwardJs],
       ['/hooks/create.js', defaultHookCreateJs],
-      ['/hooks/load.js', defaultHookLoadJs]
+      ['/hooks/load.js', defaultHookLoadJs],
+      ['/hooks/delete.js', defaultHookDeleteJs]
     ];
 
     for (const [path, content] of defaultFiles) {
@@ -212,6 +214,7 @@ export class Git {
         const headStatus = statusEntry[1];
         if (headStatus === 0) {
             await this.pfs.unlink(filepath);
+            window.thoughtform.events.publish('file:delete', { path: filepath, isDirectory: false });
         } else {
             await git.checkout({ fs: this.fs, dir: '/', filepaths: [cleanPath], force: true });
         }

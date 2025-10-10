@@ -15,6 +15,7 @@ import defaultBrowserBackJs from '../settings/keymaps/browser-back.js?raw';
 import defaultBrowserForwardJs from '../settings/keymaps/browser-forward.js?raw';
 import defaultHookCreateJs from '../settings/hooks/create.js?raw';
 import defaultHookLoadJs from '../settings/hooks/load.js?raw';
+import defaultHookDeleteJs from '../settings/hooks/delete.js?raw';
 
 
 async function listAllFiles(gitClient, dir) {
@@ -291,7 +292,8 @@ export async function resetDefaultSettings(log) {
     ['/keymaps/browser-back.js', defaultBrowserBackJs],
     ['/keymaps/browser-forward.js', defaultBrowserForwardJs],
     ['/hooks/create.js', defaultHookCreateJs],
-    ['/hooks/load.js', defaultHookLoadJs]
+    ['/hooks/load.js', defaultHookLoadJs],
+    ['/hooks/delete.js', defaultHookDeleteJs]
   ];
 
   const settingsGit = new Git('Settings');

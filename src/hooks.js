@@ -4,6 +4,7 @@ import { executeFile } from './executor.js';
 const eventToHookFileMap = {
   'app:load': 'load.js',
   'file:create': 'create.js',
+  'file:delete': 'delete.js',
 };
 
 export class HookRunner {
