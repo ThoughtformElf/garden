@@ -3,22 +3,7 @@
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
-
-// --- Vite Raw Imports for Default Settings Scaffolding ---
-import defaultInterfaceYml from '../settings/interface.yml?raw';
-import defaultKeymapsYml from '../settings/keymaps.yml?raw';
-import defaultNavigateOrPromptJs from '../settings/keymaps/navigate-or-prompt.js?raw';
-import defaultToggleSidebarJs from '../settings/keymaps/toggle-sidebar.js?raw';
-import defaultToggleDevtoolsJs from '../settings/keymaps/toggle-devtools.js?raw';
-import defaultSearchFilesJs from '../settings/keymaps/search-files.js?raw';
-import defaultExecuteCommandJs from '../settings/keymaps/execute-command.js?raw';
-import defaultBrowserBackJs from '../settings/keymaps/browser-back.js?raw';
-import defaultBrowserForwardJs from '../settings/keymaps/browser-forward.js?raw';
-import defaultHookCreateJs from '../settings/hooks/create.js?raw';
-import defaultHookLoadJs from '../settings/hooks/load.js?raw';
-import defaultHookDeleteJs from '../settings/hooks/delete.js?raw';
-import defaultDuplicateFileJs from '../settings/keymaps/duplicate-current-file.js?raw';
-
+import { defaultFiles } from '../settings/defaults.js';
 
 /**
  * @class Git
@@ -74,23 +59,6 @@ export class Git {
     await this.ensureDir('/keymaps');
     await this.ensureDir('/hooks');
     
-    // An array of [path, content] pairs
-    const defaultFiles = [
-      ['/interface.yml', defaultInterfaceYml],
-      ['/keymaps.yml', defaultKeymapsYml],
-      ['/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
-      ['/keymaps/toggle-sidebar.js', defaultToggleSidebarJs],
-      ['/keymaps/toggle-devtools.js', defaultToggleDevtoolsJs],
-      ['/keymaps/search-files.js', defaultSearchFilesJs],
-      ['/keymaps/execute-command.js', defaultExecuteCommandJs],
-      ['/keymaps/browser-back.js', defaultBrowserBackJs],
-      ['/keymaps/browser-forward.js', defaultBrowserForwardJs],
-      ['/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],
-      ['/hooks/create.js', defaultHookCreateJs],
-      ['/hooks/load.js', defaultHookLoadJs],
-      ['/hooks/delete.js', defaultHookDeleteJs]
-    ];
-
     for (const [path, content] of defaultFiles) {
       try {
         await this.pfs.writeFile(path, content, 'utf8');

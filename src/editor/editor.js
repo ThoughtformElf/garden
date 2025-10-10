@@ -1,25 +1,18 @@
 // src/editor/editor.js
-import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, highlightActiveLine } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 import { EditorState, Compartment, Annotation } from '@codemirror/state';
-import { history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { vim, Vim } from '@replit/codemirror-vim';
-import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-relative';
 import debounce from 'lodash/debounce';
-import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
-import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { lintKeymap } from '@codemirror/lint';
 
 import { Sidebar } from '../sidebar/sidebar.js';
-import { basicDark } from '../util/theme.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
-import { allHighlightPlugins } from './plugins/index.js';
 import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
 import { KeymapService } from '../keymaps.js';
 import { Modal } from '../util/modal.js';
+import { createEditorExtensions } from './extensions.js';
 
 const programmaticChange = Annotation.define();
 
@@ -97,49 +90,22 @@ export class Editor {
     this.keymapService = new KeymapService(tempView);
     const dynamicKeymapExtension = this.keymapService.getCompartment();
 
-    const extensions = [
-      appContextField.init(() => ({
+    const extensions = createEditorExtensions({
+      appContext: appContextField.init(() => ({
         gitClient: this.gitClient,
         sidebar: this.sidebar,
         editor: this,
       })),
       dynamicKeymapExtension,
-      this.vimCompartment.of([]),
-      keymap.of([indentWithTab]),
-      lineNumbers(),
-      highlightActiveLineGutter(),
-      highlightSpecialChars(),
-      history(),
-      foldGutter(),
-      drawSelection(),
-      dropCursor(),
-      EditorState.allowMultipleSelections.of(true),
-      indentOnInput(),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      bracketMatching(),
-      closeBrackets(),
-      autocompletion(),
-      rectangularSelection(),
-      highlightActiveLine(),
-      highlightSelectionMatches(),
-      keymap.of([
-          ...closeBracketsKeymap,
-          ...searchKeymap,
-          ...historyKeymap,
-          ...foldKeymap,
-          ...completionKeymap,
-          ...lintKeymap
-      ]),
-      EditorView.lineWrapping,
-      lineNumbersRelative,
-      basicDark,
-      this.languageCompartment.of(getLanguageExtension(this.filePath)),
+      vimCompartment: this.vimCompartment,
+      languageCompartment: this.languageCompartment,
+      tokenCounterCompartment: this.tokenCounterCompartment,
       updateListener,
-      ...allHighlightPlugins,
-      diffCompartment.of([]),
-      this.tokenCounterCompartment.of(createTokenCounterExtension()),
+      filePath: this.filePath,
+      getLanguageExtension,
+      createTokenCounterExtension,
       ...(this.editorConfig.extensions || []),
-    ];
+    });
 
     this.editorView = new EditorView({
       doc: initialContent,
