@@ -240,8 +240,6 @@ export class WorkspaceManager {
       }
   }
   
-  // --- NEW METHODS START HERE ---
-
   _getPaneList() {
     const paneList = [];
     const traverse = (node) => {
@@ -307,7 +305,48 @@ export class WorkspaceManager {
     this._findAndSwap('down');
   }
   
-  // --- NEW METHODS END HERE ---
+  // --- NEW METHOD ---
+  async closeActivePane() {
+      const panes = this._getPaneList();
+      if (panes.length <= 1) {
+          console.log("Cannot close the last pane.");
+          return;
+      }
+
+      const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
+      if (currentIndex === -1) return;
+
+      // Determine which pane to activate next
+      const nextIndex = (currentIndex + 1) % panes.length;
+      const nextActivePaneId = panes[nextIndex === currentIndex ? 0 : nextIndex].id;
+
+      // Recursively traverse the tree to find the parent of the pane to remove,
+      // and replace the parent with its other child.
+      const findAndRemove = (node) => {
+          if (!node || node.type === 'leaf') {
+              return node;
+          }
+
+          const childIndexToRemove = node.children.findIndex(child => child.id === this.activePaneId);
+          if (childIndexToRemove !== -1) {
+              const remainingChildIndex = 1 - childIndexToRemove;
+              return node.children[remainingChildIndex]; // Promote the sibling
+          }
+
+          node.children = node.children.map(child => findAndRemove(child)).filter(Boolean);
+          
+          if (node.children.length === 1) {
+              return node.children[0];
+          }
+          return node;
+      };
+
+      this.paneTree = findAndRemove(this.paneTree);
+      
+      // Re-render the UI and then set the new active pane
+      await this.render();
+      this.setActivePane(nextActivePaneId);
+  }
 
   getActivePaneInfo() {
       if (!this.activePaneId) return null;

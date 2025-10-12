@@ -48,3 +48,6 @@
 
 - key: "Alt-Shift-ArrowUp"
   run: "keymaps/move-pane-up.js"
+
+- key: "Alt-Shift-x"
+  run: "keymaps/close-pane.js"
