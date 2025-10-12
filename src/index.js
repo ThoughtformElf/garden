@@ -15,6 +15,8 @@ import { initializeAiService } from './ai/index.js';
 import { initializeConfigService } from './config.js';
 import { initializeEventBus } from './events.js';
 import { HookRunner } from './hooks.js';
+import { registerSW } from 'virtual:pwa-register';
+import { Modal } from './util/modal.js';
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
@@ -23,6 +25,28 @@ window.thoughtform = {
   config: initializeConfigService(),
   events: initializeEventBus(),
 };
+
+// --- PWA Update Logic ---
+const updateSW = registerSW({
+  onNeedRefresh() {
+    Modal.confirm({
+      title: 'Update Available',
+      message: 'A new version of Thoughtform Garden is available. Reload to apply the update?',
+      okText: 'Reload'
+    }).then(confirmed => {
+      if (confirmed) {
+        updateSW(true); // Reloads the page with the new version
+      }
+    });
+  },
+  onOfflineReady() {
+    console.log('App is ready for offline use.');
+  }
+});
+
+// Attach the update check function to the global API so devtools can call it
+window.thoughtform.updateApp = updateSW;
+
 
 // --- Main Application Logic ---
 async function main() {

@@ -91,6 +91,7 @@ export function initializeDevTools() {
           <hr>
           
           <h2>Maintenance</h2>
+          <button id="update-app-btn" class="eruda-button">Update Application</button>
           <button id="reset-settings-btn" class="eruda-button">Reset Default Settings...</button>
           
           <hr>
@@ -107,6 +108,46 @@ export function initializeDevTools() {
       const fileInput = $el.find('#import-file-input')[0];
       const clearDataBtn = $el.find('#clear-data-btn')[0];
       const resetSettingsBtn = $el.find('#reset-settings-btn')[0];
+      const updateAppBtn = $el.find('#update-app-btn')[0];
+
+      updateAppBtn.addEventListener('click', () => {
+        const updateCheckFn = window.thoughtform.updateApp;
+        if (!updateCheckFn) {
+            const errModal = new Modal({ title: 'Error' });
+            errModal.updateContent('<p>Update check function is not available. The PWA module may not have loaded correctly.</p>');
+            errModal.addFooterButton('Close', () => errModal.destroy());
+            errModal.show();
+            return;
+        }
+
+        const progressModal = new Modal({ title: 'Checking for Updates...' });
+        progressModal.updateContent('<p>Contacting server for the latest version...</p>');
+        progressModal.show();
+        
+        let updateFound = false;
+        
+        const originalOnNeedRefresh = updateCheckFn.onNeedRefresh;
+        if (originalOnNeedRefresh) {
+            updateCheckFn.onNeedRefresh = () => {
+                updateFound = true;
+                progressModal.destroy();
+                originalOnNeedRefresh();
+            };
+        }
+
+        updateCheckFn();
+
+        setTimeout(() => {
+            if (!updateFound) {
+                progressModal.updateContent('<p>No new update found. You are on the latest version.</p>');
+                progressModal.clearFooter();
+                progressModal.addFooterButton('Close', () => progressModal.destroy());
+            }
+            if (updateCheckFn.onNeedRefresh !== originalOnNeedRefresh) {
+               updateCheckFn.onNeedRefresh = originalOnNeedRefresh;
+            }
+        }, 5000);
+      });
 
       resetSettingsBtn.addEventListener('click', async () => {
         const confirmed = await Modal.confirm({
