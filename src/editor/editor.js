@@ -43,8 +43,8 @@ export class Editor {
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();
     this.tokenCounterCompartment = new Compartment();
-    this.imageViewerElement = null;
-    this.currentObjectUrl = null;
+    this.mediaViewerElement = null;
+    this.currentMediaObjectUrl = null;
 
     this.debouncedHandleUpdate = debounce(this.handleUpdate.bind(this), 500);
     
@@ -69,15 +69,24 @@ export class Editor {
     
     initializeDragAndDrop(this.gitClient, this.sidebar);
     
-    const initialContent = await this.loadFileContent(this.filePath);
+    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+    const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
+    const audioExtensions = ['mp3', 'wav', 'flac'];
+    const mediaExtensions = [...imageExtensions, ...videoExtensions, ...audioExtensions];
+    const initialExtension = this.filePath.split('.').pop()?.toLowerCase();
+    
+    let initialContent = '';
+    if (!mediaExtensions.includes(initialExtension)) {
+        initialContent = await this.loadFileContent(this.filePath);
+    }
 
     const loadingIndicator = document.getElementById('loading-indicator');
     if(loadingIndicator) loadingIndicator.remove();
     this.mainContainer.style.display = 'flex';
 
-    this.imageViewerElement = document.createElement('div');
-    this.imageViewerElement.className = 'image-viewer-container';
-    this.mainContainer.appendChild(this.imageViewerElement);
+    this.mediaViewerElement = document.createElement('div');
+    this.mediaViewerElement.className = 'media-viewer-container';
+    this.mainContainer.appendChild(this.mediaViewerElement);
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
@@ -228,26 +237,57 @@ export class Editor {
 
   async loadFile(filepath) {
     const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+    const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
+    const audioExtensions = ['mp3', 'wav', 'flac'];
+    const mediaExtensions = [...imageExtensions, ...videoExtensions, ...audioExtensions];
     const extension = filepath.split('.').pop()?.toLowerCase();
 
-    if (imageExtensions.includes(extension)) {
+    if (mediaExtensions.includes(extension)) {
       this.hideDiff();
-
+      
       this.mainContainer.classList.remove('is-editor');
-      this.mainContainer.classList.add('is-image-preview');
-      this.imageViewerElement.innerHTML = '<p>Loading image...</p>';
+      this.mainContainer.classList.add('is-media-preview');
+      this.mediaViewerElement.innerHTML = '<p>Loading media...</p>';
 
       const buffer = await this.gitClient.readFileAsBuffer(filepath);
       if (buffer) {
-        const mimeType = `image/${extension === 'svg' ? 'svg+xml' : extension}`;
+        const mimeTypeMap = {
+          'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif',
+          'svg': 'image/svg+xml', 'webp': 'image/webp', 'avif': 'image/avif',
+          'mp4': 'video/mp4', 'webm': 'video/webm', 'mov': 'video/quicktime', 'ogg': 'video/ogg',
+          'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'flac': 'audio/flac',
+        };
+        const mimeType = mimeTypeMap[extension] || 'application/octet-stream';
         const blob = new Blob([buffer], { type: mimeType });
         
-        if (this.currentObjectUrl) URL.revokeObjectURL(this.currentObjectUrl);
+        if (this.currentMediaObjectUrl) URL.revokeObjectURL(this.currentMediaObjectUrl);
         
-        this.currentObjectUrl = URL.createObjectURL(blob);
-        this.imageViewerElement.innerHTML = `<img src="${this.currentObjectUrl}" alt="${filepath}" />`;
+        this.currentMediaObjectUrl = URL.createObjectURL(blob);
+
+        let mediaElementHTML = '';
+        if (imageExtensions.includes(extension)) {
+          mediaElementHTML = `<img src="${this.currentMediaObjectUrl}" alt="${filepath}" />`;
+        } else if (videoExtensions.includes(extension)) {
+          mediaElementHTML = `<video src="${this.currentMediaObjectUrl}" controls></video>`;
+        } else if (audioExtensions.includes(extension)) {
+          mediaElementHTML = `<audio src="${this.currentMediaObjectUrl}" controls></audio>`;
+        }
+        
+        this.mediaViewerElement.innerHTML = mediaElementHTML;
+
+        // --- THIS IS THE FIX (Part 1) ---
+        const mediaElement = this.mediaViewerElement.querySelector('video, audio');
+        if (mediaElement) {
+            mediaElement.onerror = (e) => {
+                console.error("Media playback error:", e);
+                this.mediaViewerElement.innerHTML = `<p class="error">Error playing media. The file format or codec might not be supported by your browser.</p>`;
+            };
+            mediaElement.load(); // Explicitly tell the element to load the new source
+        }
+        // --- END OF FIX ---
+
       } else {
-        this.imageViewerElement.innerHTML = `<p class="error">Could not load image: ${filepath}</p>`;
+        this.mediaViewerElement.innerHTML = `<p class="error">Could not load media: ${filepath}</p>`;
       }
 
       this.filePath = filepath;
@@ -257,12 +297,12 @@ export class Editor {
       return;
     }
 
-    this.mainContainer.classList.remove('is-image-preview');
+    this.mainContainer.classList.remove('is-media-preview');
     this.mainContainer.classList.add('is-editor');
 
-    if (this.currentObjectUrl) {
-      URL.revokeObjectURL(this.currentObjectUrl);
-      this.currentObjectUrl = null;
+    if (this.currentMediaObjectUrl) {
+      URL.revokeObjectURL(this.currentMediaObjectUrl);
+      this.currentMediaObjectUrl = null;
     }
     
     this.hideDiff();

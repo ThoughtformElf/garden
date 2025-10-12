@@ -24,7 +24,6 @@ export function initializeDragAndDrop(gitClient, sidebar) {
     overlay.classList.remove('visible');
   };
 
-  // This function now handles both files and directories, with a logging callback.
   const processEntries = async (entries, logCallback) => {
     let finalEntries = entries;
 
@@ -41,10 +40,9 @@ export function initializeDragAndDrop(gitClient, sidebar) {
       
       if (!userChoice || userChoice === 'cancel') {
         logCallback('Import cancelled by user.', 'Import cancelled by user.');
-        return; // Abort the entire operation
+        return;
       }
       
-      // If we are here, user chose 'import_safe'
       finalEntries = entries.filter(entry => !(entry.isDirectory && entry.name === '.git'));
       logCallback('Ignoring .git directory and proceeding with import.', 'Ignoring .git directory.');
     }
@@ -52,7 +50,12 @@ export function initializeDragAndDrop(gitClient, sidebar) {
 
     const filesToProcess = [];
     const zipFiles = [];
-    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+    const binaryExtensions = [
+        'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', // images
+        'mp4', 'webm', 'mov', 'ogg', // videos
+        'mp3', 'wav', 'flac', // audio
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx' // documents
+    ];
     
     const traverseFileTree = async (entry, path) => {
       if (entry.isFile) {
@@ -85,8 +88,7 @@ export function initializeDragAndDrop(gitClient, sidebar) {
         let content;
         const extension = file.name.split('.').pop()?.toLowerCase();
         
-        // THE FIX: Only image files are treated as binary. Everything else is raw text.
-        if (imageExtensions.includes(extension)) {
+        if (binaryExtensions.includes(extension)) {
             content = await file.arrayBuffer();
         } else {
             content = await file.text();
@@ -154,7 +156,6 @@ export function initializeDragAndDrop(gitClient, sidebar) {
 
       let logHTML = '';
       const logCallback = (htmlMessage, consoleMessage) => {
-        // Use the plain message for the console, and the HTML for the modal
         console.log(`[Import Log] ${consoleMessage}`);
         logHTML += `<div>${htmlMessage}</div>`;
         logContainer.innerHTML = logHTML;

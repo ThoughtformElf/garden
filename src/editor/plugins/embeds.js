@@ -1,3 +1,4 @@
+// src/editor/plugins/embeds.js
 import { WidgetType, Decoration, ViewPlugin } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
@@ -5,17 +6,26 @@ import { Git } from '../../util/git-integration.js';
 import { appContextField } from '../navigation.js';
 
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
+const audioExtensions = ['mp3', 'wav', 'flac'];
+const mediaExtensions = [...imageExtensions, ...videoExtensions, ...audioExtensions];
 
 function getMimeType(extension) {
   const ext = extension.toLowerCase();
   switch (ext) {
     case 'png': return 'image/png';
-    case 'jpg':
-    case 'jpeg': return 'image/jpeg';
+    case 'jpg': case 'jpeg': return 'image/jpeg';
     case 'gif': return 'image/gif';
     case 'svg': return 'image/svg+xml';
     case 'webp': return 'image/webp';
     case 'avif': return 'image/avif';
+    case 'mp4': return 'video/mp4';
+    case 'webm': return 'video/webm';
+    case 'mov': return 'video/quicktime';
+    case 'ogg': return 'video/ogg';
+    case 'mp3': return 'audio/mpeg';
+    case 'wav': return 'audio/wav';
+    case 'flac': return 'audio/flac';
     default: return 'application/octet-stream';
   }
 }
@@ -37,13 +47,25 @@ class EmbedWidget extends WidgetType {
   toDOM() {
     const container = document.createElement('span');
     container.className = 'cm-embed-container';
+    const extension = this.linkTarget.split('.').pop()?.toLowerCase().split('?')[0];
 
     if (this.type === 'external') {
-      const image = document.createElement('img');
-      image.src = this.linkTarget;
-      image.alt = this.altText;
-      image.className = 'cm-embedded-image';
-      container.appendChild(image);
+      let element;
+      if (videoExtensions.includes(extension)) {
+        element = document.createElement('video');
+        element.className = 'cm-embedded-video';
+        element.controls = true;
+      } else if (audioExtensions.includes(extension)) {
+        element = document.createElement('audio');
+        element.className = 'cm-embedded-audio';
+        element.controls = true;
+      } else {
+        element = document.createElement('img');
+        element.className = 'cm-embedded-image';
+        element.alt = this.altText;
+      }
+      element.src = this.linkTarget;
+      container.appendChild(element);
     } else { // 'internal'
       const placeholder = document.createElement('span');
       placeholder.className = 'cm-embed-placeholder';
@@ -61,7 +83,6 @@ class EmbedWidget extends WidgetType {
   }
   
   async loadInternalContent(container) {
-    // FIX: Decode the URI component to handle spaces and other characters.
     const decodedTarget = decodeURIComponent(this.linkTarget);
     let path = decodedTarget;
     let garden = null;
@@ -71,8 +92,8 @@ class EmbedWidget extends WidgetType {
     }
     
     const extension = path.split('.').pop()?.toLowerCase();
-    if (!imageExtensions.includes(extension)) {
-        container.textContent = ``; // Phase 2: Handle non-image transclusion. For now, hide.
+    if (!mediaExtensions.includes(extension)) {
+        container.textContent = ``;
         container.style.display = 'none';
         return;
     }
@@ -97,13 +118,34 @@ class EmbedWidget extends WidgetType {
     const blob = new Blob([buffer], { type: mimeType });
     this.objectURL = URL.createObjectURL(blob);
 
-    const image = document.createElement('img');
-    image.src = this.objectURL;
-    image.alt = this.linkTarget;
-    image.className = 'cm-embedded-image';
+    let element;
+    if (imageExtensions.includes(extension)) {
+        element = document.createElement('img');
+        element.className = 'cm-embedded-image';
+        element.alt = this.linkTarget;
+    } else if (videoExtensions.includes(extension)) {
+        element = document.createElement('video');
+        element.className = 'cm-embedded-video';
+        element.controls = true;
+    } else if (audioExtensions.includes(extension)) {
+        element = document.createElement('audio');
+        element.className = 'cm-embedded-audio';
+        element.controls = true;
+    }
 
+    element.src = this.objectURL;
     container.innerHTML = ''; // Clear placeholder
-    container.appendChild(image);
+    container.appendChild(element);
+
+    // --- THIS IS THE FIX (Part 2) ---
+    if (element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
+        element.onerror = (e) => {
+            console.error("Embedded media playback error:", e);
+            container.innerHTML = `<span class="cm-embed-error">Error playing: ${this.linkTarget}</span>`;
+        };
+        element.load();
+    }
+    // --- END OF FIX ---
   }
 
   destroy() {
@@ -118,9 +160,8 @@ function buildDecorations(view) {
   const tree = syntaxTree(view.state);
 
   const isInsideCodeBlock = (pos) => {
-    let node = tree.resolve(pos, 1); // Bias to the right, important for start of a token
+    let node = tree.resolve(pos, 1);
     while (node) {
-      // Check for FencedCode, CodeBlock, InlineCode, etc.
       if (node.name.includes('Code')) {
         return true;
       }
@@ -132,33 +173,32 @@ function buildDecorations(view) {
   for (const { from, to } of view.visibleRanges) {
     const text = view.state.doc.sliceString(from, to);
     
-    // --- Internal Embeds: ![[wikilink.png]] ---
     const internalEmbedRegex = /!\[\[([^\[\]]+?)\]\]/g;
     let match;
     while ((match = internalEmbedRegex.exec(text))) {
       const start = from + match.index;
       
-      // --- SYNTAX CHECK: Skip if inside a code block ---
       if (isInsideCodeBlock(start)) continue;
 
       const end = start + match[0].length;
       const linkTarget = match[1];
-
-      builder.add(
-        start,
-        end,
-        Decoration.replace({
-          widget: new EmbedWidget(linkTarget, linkTarget, 'internal', view),
-        })
-      );
+      const extension = linkTarget.split('.').pop()?.toLowerCase();
+      
+      if (mediaExtensions.includes(extension)) {
+        builder.add(
+          start,
+          end,
+          Decoration.replace({
+            widget: new EmbedWidget(linkTarget, linkTarget, 'internal', view),
+          })
+        );
+      }
     }
 
-    // --- External Embeds: ![alt](url) ---
     const externalEmbedRegex = /!\[(.*?)\]\((.*?)\)/g;
     while ((match = externalEmbedRegex.exec(text))) {
       const start = from + match.index;
       
-      // --- SYNTAX CHECK: Skip if inside a code block ---
       if (isInsideCodeBlock(start)) continue;
 
       const end = start + match[0].length;
@@ -166,7 +206,7 @@ function buildDecorations(view) {
       const url = match[2];
       
       const extension = url.split('.').pop()?.toLowerCase()?.split('?')[0];
-      if (url.startsWith('http') && imageExtensions.includes(extension)) {
+      if (url.startsWith('http') && mediaExtensions.includes(extension)) {
         builder.add(
           start,
           end,

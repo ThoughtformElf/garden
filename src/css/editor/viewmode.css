@@ -1,41 +1,91 @@
-/* Controls visibility of the editor vs. the image previewer */
+/*
+  =================================================================
+  --- View Mode Controller Styles ---
+  =================================================================
+  Controls the visibility of the text editor vs. the media previewer.
+*/
 
-/* When in editor mode, the image viewer is hidden. */
-main.is-editor .image-viewer-container {
+/* When in editor mode, the media viewer is hidden. */
+main.is-editor .media-viewer-container {
   display: none !important;
 }
 
-/* When in image preview mode, the CodeMirror editor is hidden. */
-main.is-image-preview .cm-editor {
+/* When in media preview mode, the CodeMirror editor is hidden. */
+main.is-media-preview .cm-editor {
   display: none !important;
 }
 
 /* 
-  Basic styling for the container that holds the image.
-  Uses flexbox to center the image.
+  Base styling for the container that holds the media.
+  Uses flexbox to center the content.
 */
-.image-viewer-container {
+.media-viewer-container {
   display: flex;
   width: 100%;
   height: 100%;
   justify-content: center;
   align-items: center;
-  padding: 1rem;
+  padding: 2rem;
   box-sizing: border-box;
+  overflow: auto;
 }
 
 /*
-  Ensures the image scales down to fit the container
-  while maintaining its aspect ratio.
+  Ensures images and videos scale down to fit the container
+  while maintaining their aspect ratio.
 */
-.image-viewer-container img {
+.media-viewer-container img,
+.media-viewer-container video {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border-primary);
+}
+
+/*
+ * Give the audio player in the main viewer a sensible default width
+ * so it doesn't span the entire screen.
+ */
+.media-viewer-container audio {
+  width: 100%;
+  max-width: 40rem;
 }
 
 /* A simple style for error text within the viewer */
-.image-viewer-container .error {
+.media-viewer-container .error {
   font-size: 1rem;
   color: var(--color-text-destructive, #f44336);
+}
+
+
+/*
+  =================================================================
+  --- Embedded Media Styles (for ![[wikilinks]] in the editor) ---
+  =================================================================
+*/
+
+/*
+ * Styles for embedded images and videos within the editor content.
+ * Constrains their size to fit neatly within the text flow.
+ */
+.cm-embedded-image,
+.cm-embedded-video {
+  max-width: 100%;
+  max-height: 30rem;
+  display: block;
+  margin-inline: auto; /* Center horizontally */
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border);
+}
+
+/*
+ * Specific styles for the embedded audio player.
+ * Gives it a consistent width to look clean within the document.
+ */
+.cm-embedded-audio {
+  width: 100%;
+  max-width: 30rem;
+  display: block;
+  margin-inline: auto; /* Center horizontally */
 }
