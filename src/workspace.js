@@ -171,13 +171,12 @@ export class WorkspaceManager {
   }
   
   async splitPane(paneIdToSplit, direction) {
-    // --- THIS IS THE FIX ---
-    let newPaneId = null; // Variable to capture the ID of the new pane.
+    let newPaneId = null; 
 
     const findAndSplit = (node) => {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
-            newPaneId = `pane-${Date.now()}`; // Capture the new ID
-            const newLeaf = JSON.parse(JSON.stringify(node)); // Deep copy buffer state
+            newPaneId = `pane-${Date.now()}`; 
+            const newLeaf = JSON.parse(JSON.stringify(node)); 
             newLeaf.id = newPaneId;
             
             return {
@@ -193,12 +192,11 @@ export class WorkspaceManager {
     };
     
     this.paneTree = findAndSplit(this.paneTree);
-    await this.render(); // Re-render the entire layout
+    await this.render(); 
 
     if (newPaneId) {
-        this.setActivePane(newPaneId); // Explicitly set the new pane as active
+        this.setActivePane(newPaneId); 
     }
-    // --- END OF FIX ---
   }
   
   async openFile(garden, path) {
@@ -241,6 +239,75 @@ export class WorkspaceManager {
           window.history.pushState(null, '', newUrl);
       }
   }
+  
+  // --- NEW METHODS START HERE ---
+
+  _getPaneList() {
+    const paneList = [];
+    const traverse = (node) => {
+        if (node.type === 'leaf') {
+            paneList.push(node);
+        } else if (node.type.startsWith('split-')) {
+            node.children.forEach(traverse);
+        }
+    };
+    traverse(this.paneTree);
+    return paneList;
+  }
+
+  selectNextPane() {
+    const panes = this._getPaneList();
+    const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
+    if (currentIndex === -1) return;
+    const nextIndex = (currentIndex + 1) % panes.length;
+    this.setActivePane(panes[nextIndex].id);
+  }
+  
+  selectPrevPane() {
+    const panes = this._getPaneList();
+    const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
+    if (currentIndex === -1) return;
+    const prevIndex = (currentIndex - 1 + panes.length) % panes.length;
+    this.setActivePane(panes[prevIndex].id);
+  }
+  
+  _findAndSwap(direction) {
+    let parentNode = null;
+    let nodeIndex = -1;
+
+    const findParent = (node) => {
+        if (node.type.startsWith('split-')) {
+            const index = node.children.findIndex(child => child.id === this.activePaneId);
+            if (index !== -1) {
+                parentNode = node;
+                nodeIndex = index;
+                return;
+            }
+            node.children.forEach(findParent);
+        }
+    };
+    findParent(this.paneTree);
+
+    if (parentNode) {
+      if (direction === 'up' && nodeIndex > 0) {
+        [parentNode.children[nodeIndex], parentNode.children[nodeIndex - 1]] = [parentNode.children[nodeIndex - 1], parentNode.children[nodeIndex]];
+        this.render();
+      } else if (direction === 'down' && nodeIndex < parentNode.children.length - 1) {
+        [parentNode.children[nodeIndex], parentNode.children[nodeIndex + 1]] = [parentNode.children[nodeIndex + 1], parentNode.children[nodeIndex]];
+        this.render();
+      }
+    }
+  }
+  
+  movePaneUp() {
+    this._findAndSwap('up');
+  }
+
+  movePaneDown() {
+    this._findAndSwap('down');
+  }
+  
+  // --- NEW METHODS END HERE ---
 
   getActivePaneInfo() {
       if (!this.activePaneId) return null;

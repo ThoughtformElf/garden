@@ -20,6 +20,10 @@ import defaultHookLoadJs from './hooks/load.js?raw';
 import defaultHookDeleteJs from './hooks/delete.js?raw';
 import defaultSplitVerticalJs from './keymaps/split-pane-vertical.js?raw';
 import defaultSplitHorizontalJs from './keymaps/split-pane-horizontal.js?raw';
+import defaultSelectNextPaneJs from './keymaps/select-next-pane.js?raw';
+import defaultSelectPrevPaneJs from './keymaps/select-prev-pane.js?raw';
+import defaultMovePaneUpJs from './keymaps/move-pane-up.js?raw';
+import defaultMovePaneDownJs from './keymaps/move-pane-down.js?raw';
 
 export const defaultFiles = [
   ['/interface.yml', defaultInterfaceYml],
@@ -35,6 +39,10 @@ export const defaultFiles = [
   ['/keymaps/new-file.js', defaultNewFileJs],
   ['/keymaps/split-pane-vertical.js', defaultSplitVerticalJs],
   ['/keymaps/split-pane-horizontal.js', defaultSplitHorizontalJs],
+  ['/keymaps/select-next-pane.js', defaultSelectNextPaneJs],
+  ['/keymaps/select-prev-pane.js', defaultSelectPrevPaneJs],
+  ['/keymaps/move-pane-up.js', defaultMovePaneUpJs],
+  ['/keymaps/move-pane-down.js', defaultMovePaneDownJs],
   ['/hooks/create.js', defaultHookCreateJs],
   ['/hooks/load.js', defaultHookLoadJs],
   ['/hooks/delete.js', defaultHookDeleteJs]

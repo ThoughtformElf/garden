@@ -36,3 +36,15 @@
 
 - key: "Mod-Shift-\\"
   run: "keymaps/split-pane-horizontal.js"
+
+- key: "Alt-Shift-ArrowRight"
+  run: "keymaps/select-next-pane.js"
+
+- key: "Alt-Shift-ArrowLeft"
+  run: "keymaps/select-prev-pane.js"
+
+- key: "Alt-Shift-ArrowDown"
+  run: "keymaps/move-pane-down.js"
+
+- key: "Alt-Shift-ArrowUp"
+  run: "keymaps/move-pane-up.js"
