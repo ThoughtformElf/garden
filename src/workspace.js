@@ -38,6 +38,14 @@ export class WorkspaceManager {
   }
 
   async render() {
+    // --- THIS IS THE FIX ---
+    // Reset the main container's styles before every render to ensure
+    // that old grid layouts are cleared when we go back to a single pane.
+    this.mainContainer.style.display = 'flex';
+    this.mainContainer.style.gridTemplateColumns = '';
+    this.mainContainer.style.gridTemplateRows = '';
+    // --- END OF FIX ---
+
     // Before wiping the DOM, destroy old editor instances to prevent memory leaks
     this.panes.forEach(({ editor }) => {
         if (editor && editor.editorView) {
@@ -305,7 +313,6 @@ export class WorkspaceManager {
     this._findAndSwap('down');
   }
   
-  // --- NEW METHOD ---
   async closeActivePane() {
       const panes = this._getPaneList();
       if (panes.length <= 1) {
@@ -316,12 +323,9 @@ export class WorkspaceManager {
       const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
       if (currentIndex === -1) return;
 
-      // Determine which pane to activate next
       const nextIndex = (currentIndex + 1) % panes.length;
       const nextActivePaneId = panes[nextIndex === currentIndex ? 0 : nextIndex].id;
 
-      // Recursively traverse the tree to find the parent of the pane to remove,
-      // and replace the parent with its other child.
       const findAndRemove = (node) => {
           if (!node || node.type === 'leaf') {
               return node;
@@ -330,7 +334,7 @@ export class WorkspaceManager {
           const childIndexToRemove = node.children.findIndex(child => child.id === this.activePaneId);
           if (childIndexToRemove !== -1) {
               const remainingChildIndex = 1 - childIndexToRemove;
-              return node.children[remainingChildIndex]; // Promote the sibling
+              return node.children[remainingChildIndex];
           }
 
           node.children = node.children.map(child => findAndRemove(child)).filter(Boolean);
@@ -343,7 +347,6 @@ export class WorkspaceManager {
 
       this.paneTree = findAndRemove(this.paneTree);
       
-      // Re-render the UI and then set the new active pane
       await this.render();
       this.setActivePane(nextActivePaneId);
   }
