@@ -156,6 +156,12 @@ export class MessageHandler {
                             data: Buffer.from(chunk).toString('base64'),
                             zipSize: zipData.length
                         }, peerId);
+
+                        if ((i + 1) % 10 === 0 || (i + 1) === totalChunks) {
+                            instance.dispatchEvent(new CustomEvent('syncProgress', { 
+                                detail: { message: `Sent ${i + 1} of ${totalChunks} chunks for ${gardenName} to ${peerId.substring(0,8)}...`, type: 'info' } 
+                            }));
+                        }
                     }
                     
                     instance.sync.sendSyncMessage({ type: 'garden_zip_complete', gardenName: gardenName, transferId: transferId }, peerId);
