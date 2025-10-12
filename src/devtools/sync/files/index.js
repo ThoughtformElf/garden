@@ -15,9 +15,12 @@ export class SyncFiles extends EventEmitterMixin {
         this.pendingWriteCount = 0;
         this.isSyncCompleteMessageReceived = false;
         this.deletedGitDirs = new Set();
-        this.isSyncFailed = false; // --- THIS IS THE FIX (Part 1) ---
+        this.isSyncFailed = false;
+        this.isSyncCancelled = false;
         
         this.activeTransfers = new Map();
+        this.currentTransferId = null;
+        this.targetPeers = [];
     }
     
     resetFullSyncState() {
@@ -25,7 +28,10 @@ export class SyncFiles extends EventEmitterMixin {
         this.isSyncCompleteMessageReceived = false;
         this.deletedGitDirs.clear();
         this.activeTransfers.clear();
-        this.isSyncFailed = false; // --- THIS IS THE FIX (Part 2) ---
+        this.isSyncFailed = false;
+        this.isSyncCancelled = false;
+        this.currentTransferId = null;
+        this.targetPeers = [];
     }
 
     _getGitClient() {
@@ -41,17 +47,15 @@ export class SyncFiles extends EventEmitterMixin {
     }
 
     async handleSyncMessage(data) {
+        if (this.isSyncCancelled && data.type !== 'sync_cancel') return;
+
         try {
             await MessageHandler.handleSyncMessage(this, data);
         } catch (error) {
-            // --- THIS IS THE FIX (Part 3) ---
             console.error('[SyncFiles] Critical error handling sync message:', error);
             this.isSyncFailed = true;
             this.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `A critical error occurred: ${error.message}. Aborting sync.`, 
-                    type: 'error' 
-                } 
+                detail: { message: `A critical error occurred: ${error.message}. Aborting sync.`, type: 'error' } 
             }));
         }
     }
@@ -64,6 +68,23 @@ export class SyncFiles extends EventEmitterMixin {
     requestSpecificGardens(selection) {
         this.resetFullSyncState();
         SyncActions.requestSpecificGardens(this, selection);
+    }
+
+    cancelSync(broadcast = true) {
+        if (this.isSyncCancelled) return;
+        this.isSyncCancelled = true;
+        this.activeTransfers.clear();
+
+        if (broadcast && this.currentTransferId) {
+            this.sync.sendSyncMessage({
+                type: 'sync_cancel',
+                transferId: this.currentTransferId
+            });
+        }
+        
+        this.dispatchEvent(new CustomEvent('syncProgress', {
+            detail: { message: 'Sync cancelled by user.', type: 'cancelled' }
+        }));
     }
 
     incrementPendingWrites() {
@@ -81,14 +102,12 @@ export class SyncFiles extends EventEmitterMixin {
     }
 
     checkForReload() {
-        // --- THIS IS THE FIX (Part 4) ---
-        if (this.isSyncFailed) {
-            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Sync failed. Please close this dialog and check the console for errors.', type: 'error' } }));
+        if (this.isSyncFailed || this.isSyncCancelled) {
             return;
         }
 
         if (this.isSyncCompleteMessageReceived && this.pendingWriteCount === 0 && this.activeTransfers.size === 0) {
-            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'All files received and written. Reloading...', type: 'complete' } }));
+            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'All files received and written. Reloading...', type: 'complete', action: 'receive' } }));
             setTimeout(() => window.location.reload(), 1500);
         }
     }

@@ -7,6 +7,12 @@ import JSZip from 'jszip';
 export class MessageHandler {
     static async handleSyncMessage(instance, data) {
         switch (data.type) {
+            case 'send_initiation':
+                this.handleSendInitiation(instance, data);
+                break;
+            case 'sync_cancel':
+                this.handleSyncCancel(instance, data);
+                break;
             case 'file_update':
                 await FileOperations.handleFileUpdate(instance, data);
                 break;
@@ -27,6 +33,23 @@ export class MessageHandler {
                 debug.log('Unknown sync message type:', data.type);
         }
     }
+    
+    static handleSendInitiation(instance, data) {
+        if (instance.isSyncCancelled) return;
+        instance.currentTransferId = data.transferId;
+        instance.dispatchEvent(new CustomEvent('syncProgress', {
+            detail: {
+                message: `Incoming transfer from peer for gardens: ${data.gardens.join(', ')}.`,
+                type: 'info'
+            }
+        }));
+    }
+
+    static handleSyncCancel(instance, data) {
+        if (instance.currentTransferId === data.transferId) {
+            instance.cancelSync(false); // false = don't broadcast, we just received
+        }
+    }
 
     static async handleRequestGardens(instance, gardens = [], requesterId) {
         if (!requesterId) {
@@ -43,8 +66,19 @@ export class MessageHandler {
     static async sendGardens(instance, gardens, targetPeerIds) {
         if (!gardens || gardens.length === 0 || !targetPeerIds || targetPeerIds.length === 0) return;
         
-        const CHUNK_SIZE = 64 * 1024; // 64KB chunks
-        const HIGH_WATER_MARK = 10 * 1024 * 1024; // 10MB buffer limit
+        const transferId = crypto.randomUUID();
+        instance.currentTransferId = transferId;
+        instance.targetPeers = targetPeerIds;
+
+        // --- IMMEDIATE INITIATION MESSAGE ---
+        instance.sync.sendSyncMessage({
+            type: 'send_initiation',
+            gardens: gardens,
+            transferId: transferId,
+        });
+        
+        const CHUNK_SIZE = 64 * 1024;
+        const HIGH_WATER_MARK = 10 * 1024 * 1024;
 
         const waitForBuffer = (dataChannel) => {
             return new Promise(resolve => {
@@ -64,21 +98,23 @@ export class MessageHandler {
 
         try {
             for (const gardenName of gardens) {
+                if (instance.isSyncCancelled) throw new Error("Sync cancelled by user.");
                 instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Preparing ${gardenName} for transfer...`, type: 'info' } }));
                 
                 const zip = new JSZip();
                 const tempGitClient = new Git(gardenName);
-                
                 const allFiles = await this.getAllFilesIncludingGit(tempGitClient.pfs, '/');
                 
                 instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Zipping ${allFiles.length} files from ${gardenName}...`, type: 'info' } }));
                 
                 for (const filePath of allFiles) {
+                    if (instance.isSyncCancelled) throw new Error("Sync cancelled by user.");
                     const content = await tempGitClient.pfs.readFile(filePath);
                     const zipPath = filePath.startsWith('/') ? filePath.substring(1) : filePath;
                     zip.file(zipPath, content);
                 }
                 
+                if (instance.isSyncCancelled) throw new Error("Sync cancelled by user.");
                 const zipData = await zip.generateAsync({ 
                     type: 'uint8array',
                     compression: 'DEFLATE',
@@ -89,21 +125,22 @@ export class MessageHandler {
                 instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Zip created for ${gardenName} (${zipSizeMB} MB).`, type: 'info' } }));
                 
                 const totalChunks = Math.ceil(zipData.length / CHUNK_SIZE);
-                const transferId = crypto.randomUUID();
-
+                
                 for (const peerId of targetPeerIds) {
+                    if (instance.isSyncCancelled) throw new Error("Sync cancelled by user.");
                     const peerConnection = instance.sync.peerConnections.get(peerId);
                     if (!peerConnection || !peerConnection.dataChannel || peerConnection.dataChannel.readyState !== 'open') {
                          const errorMsg = `Error: Cannot send files to ${peerId.substring(0,8)}... No open data channel.`;
                          console.error(errorMsg);
                          instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: errorMsg, type: 'error' } }));
-                         continue; // Skip to the next peer
+                         continue;
                     }
                     const dataChannel = peerConnection.dataChannel;
 
                     instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Sending ${gardenName} to ${peerId.substring(0,8)}...`, type: 'info' } }));
                     
                     for (let i = 0; i < totalChunks; i++) {
+                        if (instance.isSyncCancelled) throw new Error("Sync cancelled by user.");
                         await waitForBuffer(dataChannel);
 
                         const start = i * CHUNK_SIZE;
@@ -121,12 +158,7 @@ export class MessageHandler {
                         }, peerId);
                     }
                     
-                    instance.sync.sendSyncMessage({
-                        type: 'garden_zip_complete',
-                        gardenName: gardenName,
-                        transferId: transferId
-                    }, peerId);
-                    
+                    instance.sync.sendSyncMessage({ type: 'garden_zip_complete', gardenName: gardenName, transferId: transferId }, peerId);
                     instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Finished sending ${gardenName} to ${peerId.substring(0,8)}.`, type: 'info' } }));
                 }
             }
@@ -134,14 +166,17 @@ export class MessageHandler {
             for (const peerId of targetPeerIds) {
                 instance.sync.sendSyncMessage({ type: 'full_sync_complete' }, peerId);
             }
-            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `All selected gardens sent successfully.`, type: 'complete' } }));
+            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `All selected gardens sent successfully.`, type: 'complete', action: 'send' } }));
             
         } catch (error) {
-            console.error('Error handling garden send/request:', error);
-            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: ${error.message}`, type: 'error' } }));
+            if (error.message.includes("cancelled")) {
+                 instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'Sync cancelled by user.', type: 'cancelled' } }));
+            } else {
+                console.error('Error handling garden send/request:', error);
+                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: ${error.message}`, type: 'error' } }));
+            }
         }
     }
-
 
     static async getAllFilesIncludingGit(pfs, dir) {
         let fileList = [];
@@ -167,10 +202,9 @@ export class MessageHandler {
     }
 
     static async handleGardenZipChunk(instance, data) {
-        // Initialize transfer tracking if needed
-        if (!instance.activeTransfers) {
-            instance.activeTransfers = new Map();
-        }
+        if (instance.isSyncCancelled || instance.currentTransferId !== data.transferId) return;
+        
+        if (!instance.activeTransfers) instance.activeTransfers = new Map();
         
         const transferKey = `${data.gardenName}-${data.transferId}`;
         
@@ -182,61 +216,40 @@ export class MessageHandler {
                 gardenName: data.gardenName,
                 zipSize: data.zipSize
             });
-            
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Receiving ${data.gardenName} (${(data.zipSize / 1024 / 1024).toFixed(2)} MB in ${data.totalChunks} chunks)...`, 
-                    type: 'info' 
-                } 
+                detail: { message: `Receiving ${data.gardenName} (${(data.zipSize / 1024 / 1024).toFixed(2)} MB)...`, type: 'info' } 
             }));
         }
         
         const transfer = instance.activeTransfers.get(transferKey);
-        
-        // Store the chunk
         transfer.chunks[data.chunkIndex] = Buffer.from(data.data, 'base64');
         transfer.receivedCount++;
         
-        // Update progress periodically
         if (transfer.receivedCount % 10 === 0 || transfer.receivedCount === transfer.totalChunks) {
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Received ${transfer.receivedCount} of ${transfer.totalChunks} chunks for ${data.gardenName}...`, 
-                    type: 'info' 
-                } 
+                detail: { message: `Received ${transfer.receivedCount} of ${transfer.totalChunks} chunks for ${data.gardenName}...`, type: 'info' } 
             }));
         }
     }
 
     static async handleGardenZipComplete(instance, data) {
+        if (instance.isSyncCancelled) return;
         const transferKey = `${data.gardenName}-${data.transferId}`;
         const transfer = instance.activeTransfers.get(transferKey);
         
-        if (!transfer) {
-            console.error(`No transfer found for ${transferKey}`);
-            return;
-        }
+        if (!transfer) return;
         
         if (transfer.receivedCount !== transfer.totalChunks) {
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Error: Only received ${transfer.receivedCount} of ${transfer.totalChunks} chunks for ${data.gardenName}`, 
-                    type: 'error' 
-                } 
+                detail: { message: `Error: Missing chunks for ${data.gardenName}`, type: 'error' } 
             }));
             instance.activeTransfers.delete(transferKey);
             return;
         }
         
         try {
-            instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Reassembling and extracting ${data.gardenName}...`, 
-                    type: 'info' 
-                } 
-            }));
+            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Reassembling and extracting ${data.gardenName}...`, type: 'info' } }));
             
-            // Reassemble the zip file
             const totalLength = transfer.chunks.reduce((sum, chunk) => sum + chunk.length, 0);
             const zipData = new Uint8Array(totalLength);
             let offset = 0;
@@ -246,24 +259,15 @@ export class MessageHandler {
                 offset += chunk.length;
             }
             
-            // Load and extract the zip
             const zip = await JSZip.loadAsync(zipData);
             const gitClient = new Git(data.gardenName);
             await gitClient.initRepo();
             
-            // Clear the garden completely including .git
-            instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Clearing existing data for ${data.gardenName}...`, 
-                    type: 'info' 
-                } 
-            }));
+            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Clearing existing data for ${data.gardenName}...`, type: 'info' } }));
             
-            // Clear everything including .git
             await gitClient.rmrf('/.git');
             await gitClient.clearWorkdir();
             
-            // Extract all files
             const fileEntries = Object.entries(zip.files);
             let extractedCount = 0;
             
@@ -272,37 +276,19 @@ export class MessageHandler {
                     const content = await zipEntry.async('uint8array');
                     const fullPath = `/${path}`;
                     
-                    // Ensure parent directory exists
                     const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
-                    if (dirPath && dirPath !== '/') {
-                        await gitClient.ensureDir(dirPath);
-                    }
+                    if (dirPath && dirPath !== '/') await gitClient.ensureDir(dirPath);
                     
                     await gitClient.pfs.writeFile(fullPath, content);
                     extractedCount++;
-                    
-                    if (extractedCount % 50 === 0) {
-                        instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                            detail: { 
-                                message: `Extracted ${extractedCount} files for ${data.gardenName}...`, 
-                                type: 'info' 
-                            } 
-                        }));
-                    }
                 }
             }
             
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Successfully received and extracted ${data.gardenName} (${extractedCount} files).`, 
-                    type: 'complete' 
-                } 
+                detail: { message: `Successfully extracted ${data.gardenName} (${extractedCount} files).`, type: 'complete' } 
             }));
             
-            // Cleanup transfer tracking
             instance.activeTransfers.delete(transferKey);
-            
-            // Check if this completes all transfers
             if (instance.activeTransfers.size === 0) {
                 instance.markSyncStreamAsComplete();
             }
@@ -310,10 +296,7 @@ export class MessageHandler {
         } catch (error) {
             console.error(`Error extracting garden ${data.gardenName}:`, error);
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { 
-                    message: `Error extracting ${data.gardenName}: ${error.message}`, 
-                    type: 'error' 
-                } 
+                detail: { message: `Error extracting ${data.gardenName}: ${error.message}`, type: 'error' } 
             }));
             instance.activeTransfers.delete(transferKey);
         }

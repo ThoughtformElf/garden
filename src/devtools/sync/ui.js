@@ -46,7 +46,6 @@ export class SyncUI {
                 <div class="sync-status-grid">
                     <strong>Status:</strong> <span id="sync-status">Disconnected</span>
                     <strong>Method:</strong> <span id="sync-method-indicator">None</span>
-                    <!-- THIS IS THE FIX: Added the missing peer count element -->
                     <strong>Peers:</strong> <span id="sync-peer-count">0</span>
                 </div>
             </div>
@@ -157,7 +156,6 @@ export class SyncUI {
     const statusEl = this.sync._container.querySelector('#sync-status');
     if (statusEl) statusEl.textContent = message;
     
-    // This will now correctly find and update the peer count element.
     const peerCountEl = this.sync._container.querySelector('#sync-peer-count');
     if (peerCountEl) peerCountEl.textContent = this.sync.connectedPeers.size;
   }
@@ -243,12 +241,23 @@ export class SyncUI {
     this.syncProgressLogArea = this.syncProgressModal.content.querySelector('#sync-progress-log');
     this.syncProgressFinalMessageArea = this.syncProgressModal.content.querySelector('#sync-progress-final-message');
     this.syncProgressActionButton = null; 
+
+    this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Cancel', () => {
+        this.sync.fileSync.cancelSync();
+    });
+
     this.syncProgressModal.show();
   }
   
   updateSyncProgress(event) {
-    if (!this.syncProgressModal || !this.syncProgressLogArea) return;
-    const { message = 'No message', type = 'info' } = event.detail;
+    const { message = 'No message', type = 'info', action = 'receive' } = event.detail;
+
+    if (!this.syncProgressModal) {
+      this.showSyncProgressModal();
+    }
+    
+    if (!this.syncProgressLogArea) return;
+
     const logEntry = document.createElement('div');
     const timestamp = new Date().toLocaleTimeString();
     logEntry.textContent = `[${timestamp}] ${message}`;
@@ -271,16 +280,15 @@ export class SyncUI {
       if (this.syncProgressActionButton) {
         this.syncProgressActionButton.remove();
       }
-
-      if (type === 'error' || type === 'cancelled') {
-        this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
-        if (type === 'error') this.syncProgressActionButton.classList.add('destructive');
-      }
+      
+      this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
+      if (type === 'error') this.syncProgressActionButton.classList.add('destructive');
     }
   }
   
   hideSyncProgressModal() {
     if (this.syncProgressModal) {
+      this.sync.fileSync.resetFullSyncState(); // THIS IS THE FIX
       this.syncProgressModal.destroy();
       this.syncProgressModal = null;
     }
