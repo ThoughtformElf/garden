@@ -137,7 +137,6 @@ class EmbedWidget extends WidgetType {
     container.innerHTML = ''; // Clear placeholder
     container.appendChild(element);
 
-    // --- THIS IS THE FIX (Part 2) ---
     if (element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
         element.onerror = (e) => {
             console.error("Embedded media playback error:", e);
@@ -145,7 +144,6 @@ class EmbedWidget extends WidgetType {
         };
         element.load();
     }
-    // --- END OF FIX ---
   }
 
   destroy() {
@@ -158,6 +156,12 @@ class EmbedWidget extends WidgetType {
 function buildDecorations(view) {
   const builder = new RangeSetBuilder();
   const tree = syntaxTree(view.state);
+
+  const selection = view.state.selection;
+  const cursorLines = new Set();
+  for (const range of selection.ranges) {
+    cursorLines.add(view.state.doc.lineAt(range.head).number);
+  }
 
   const isInsideCodeBlock = (pos) => {
     let node = tree.resolve(pos, 1);
@@ -177,8 +181,9 @@ function buildDecorations(view) {
     let match;
     while ((match = internalEmbedRegex.exec(text))) {
       const start = from + match.index;
+      const line = view.state.doc.lineAt(start);
       
-      if (isInsideCodeBlock(start)) continue;
+      if (isInsideCodeBlock(start) || cursorLines.has(line.number)) continue;
 
       const end = start + match[0].length;
       const linkTarget = match[1];
@@ -198,8 +203,9 @@ function buildDecorations(view) {
     const externalEmbedRegex = /!\[(.*?)\]\((.*?)\)/g;
     while ((match = externalEmbedRegex.exec(text))) {
       const start = from + match.index;
-      
-      if (isInsideCodeBlock(start)) continue;
+      const line = view.state.doc.lineAt(start);
+
+      if (isInsideCodeBlock(start) || cursorLines.has(line.number)) continue;
 
       const end = start + match[0].length;
       const altText = match[1];
@@ -226,7 +232,7 @@ export const embedPlugin = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view);
     }
     update(update) {
-      if (update.docChanged || update.viewportChanged || syntaxTree(update.startState) !== syntaxTree(update.state)) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet || syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildDecorations(update.view);
       }
     }
