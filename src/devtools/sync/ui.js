@@ -52,6 +52,7 @@ export class SyncUI {
                     <strong>Status:</strong> <span id="sync-status">Disconnected</span>
                     <strong>Method:</strong> <span id="sync-method-indicator">None</span>
                     <strong>Peers:</strong> <span id="sync-peer-count">0</span>
+                    <strong>Peer ID:</strong> <span id="sync-peer-id-display" style="word-break: break-all;">Not Connected</span>
                 </div>
             </div>
             <div class="sync-panel sync-actions">
@@ -84,6 +85,20 @@ export class SyncUI {
     this.nameInput.value = localStorage.getItem('thoughtform_sync_name') || '';
     this.peerPrefixInput.value = localStorage.getItem('thoughtform_peer_prefix') || '';
     this.autoConnectCheckbox.checked = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
+
+    this.peerPrefixInput.addEventListener('input', () => {
+        if (this.sync.connectionState === 'disconnected' || this.sync.connectionState === 'error') {
+            const peerIdEl = this.sync._container.querySelector('#sync-peer-id-display');
+            if (peerIdEl) {
+                const prefix = this.peerPrefixInput.value.trim();
+                if (prefix) {
+                    peerIdEl.textContent = `${prefix}-<random_id>`;
+                } else {
+                    peerIdEl.textContent = 'Not Connected';
+                }
+            }
+        }
+    });
     
     this.connectBtn.addEventListener('click', () => {
       const currentState = this.sync.connectionState;

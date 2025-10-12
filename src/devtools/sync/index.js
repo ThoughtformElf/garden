@@ -121,9 +121,26 @@ export class Sync {
       };
   }
 
+  updatePeerIdDisplay() {
+    const peerIdEl = this._container?.querySelector('#sync-peer-id-display');
+    if (peerIdEl) {
+        const peerId = this.getPeerId();
+        if (peerId) {
+            peerIdEl.textContent = peerId;
+        } else if (this.connectionState === 'disconnected' || this.connectionState === 'error') {
+            peerIdEl.textContent = 'Not Connected';
+        } else {
+            peerIdEl.textContent = 'Connecting...';
+        }
+    }
+  }
+
   updateConnectionState(newState, statusMessage) {
       this.connectionState = newState;
       this.isConnected = (newState === 'connected-p2p' || newState === 'connected-signal');
+      
+      this.updatePeerIdDisplay();
+      
       if (this.ui) {
           if (statusMessage) this.ui.updateStatus(statusMessage);
           this.ui.updateConnectionIndicator(newState);

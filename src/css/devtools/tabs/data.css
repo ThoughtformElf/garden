@@ -1,4 +1,7 @@
 /* ===== DATA TAB ===== */
+#eruda-Data, #eruda-AI {
+  overflow: auto !important;
+}
 #eruda-Data > div {
   padding: 1rem;
 }
