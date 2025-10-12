@@ -162,14 +162,21 @@ export class WorkspaceManager {
       pane.element.classList.toggle('is-active-pane', id === paneId);
     });
     
+    // Focus the editor in the newly active pane
+    const activePane = this.panes.get(paneId);
+    activePane?.editor?.editorView.focus();
+    
     this._updateURL();
     window.thoughtform.sidebar?.refresh();
   }
   
-  splitPane(paneIdToSplit, direction) {
+  async splitPane(paneIdToSplit, direction) {
+    // --- THIS IS THE FIX ---
+    let newPaneId = null; // Variable to capture the ID of the new pane.
+
     const findAndSplit = (node) => {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
-            const newPaneId = `pane-${Date.now()}`;
+            newPaneId = `pane-${Date.now()}`; // Capture the new ID
             const newLeaf = JSON.parse(JSON.stringify(node)); // Deep copy buffer state
             newLeaf.id = newPaneId;
             
@@ -186,7 +193,12 @@ export class WorkspaceManager {
     };
     
     this.paneTree = findAndSplit(this.paneTree);
-    this.render();
+    await this.render(); // Re-render the entire layout
+
+    if (newPaneId) {
+        this.setActivePane(newPaneId); // Explicitly set the new pane as active
+    }
+    // --- END OF FIX ---
   }
   
   async openFile(garden, path) {
@@ -212,29 +224,23 @@ export class WorkspaceManager {
     this._updateURL();
   }
 
-  // --- THIS IS THE FIX ---
-  // Renamed and rewritten to handle the full URL.
   _updateURL() {
       const info = this.getActivePaneInfo();
       if (!info) return;
       const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
       
-      // Calculate the base path, same as in index.js, for correct URL construction.
       const fullUrlPath = new URL(import.meta.url).pathname;
       const srcIndex = fullUrlPath.lastIndexOf('/src/');
       const basePath = srcIndex > -1 ? fullUrlPath.substring(0, srcIndex) : '';
 
       const newPathname = `${basePath}/${encodeURIComponent(activeBuffer.garden)}`;
-      const newHash = `#${encodeURIComponent(activeBuffer.path)}`;
+      const newHash = `#${encodeURI(activeBuffer.path)}`;
       const newUrl = `${newPathname}${newHash}`;
 
-      // Only push a new state if the combined path is different,
-      // to avoid cluttering browser history.
       if (window.location.pathname !== newPathname || window.location.hash !== newHash) {
           window.history.pushState(null, '', newUrl);
       }
   }
-  // --- END OF FIX ---
 
   getActivePaneInfo() {
       if (!this.activePaneId) return null;

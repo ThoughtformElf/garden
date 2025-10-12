@@ -19,7 +19,6 @@ import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace.js'; // Import the new manager
 
-// --- THIS IS THE FIX ---
 // Handles browser back/forward buttons.
 function initializeNavigationListener() {
     window.addEventListener('popstate', async () => {
@@ -34,14 +33,16 @@ function initializeNavigationListener() {
         gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
         gardenName = decodeURIComponent(gardenName);
 
+        // --- THIS IS THE FIX ---
+        // Use decodeURI for consistency with the encoding method.
         let filePath = (window.location.hash || '#/home').substring(1);
-        filePath = decodeURIComponent(filePath);
+        filePath = decodeURI(filePath);
+        // --- END OF FIX ---
 
         // Tell the workspace to load this state into the active pane.
         await window.thoughtform.workspace.openFile(gardenName, filePath);
     });
 }
-// --- END OF FIX ---
 
 // --- Main Application Logic ---
 async function main() {
@@ -136,7 +137,7 @@ async function main() {
   hookRunner.initialize();
   window.thoughtform.hooks = hookRunner;
   
-  initializeNavigationListener(); // --- FIX: Call the new listener
+  initializeNavigationListener();
 
   window.thoughtform.events.publish('app:load');
 }
