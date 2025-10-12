@@ -17,6 +17,7 @@ import { initializeEventBus } from './events.js';
 import { HookRunner } from './hooks.js';
 import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';
+import { initializeWorkspaceManager } from './workspace.js'; // Import the new manager
 
 // --- Expose a global API for the app ---
 window.thoughtform = {
@@ -24,6 +25,7 @@ window.thoughtform = {
   ai: initializeAiService(),
   config: initializeConfigService(),
   events: initializeEventBus(),
+  workspace: initializeWorkspaceManager(), // Initialize and expose the workspace manager
 };
 
 // --- PWA Update Logic ---
@@ -98,14 +100,19 @@ async function main() {
   });
 
   // Attach the editor instance to the global object so other modules can access it.
+  // DEPRECATED: Use window.thoughtform.workspace.getActiveEditor() instead.
+  // We keep this for now for components that haven't been refactored yet.
   window.thoughtform.editor = editor;
+
+  // Register the single editor instance with the workspace manager.
+  window.thoughtform.workspace.registerEditor(editor);
 
   const checkEditorReady = setInterval(() => {
     if (editor.isReady) {
       clearInterval(checkEditorReady);
       
-      commandPalette.gitClient = gitClient;
-      commandPalette.editor = editor;
+      commandPalette.gitClient = gitClient; // TODO: Refactor to use workspace
+      commandPalette.editor = editor; // TODO: Refactor to use workspace
 
       // Initialize the config service now that the editor is ready
       window.thoughtform.config.initialize();

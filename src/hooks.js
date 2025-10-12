@@ -10,7 +10,6 @@ const eventToHookFileMap = {
 export class HookRunner {
   constructor(eventBus) {
     this.eventBus = eventBus;
-    this.git = window.thoughtform.editor.gitClient;
     this.config = window.thoughtform.config;
   }
 
@@ -26,11 +25,16 @@ export class HookRunner {
     const hookFileName = eventToHookFileMap[eventName];
     if (!hookFileName) return;
 
+    const editor = window.thoughtform.workspace.getActiveEditor();
+    const git = window.thoughtform.workspace.getActiveGitClient();
+
+    if (!editor || !git) return;
+
     // Ask the ConfigService for the correct hook script path
     const hookPath = await this.config.getHook(hookFileName);
     
     if (hookPath) {
-      executeFile(hookPath, window.thoughtform.editor, this.git, eventData);
+      executeFile(hookPath, editor, git, eventData);
     }
   }
 }

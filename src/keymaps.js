@@ -52,11 +52,11 @@ export class KeymapService {
       return {
         key: binding.key,
         run: () => {
-          executeFile(
-            fullPath,
-            window.thoughtform.editor,
-            window.thoughtform.editor.gitClient
-          );
+          const editor = window.thoughtform.workspace.getActiveEditor();
+          const git = window.thoughtform.workspace.getActiveGitClient();
+          if (editor && git) {
+            executeFile(fullPath, editor, git);
+          }
           return true;
         },
       };

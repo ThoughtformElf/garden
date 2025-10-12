@@ -79,9 +79,9 @@ class AiService {
 
       if (hasWikilinks) {
         // Use the Agent
-        const editor = window.thoughtform.editor; 
+        const editor = window.thoughtform.workspace.getActiveEditor(); 
         if (!editor || !editor.gitClient) {
-          throw new Error("Cannot find global editor or gitClient instance for agent.");
+          throw new Error("Cannot find active editor or gitClient instance for agent.");
         }
         
         const agent = new Agent({

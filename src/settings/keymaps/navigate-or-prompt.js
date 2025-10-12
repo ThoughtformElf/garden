@@ -2,8 +2,8 @@
 // It intelligently determines what to do based on the cursor's context.
 
 // --- CONTEXT GLOBALS ---
-// 'editor': The global editor instance.
-// 'git': The git client for the current garden.
+// 'editor': The global editor instance, passed by the executor.
+// 'git': The git client for the current garden, passed by the executor.
 // 'event': Null for keymap-triggered events.
 
 const view = editor.editorView;

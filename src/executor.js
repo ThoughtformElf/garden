@@ -6,8 +6,8 @@ import { Git } from './util/git-integration.js';
  * Takes a file path, reads it, and executes it within a scoped, sandboxed context.
  *
  * @param {string} path - The path to the script to execute (e.g., 'Settings#keymaps/prompt.js').
- * @param {object} editor - The global editor instance.
- * @param {object} git - The git client for the CURRENTLY active garden.
+ * @param {object} editor - The editor instance context for this execution.
+ * @param {object} git - The git client context for this execution.
  * @param {object|null} event - Optional event data from a hook.
  */
 export async function executeFile(path, editor, git, event = null) {
