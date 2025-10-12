@@ -14,6 +14,7 @@ import defaultExecuteCommandJs from './keymaps/execute-command.js?raw';
 import defaultBrowserBackJs from './keymaps/browser-back.js?raw';
 import defaultBrowserForwardJs from './keymaps/browser-forward.js?raw';
 import defaultDuplicateFileJs from './keymaps/duplicate-current-file.js?raw';
+import defaultNewFileJs from './keymaps/new-file.js?raw';
 import defaultHookCreateJs from './hooks/create.js?raw';
 import defaultHookLoadJs from './hooks/load.js?raw';
 import defaultHookDeleteJs from './hooks/delete.js?raw';
@@ -29,6 +30,7 @@ export const defaultFiles = [
   ['/keymaps/browser-back.js', defaultBrowserBackJs],
   ['/keymaps/browser-forward.js', defaultBrowserForwardJs],
   ['/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],
+  ['/keymaps/new-file.js', defaultNewFileJs],
   ['/hooks/create.js', defaultHookCreateJs],
   ['/hooks/load.js', defaultHookLoadJs],
   ['/hooks/delete.js', defaultHookDeleteJs]

@@ -204,35 +204,7 @@ export const fileActions = {
   },
 
   async handleNewFile() {
-    const newName = await Modal.prompt({
-      title: 'New File',
-      label: 'Enter new file name (including folders, e.g., "projects/new-idea"):',
-    });
-    if (!newName) return;
-    const newPath = `/${newName}`;
-    
-    try {
-      const stat = await this.gitClient.pfs.stat(newPath);
-      const itemType = stat.isDirectory() ? 'folder' : 'file';
-      await this.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${newName}" already exists.` });
-      return;
-    } catch (e) {
-      if (e.code !== 'ENOENT') {
-        console.error('Error checking for file:', e);
-        await this.showAlert({ title: 'Error', message: 'An unexpected error occurred.' });
-        return;
-      }
-    }
-
-    try {
-        await this.gitClient.writeFile(newPath, '');
-        // Publish the event AFTER the file has been successfully written
-        window.thoughtform.events.publish('file:create', { path: newPath });
-        window.location.hash = `#${newPath}`;
-    } catch (writeError) {
-        console.error('Error creating file:', writeError);
-        await this.showAlert({ title: 'Error', message: `Could not create file: ${writeError.message}` });
-    }
+    await this.editor.newFile();
   },
 
   async handleNewFolder() {

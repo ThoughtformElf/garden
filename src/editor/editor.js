@@ -290,34 +290,75 @@ export class Editor {
       await this.loadFile(filepath);
   }
   
+  async newFile() {
+    try {
+      const newName = await Modal.prompt({
+        title: 'New File',
+        label: 'Enter new file name (including folders, e.g., "projects/new-idea"):',
+      });
+      if (!newName || !newName.trim()) {
+        return;
+      }
+      const newPath = `/${newName.trim()}`;
+      
+      try {
+        const stat = await this.gitClient.pfs.stat(newPath);
+        const itemType = stat.isDirectory() ? 'folder' : 'file';
+        await this.sidebar.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${newName}" already exists.` });
+        return;
+      } catch (e) {
+        if (e.code !== 'ENOENT') {
+          console.error('Error checking for file:', e);
+          await this.sidebar.showAlert({ title: 'Error', message: 'An unexpected error occurred.' });
+          return;
+        }
+      }
+
+      try {
+          await this.gitClient.writeFile(newPath, '');
+          window.thoughtform.events.publish('file:create', { path: newPath });
+          window.location.hash = `#${newPath}`;
+      } catch (writeError) {
+          console.error('Error creating file:', writeError);
+          await this.sidebar.showAlert({ title: 'Error', message: `Could not create file: ${writeError.message}` });
+      }
+    } finally {
+      this.editorView.focus();
+    }
+  }
+
   async duplicateFile(path) {
     if (!path) return;
     
-    const stat = await this.gitClient.pfs.stat(path);
-    if (stat.isDirectory()) {
-        await this.sidebar.showAlert({ title: 'Action Not Supported', message: 'Duplicating folders is not yet supported.' });
-        return;
-    }
-
-    const directory = path.substring(0, path.lastIndexOf('/'));
-    const originalFilename = path.substring(path.lastIndexOf('/') + 1);
-    const defaultName = `${originalFilename.split('.').slice(0, -1).join('.') || originalFilename} (copy)${originalFilename.includes('.') ? '.' + originalFilename.split('.').pop() : ''}`;
-    
-    const newFilename = await Modal.prompt({
-        title: 'Duplicate File',
-        label: 'Enter name for duplicated file:',
-        defaultValue: defaultName
-    });
-    if (!newFilename) return;
-
-    const newPath = `${directory}/${newFilename}`;
     try {
-      const rawContent = await this.gitClient.readFile(path);
-      await this.gitClient.writeFile(newPath, rawContent);
-      await this.sidebar.refresh();
-    } catch (e) {
-      console.error('Error duplicating file:', e);
-      await this.sidebar.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
+        const stat = await this.gitClient.pfs.stat(path);
+        if (stat.isDirectory()) {
+            await this.sidebar.showAlert({ title: 'Action Not Supported', message: 'Duplicating folders is not yet supported.' });
+            return;
+        }
+    
+        const directory = path.substring(0, path.lastIndexOf('/'));
+        const originalFilename = path.substring(path.lastIndexOf('/') + 1);
+        const defaultName = `${originalFilename.split('.').slice(0, -1).join('.') || originalFilename} (copy)${originalFilename.includes('.') ? '.' + originalFilename.split('.').pop() : ''}`;
+        
+        const newFilename = await Modal.prompt({
+            title: 'Duplicate File',
+            label: 'Enter name for duplicated file:',
+            defaultValue: defaultName
+        });
+        if (!newFilename) return;
+    
+        const newPath = `${directory}/${newFilename}`;
+        try {
+          const rawContent = await this.gitClient.readFile(path);
+          await this.gitClient.writeFile(newPath, rawContent);
+          await this.sidebar.refresh();
+        } catch (e) {
+          console.error('Error duplicating file:', e);
+          await this.sidebar.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
+        }
+    } finally {
+        this.editorView.focus();
     }
   }
 
