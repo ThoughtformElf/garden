@@ -11,6 +11,7 @@ import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-rel
 import { basicDark } from '../util/theme.js';
 import { allHighlightPlugins } from './plugins/index.js';
 import { diffCompartment } from './diff.js';
+import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'; // Import the new status bar
 
 /**
  * Creates the complete array of CodeMirror extensions for the editor.
@@ -19,11 +20,9 @@ import { diffCompartment } from './diff.js';
  * @param {object} options.dynamicKeymapExtension - The keymap compartment.
  * @param {object} options.vimCompartment - The vim compartment.
  * @param {object} options.languageCompartment - The language compartment.
- * @param {object} options.tokenCounterCompartment - The token counter compartment.
  * @param {Function} options.updateListener - The update listener.
  * @param {string} options.filePath - The initial file path.
  * @param {Function} options.getLanguageExtension - The function to get language extensions.
- * @param {Function} options.createTokenCounterExtension - The function to create the token counter.
  * @returns {Array} An array of CodeMirror extensions.
  */
 export function createEditorExtensions({
@@ -31,11 +30,9 @@ export function createEditorExtensions({
   dynamicKeymapExtension,
   vimCompartment,
   languageCompartment,
-  tokenCounterCompartment,
   updateListener,
   filePath,
   getLanguageExtension,
-  createTokenCounterExtension
 }) {
   return [
     appContext,
@@ -73,6 +70,6 @@ export function createEditorExtensions({
     updateListener,
     ...allHighlightPlugins,
     diffCompartment.of([]),
-    tokenCounterCompartment.of(createTokenCounterExtension()),
+    statusBarCompartment.of(createStatusBarExtension()),
   ];
 }

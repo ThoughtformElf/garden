@@ -26,6 +26,7 @@ main {
     overflow: hidden;
     outline: 1px solid transparent;
     transition: outline-color 0.2s ease-in-out;
+    width: 100%; /* <-- THIS IS THE FIX */
 }
 
 .pane.is-active-pane {
@@ -36,6 +37,7 @@ main {
 .pane .cm-editor {
     flex: 1;
     overflow: hidden; /* The editor's internal scroller will handle content overflow */
+    padding-bottom: 30px;
 }
 .cm-content {
   padding-top: 0 !important;
@@ -47,7 +49,7 @@ main {
 }
 
 .pane.is-media-preview .cm-editor,
-.pane.is-media-preview .token-status-bar {
+.pane.is-media-preview .status-bar { /* Hide status bar in media preview */
     display: none;
 }
 
@@ -71,14 +73,23 @@ main {
     border-radius: 4px;
 }
 
-
-.pane .token-status-bar {
+/* --- NEW STATUS BAR STYLES --- */
+.status-bar {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.2rem 0.8rem;
+    background-color: var(--color-background-secondary);
+    border-top: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
 }
+/* --- END OF NEW STYLES --- */
 
 .pane-resizer {
     background-color: var(--color-background-hover);
@@ -88,11 +99,11 @@ main {
 .pane-resizer-vertical {
     width: 0.5rem;
     cursor: col-resize;
-    height: 100%; /* <-- THIS IS THE FIX */
+    height: 100%;
 }
 
 .pane-resizer-horizontal {
     height: 0.5rem;
     cursor: row-resize;
-    width: 100%; /* <-- Explicitly set width for consistency */
+    width: 100%;
 }

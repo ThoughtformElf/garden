@@ -8,7 +8,7 @@ import { Sidebar } from '../sidebar/sidebar.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
 import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
-import { tokenCounterCompartment, createTokenCounterExtension } from './token-counter.js';
+import { statusBarCompartment, createStatusBarExtension } from './status-bar.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
 import { KeymapService } from '../keymaps.js';
 import { Modal } from '../util/modal.js';
@@ -19,29 +19,23 @@ const programmaticChange = Annotation.define();
 export class Editor {
   static editors = [];
 
-  constructor({ url, target, editorConfig = {}, gitClient, commandPalette }) {
+  constructor({ target, editorConfig = {}, gitClient, commandPalette, initialFile }) {
     if (!gitClient) throw new Error('Editor requires a gitClient instance.');
     if (!commandPalette) throw new Error('Editor requires a commandPalette instance.');
 
-    if (!window.location.hash) {
-      window.location.hash = '#home';
-    }
-    
     this.targetElement = typeof target === 'string' ? document.querySelector(target) : target;
-    this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
     this.gitClient = gitClient;
     this.commandPalette = commandPalette;
     
     this.editorView = null;
     this.sidebar = null;
-    this.filePath = this.getFilePath(this.url);
+    this.filePath = initialFile || '/home';
     this.isReady = false;
     this.keymapService = null;
 
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();
-    this.tokenCounterCompartment = new Compartment();
     this.mediaViewerElement = null;
     this.currentMediaObjectUrl = null;
 
@@ -59,14 +53,12 @@ export class Editor {
     // Only the first editor initializes the sidebar.
     if (!document.querySelector('#sidebar').hasChildNodes()) {
       await this.gitClient.initRepo();
-
       this.sidebar = new Sidebar({
         target: '#sidebar',
         gitClient: this.gitClient,
-        editor: this
+        editor: this // Pass self for context
       });
       await this.sidebar.init();
-      
       initializeDragAndDrop(this.gitClient, this.sidebar);
       const loadingIndicator = document.getElementById('loading-indicator');
       if(loadingIndicator) loadingIndicator.remove();
@@ -74,17 +66,10 @@ export class Editor {
     } else {
       this.sidebar = window.thoughtform.sidebar;
     }
-
-    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
-    const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
-    const audioExtensions = ['mp3', 'wav', 'flac'];
-    const mediaExtensions = [...imageExtensions, ...videoExtensions, ...audioExtensions];
-    const initialExtension = this.filePath.split('.').pop()?.toLowerCase();
     
-    let initialContent = '';
-    if (!mediaExtensions.includes(initialExtension)) {
-        initialContent = await this.loadFileContent(this.filePath);
-    }
+    if (!window.thoughtform.sidebar) window.thoughtform.sidebar = this.sidebar;
+
+    let initialContent = await this.loadFileContent(this.filePath);
 
     this.mediaViewerElement = document.createElement('div');
     this.mediaViewerElement.className = 'media-viewer-container';
@@ -110,12 +95,9 @@ export class Editor {
       dynamicKeymapExtension,
       vimCompartment: this.vimCompartment,
       languageCompartment: this.languageCompartment,
-      tokenCounterCompartment: this.tokenCounterCompartment,
       updateListener,
       filePath: this.filePath,
       getLanguageExtension,
-      createTokenCounterExtension,
-      ...(this.editorConfig.extensions || []),
     });
 
     this.editorView = new EditorView({
@@ -129,13 +111,9 @@ export class Editor {
 
     Editor.editors.push(this);
     this.isReady = true;
-    
-    if (!window.thoughtform.sidebar) window.thoughtform.sidebar = this.sidebar;
 
-    this.listenForNavigation();
     this.loadFile(this.filePath);
     this.editorView.focus();
-
     this._applyUserSettings();
   }
 
@@ -147,7 +125,6 @@ export class Editor {
         effects: this.vimCompartment.reconfigure(vim())
       });
     }
-
     await this.keymapService.updateKeymaps();
   }
 
@@ -161,26 +138,13 @@ export class Editor {
       [garden, path] = path.split('#');
     }
   
-    const appContext = { gitClient: this.gitClient, sidebar: this.sidebar };
-
-    if (garden) {
-      if (!path.startsWith('/')) {
-          path = `/${path}`;
-      }
-      const fullPathUrl = new URL(import.meta.url).pathname;
-      const srcIndex = fullPathUrl.lastIndexOf('/src/');
-      const basePath = srcIndex > -1 ? fullPathUrl.substring(0, srcIndex) : '';
-      window.location.href = `${window.location.origin}${basePath}/${encodeURIComponent(garden)}#${encodeURIComponent(path)}`;
+    if (garden && garden !== this.gitClient.gardenName) {
+      window.thoughtform.workspace.openFile(garden, path.startsWith('/') ? path : `/${path}`);
     } else {
-      const foundPath = await findFileCaseInsensitive(path, appContext);
-      let finalPath;
-  
-      if (foundPath) {
-        finalPath = foundPath;
-      } else {
-        finalPath = path.startsWith('/') ? path : `/${path}`;
-      }
-      window.location.hash = `#${encodeURIComponent(finalPath)}`;
+      const currentGarden = this.gitClient.gardenName;
+      const foundPath = await findFileCaseInsensitive(path, { gitClient: this.gitClient, sidebar: this.sidebar });
+      let finalPath = foundPath || (path.startsWith('/') ? path : `/${path}`);
+      window.thoughtform.workspace.openFile(currentGarden, finalPath);
     }
   }
 
@@ -190,13 +154,12 @@ export class Editor {
       return rawContent;
     } catch (e) {
       console.warn(`Could not read file ${filepath}, starting with empty content.`, e);
-      return '';
+      return `// "${filepath.substring(1)}" does not exist. Start typing to create it.`;
     }
   }
   
   async showDiff(originalContent) {
     if (originalContent === null) {
-      console.error("Cannot show diff, original content is null.");
       this.hideDiff();
       return;
     }
@@ -210,24 +173,6 @@ export class Editor {
     this.editorView.dispatch({
       effects: diffCompartment.reconfigure([])
     });
-  }
-
-  listenForNavigation() {
-    // Only the first editor instance should control the URL hash
-    if (Editor.editors.length === 1) {
-      window.addEventListener('hashchange', async () => {
-        // Notify all editors of the change
-        for (const editor of Editor.editors) {
-          if (editor === window.thoughtform.workspace.getActiveEditor()) {
-            editor.hideDiff();
-            const newFilePath = editor.getFilePath(window.location.hash);
-            if (newFilePath && editor.filePath !== newFilePath) {
-              await editor.loadFile(newFilePath);
-            }
-          }
-        }
-      });
-    }
   }
 
   async previewHistoricalFile(filepath, oid, parentOid) {
@@ -257,13 +202,8 @@ export class Editor {
 
     if (mediaExtensions.includes(extension)) {
       this.hideDiff();
-      
-      // --- THIS IS THE FIX ---
-      // Apply classes to the pane element, not the global main container
       this.targetElement.classList.remove('is-editor');
       this.targetElement.classList.add('is-media-preview');
-      // --- END OF FIX ---
-      
       this.mediaViewerElement.innerHTML = '<p>Loading media...</p>';
 
       const buffer = await this.gitClient.readFileAsBuffer(filepath);
@@ -289,34 +229,19 @@ export class Editor {
         } else if (audioExtensions.includes(extension)) {
           mediaElementHTML = `<audio src="${this.currentMediaObjectUrl}" controls></audio>`;
         }
-        
         this.mediaViewerElement.innerHTML = mediaElementHTML;
-
         const mediaElement = this.mediaViewerElement.querySelector('video, audio');
-        if (mediaElement) {
-            mediaElement.onerror = (e) => {
-                console.error("Media playback error:", e);
-                this.mediaViewerElement.innerHTML = `<p class="error">Error playing media. The file format or codec might not be supported by your browser.</p>`;
-            };
-            mediaElement.load();
-        }
-
+        if (mediaElement) mediaElement.load();
       } else {
         this.mediaViewerElement.innerHTML = `<p class="error">Could not load media: ${filepath}</p>`;
       }
-
       this.filePath = filepath;
-      if (this.sidebar) {
-        await this.sidebar.refresh();
-      }
+      if (this.sidebar) await this.sidebar.refresh();
       return;
     }
 
-    // --- THIS IS THE FIX ---
-    // Apply classes to the pane element, not the global main container
     this.targetElement.classList.remove('is-media-preview');
     this.targetElement.classList.add('is-editor');
-    // --- END OF FIX ---
 
     if (this.currentMediaObjectUrl) {
       URL.revokeObjectURL(this.currentMediaObjectUrl);
@@ -338,9 +263,7 @@ export class Editor {
       annotations: programmaticChange.of(true),
     });
 
-    if (this.sidebar) {
-      await this.sidebar.refresh();
-    }
+    if (this.sidebar) await this.sidebar.refresh();
     this.editorView.focus();
   }
   
@@ -375,7 +298,7 @@ export class Editor {
       try {
           await this.gitClient.writeFile(newPath, '');
           window.thoughtform.events.publish('file:create', { path: newPath });
-          window.location.hash = `#${newPath}`;
+          window.thoughtform.workspace.openFile(this.gitClient.gardenName, newPath);
       } catch (writeError) {
           console.error('Error creating file:', writeError);
           await this.sidebar.showAlert({ title: 'Error', message: `Could not create file: ${writeError.message}` });
@@ -422,23 +345,14 @@ export class Editor {
 
   async handleUpdate(newContent) {
     if (!this.isReady) return;
-    if (this.filePath !== this.getFilePath(window.location.hash)) {
-      return;
-    }
-    
     await this.gitClient.writeFile(this.filePath, newContent);
-    
-    if (this.sidebar) {
-      await this.sidebar.refresh();
-    }
+    if (this.sidebar) await this.sidebar.refresh();
   }
 
   getFilePath(hash) {
     let filepath = hash.startsWith('#') ? hash.substring(1) : hash;
     filepath = decodeURIComponent(filepath);
-    if (!filepath) {
-      filepath = 'home';
-    }
+    if (!filepath) filepath = 'home';
     return filepath;
   }
 }

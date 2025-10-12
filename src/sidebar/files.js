@@ -71,7 +71,7 @@ function renderTreeNodes(nodes, statuses, currentFile, expandedFolders, depth) {
             }
             html += `
                 <li class="file-tree-item is-file ${classes.join(' ')}" data-path="${node.path}" style="${indentStyle}" draggable="true">
-                    <a href="#${node.path}" class="status-${status}" data-filepath="${node.path}">${key}</a>
+                    <a href="#" class="status-${status}" data-filepath="${node.path}">${key}</a>
                 </li>
             `;
         }
@@ -82,7 +82,14 @@ function renderTreeNodes(nodes, statuses, currentFile, expandedFolders, depth) {
 export const fileActions = {
   async renderFiles(statusMatrix) {
     try {
-      const allPaths = await this.listAllPaths(this.gitClient, '/');
+      const gitClient = await window.thoughtform.workspace.getActiveGitClient();
+      const editor = window.thoughtform.workspace.getActiveEditor();
+      if (!gitClient || !editor) {
+        this.contentContainer.innerHTML = '';
+        return;
+      }
+
+      const allPaths = await this.listAllPaths(gitClient, '/');
       const statuses = new Map();
       for (const [filepath, head, workdir] of statusMatrix) {
           if (head !== workdir) {
@@ -90,9 +97,9 @@ export const fileActions = {
           }
       }
 
-      const currentFile = decodeURIComponent(window.location.hash.substring(1));
+      const currentFile = editor.filePath;
       const fileTree = buildTree(allPaths);
-      const expandedFoldersRaw = sessionStorage.getItem(`expanded_folders_${this.gitClient.gardenName}`);
+      const expandedFoldersRaw = sessionStorage.getItem(`expanded_folders_${gitClient.gardenName}`);
       const expandedFolders = new Set(expandedFoldersRaw ? JSON.parse(expandedFoldersRaw) : []);
       
       if (currentFile) {
@@ -111,7 +118,7 @@ export const fileActions = {
             if (e.target.closest('a')) return;
             const path = folderEl.dataset.path;
             const nestedList = folderEl.nextElementSibling;
-            const currentExpandedRaw = sessionStorage.getItem(`expanded_folders_${this.gitClient.gardenName}`);
+            const currentExpandedRaw = sessionStorage.getItem(`expanded_folders_${gitClient.gardenName}`);
             const currentExpanded = new Set(currentExpandedRaw ? JSON.parse(currentExpandedRaw) : []);
             folderEl.classList.toggle('expanded');
             nestedList.classList.toggle('active');
@@ -120,9 +127,21 @@ export const fileActions = {
             } else {
                 currentExpanded.delete(path);
             }
-            sessionStorage.setItem(`expanded_folders_${this.gitClient.gardenName}`, JSON.stringify(Array.from(currentExpanded)));
+            sessionStorage.setItem(`expanded_folders_${gitClient.gardenName}`, JSON.stringify(Array.from(currentExpanded)));
         });
       });
+      
+      // --- THIS IS THE FIX ---
+      // Intercept link clicks to use the new buffer system
+      this.contentContainer.querySelectorAll('a[data-filepath]').forEach(link => {
+          link.addEventListener('click', (e) => {
+              e.preventDefault();
+              const path = e.target.dataset.filepath;
+              const garden = gitClient.gardenName;
+              window.thoughtform.workspace.openFile(garden, path);
+          });
+      });
+      // --- END OF FIX ---
 
       let draggedElement = null;
       const self = this;
@@ -169,6 +188,7 @@ export const fileActions = {
   },
 
   async handleFileMove(sourcePath, destFolderPath) {
+    const gitClient = await window.thoughtform.workspace.getActiveGitClient();
     const sourceFilename = sourcePath.split('/').pop();
     const newPath = destFolderPath === '/' ? `/${sourceFilename}` : `${destFolderPath}/${sourceFilename}`;
     const sourceParent = sourcePath.substring(0, sourcePath.lastIndexOf('/')) || '/';
@@ -178,7 +198,7 @@ export const fileActions = {
       return;
     }
     try {
-      await this.gitClient.pfs.stat(newPath);
+      await gitClient.pfs.stat(newPath);
       await this.showAlert({ title: 'Move Failed', message: `An item named "${sourceFilename}" already exists in the destination folder.` });
       return;
     } catch (e) {
@@ -191,11 +211,9 @@ export const fileActions = {
     });
     if (confirmed) {
         try {
-            await this.gitClient.pfs.rename(sourcePath, newPath);
-            if (decodeURIComponent(window.location.hash) === `#${sourcePath}`) {
-                window.location.hash = `#${newPath}`;
-            }
+            await gitClient.pfs.rename(sourcePath, newPath);
             await this.refresh();
+            // TODO: Update buffer paths in workspace manager if the file was open
         } catch(e) {
             console.error('Error moving file:', e);
             await this.showAlert({ title: 'Error', message: 'Failed to move the item. Check the console for details.' });
@@ -204,10 +222,11 @@ export const fileActions = {
   },
 
   async handleNewFile() {
-    await this.editor.newFile();
+    await window.thoughtform.workspace.getActiveEditor()?.newFile();
   },
 
   async handleNewFolder() {
+    const gitClient = await window.thoughtform.workspace.getActiveGitClient();
     const newName = await Modal.prompt({
       title: 'New Folder',
       label: 'Enter new folder name (e.g., "projects/new-topic"):'
@@ -217,7 +236,7 @@ export const fileActions = {
     const newPath = `/${newName.trim().replace(/\/$/, '')}`;
 
     try {
-      const stat = await this.gitClient.pfs.stat(newPath);
+      const stat = await gitClient.pfs.stat(newPath);
       const itemType = stat.isDirectory() ? 'folder' : 'file';
       await this.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${newName}" already exists.` });
       return;
@@ -230,7 +249,7 @@ export const fileActions = {
     }
 
     try {
-      await this.gitClient.ensureDir(newPath);
+      await gitClient.ensureDir(newPath);
       await this.refresh();
     } catch (writeError) {
       console.error('Error creating folder:', writeError);
@@ -239,7 +258,8 @@ export const fileActions = {
   },
 
   async handleRename(oldPath) {
-    const stat = await this.gitClient.pfs.stat(oldPath);
+    const gitClient = await window.thoughtform.workspace.getActiveGitClient();
+    const stat = await gitClient.pfs.stat(oldPath);
     const itemType = stat.isDirectory() ? 'Folder' : 'File';
 
     const newName = await Modal.prompt({
@@ -252,7 +272,7 @@ export const fileActions = {
     const newPath = `/${newName}`;
     
     try {
-      const existingStat = await this.gitClient.pfs.stat(newPath);
+      const existingStat = await gitClient.pfs.stat(newPath);
       const existingItemType = existingStat.isDirectory() ? 'folder' : 'file';
       await this.showAlert({ title: 'Rename Failed', message: `A ${existingItemType} named "${newName}" already exists.` });
       return;
@@ -267,23 +287,20 @@ export const fileActions = {
     const tempPath = oldPath + `.__rename__.${Date.now()}`;
     
     try {
-      await this.gitClient.pfs.rename(oldPath, tempPath);
+      await gitClient.pfs.rename(oldPath, tempPath);
       try {
         const dirname = newPath.substring(0, newPath.lastIndexOf('/'));
         if (dirname) {
-          await this.gitClient.ensureDir(dirname);
+          await gitClient.ensureDir(dirname);
         }
-        await this.gitClient.pfs.rename(tempPath, newPath);
+        await gitClient.pfs.rename(tempPath, newPath);
       } catch (e) {
         console.error(`Error during rename phase 2/3 for ${newPath}:`, e);
-        await this.gitClient.pfs.rename(tempPath, oldPath);
+        await gitClient.pfs.rename(tempPath, oldPath);
         throw e;
       }
-      if (decodeURIComponent(window.location.hash) === `#${oldPath}`) {
-        window.location.hash = `#${newPath}`;
-      } else {
-        await this.refresh();
-      }
+      await this.refresh();
+      // TODO: Update buffer paths in workspace manager if the file was open
     } catch (e) {
       console.error(`Error renaming file:`, e);
       await this.showAlert({ title: 'Error', message: `Failed to rename file: ${e.message}` });
@@ -292,12 +309,12 @@ export const fileActions = {
   },
   
   async handleDuplicate(path) {
-    // This is now a simple wrapper around the editor's core duplicate method.
-    await this.editor.duplicateFile(path);
+    await window.thoughtform.workspace.getActiveEditor()?.duplicateFile(path);
   },
 
   async handleDelete(path) {
-    const stat = await this.gitClient.pfs.stat(path);
+    const gitClient = await window.thoughtform.workspace.getActiveGitClient();
+    const stat = await gitClient.pfs.stat(path);
     const itemType = stat.isDirectory() ? 'folder' : 'file';
 
     const confirmed = await this.showConfirm({
@@ -309,19 +326,10 @@ export const fileActions = {
 
     if (confirmed) {
       try {
-        const wasViewingDeletedFile = decodeURIComponent(window.location.hash).startsWith(`#${path}`);
-        
-        // Publish the event BEFORE the file is actually deleted.
         window.thoughtform.events.publish('file:delete', { path: path, isDirectory: stat.isDirectory() });
-
-        // Use the robust rmrf that handles both files and folders
-        await this.gitClient.rmrf(path);
-
-        if (wasViewingDeletedFile) {
-          window.location.hash = '#/home';
-        } else {
-          await this.refresh();
-        }
+        await gitClient.rmrf(path);
+        await this.refresh();
+        // TODO: Close buffers in workspace manager if the file was open
       } catch (e) {
         console.error(`Error deleting ${itemType}:`, e);
         await this.showAlert({ title: 'Error', message: `Failed to delete ${itemType}.` });

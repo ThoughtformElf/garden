@@ -1,42 +1,56 @@
 // src/workspace.js
 import { Editor } from './editor/editor.js';
+import { Git } from './util/git-integration.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,
  * workspaces, and active contexts.
  */
 export class WorkspaceManager {
-  constructor() {
+  constructor(initialGitClient) {
+    this.initialGitClient = initialGitClient; // Store the initial client
     this.paneTree = this.createInitialPaneTree(); // The data structure for the layout
-    this.panes = new Map(); // Map of paneId -> { element, editor, resizerElement }
+    this.panes = new Map(); // Map of paneId -> { element, editor }
     this.activePaneId = 'pane-1';
     this.mainContainer = document.querySelector('main');
     this.isResizing = false;
+    this.gitClients = new Map(); // Cache for Git clients
+    this.gitClients.set(initialGitClient.gardenName, initialGitClient);
   }
 
   createInitialPaneTree() {
+    const initialPath = (window.location.hash || '#/home').substring(1);
     return {
       type: 'leaf',
       id: 'pane-1',
       activeBufferIndex: 0,
-      buffers: [] // Will be populated in a later phase
+      buffers: [ { garden: this.initialGitClient.gardenName, path: initialPath } ]
     };
   }
+  
+  async getGitClient(gardenName) {
+      if (!this.gitClients.has(gardenName)) {
+          const client = new Git(gardenName);
+          await client.initRepo();
+          this.gitClients.set(gardenName, client);
+      }
+      return this.gitClients.get(gardenName);
+  }
 
-  /**
-   * Performs the initial render of the entire workspace layout.
-   */
   async render() {
-    this.mainContainer.innerHTML = ''; // Clear the main container
+    // Before wiping the DOM, destroy old editor instances to prevent memory leaks
+    this.panes.forEach(({ editor }) => {
+        if (editor && editor.editorView) {
+            editor.editorView.destroy();
+        }
+    });
+    this.panes.clear();
+
+    this.mainContainer.innerHTML = '';
     await this._renderNode(this.paneTree, this.mainContainer);
     this.setActivePane(this.activePaneId);
   }
 
-  /**
-   * Recursively walks the pane tree and builds the DOM.
-   * @param {object} node - The current node in the pane tree.
-   * @param {HTMLElement} parentElement - The DOM element to render into.
-   */
   async _renderNode(node, parentElement) {
     if (node.type === 'leaf') {
       const paneElement = document.createElement('div');
@@ -44,17 +58,16 @@ export class WorkspaceManager {
       paneElement.dataset.paneId = node.id;
       parentElement.appendChild(paneElement);
 
-      // This is a temporary shim to pass the initial garden's git client.
-      // In a future phase, this will be determined by the buffer's state.
-      const initialGitClient = window.thoughtform.editor.gitClient;
-
+      const activeBuffer = node.buffers[node.activeBufferIndex];
+      const gitClient = await this.getGitClient(activeBuffer.garden);
+      
       const editor = new Editor({
         target: paneElement,
-        gitClient: initialGitClient,
-        commandPalette: window.thoughtform.commandPalette
+        gitClient: gitClient,
+        commandPalette: window.thoughtform.commandPalette,
+        initialFile: activeBuffer.path
       });
-
-      // Wait for the editor to be fully initialized before proceeding.
+      
       await new Promise(resolve => {
         const check = setInterval(() => {
           if (editor.isReady) {
@@ -71,7 +84,7 @@ export class WorkspaceManager {
       });
 
     } else if (node.type.startsWith('split-')) {
-      const direction = node.type.split('-')[1]; // 'vertical' or 'horizontal'
+      const direction = node.type.split('-')[1];
       parentElement.style.display = 'grid';
 
       const [child1, child2] = node.children;
@@ -83,14 +96,11 @@ export class WorkspaceManager {
       const resizerElement = document.createElement('div');
       resizerElement.className = `pane-resizer pane-resizer-${direction}`;
 
-      // --- THIS IS THE FIX (Part 1) ---
-      // Define a 3-track grid: [pane1, resizer, pane2]
       if (direction === 'vertical') {
         parentElement.style.gridTemplateColumns = `${node.splitPercentage}% auto 1fr`;
       } else {
         parentElement.style.gridTemplateRows = `${node.splitPercentage}% auto 1fr`;
       }
-      // --- END OF FIX (Part 1) ---
 
       parentElement.appendChild(child1Element);
       parentElement.appendChild(resizerElement);
@@ -114,10 +124,6 @@ export class WorkspaceManager {
       const handleMove = (moveEvent) => {
         if (!this.isResizing) return;
         const parentRect = parent.getBoundingClientRect();
-        
-        // --- THIS IS THE FIX (Part 2) ---
-        // The logic for calculating the new percentage remains the same,
-        // but it will now correctly apply to the new 3-track grid definition.
         if (direction === 'vertical') {
           const newPercentage = ((moveEvent.clientX - parentRect.left) / parentRect.width) * 100;
           node.splitPercentage = Math.max(10, Math.min(90, newPercentage));
@@ -127,7 +133,6 @@ export class WorkspaceManager {
           node.splitPercentage = Math.max(10, Math.min(90, newPercentage));
           parent.style.gridTemplateRows = `${node.splitPercentage}% auto 1fr`;
         }
-        // --- END OF FIX (Part 2) ---
       };
 
       const endResize = () => {
@@ -157,7 +162,7 @@ export class WorkspaceManager {
       pane.element.classList.toggle('is-active-pane', id === paneId);
     });
     
-    // In the future, this is where we'll notify the sidebar to refresh
+    this._updateURL();
     window.thoughtform.sidebar?.refresh();
   }
   
@@ -165,15 +170,13 @@ export class WorkspaceManager {
     const findAndSplit = (node) => {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
             const newPaneId = `pane-${Date.now()}`;
-            const newLeaf = { ...node, id: newPaneId }; // Copy buffer state
+            const newLeaf = JSON.parse(JSON.stringify(node)); // Deep copy buffer state
+            newLeaf.id = newPaneId;
             
             return {
                 type: `split-${direction}`,
                 splitPercentage: 50,
-                children: [
-                    node,
-                    newLeaf
-                ]
+                children: [ node, newLeaf ]
             };
         }
         if (node.type.startsWith('split-')) {
@@ -183,7 +186,70 @@ export class WorkspaceManager {
     };
     
     this.paneTree = findAndSplit(this.paneTree);
-    this.render(); // Re-render the entire layout
+    this.render();
+  }
+  
+  async openFile(garden, path) {
+    const activePaneInfo = this.getActivePaneInfo();
+    if (!activePaneInfo) return;
+    
+    const { node, pane } = activePaneInfo;
+    
+    const existingBufferIndex = node.buffers.findIndex(b => b.garden === garden && b.path === path);
+
+    if (existingBufferIndex !== -1) {
+      node.activeBufferIndex = existingBufferIndex;
+    } else {
+      node.buffers.push({ garden, path });
+      node.activeBufferIndex = node.buffers.length - 1;
+    }
+
+    const gitClient = await this.getGitClient(garden);
+    pane.editor.gitClient = gitClient;
+    await pane.editor.loadFile(path);
+    
+    this.setActivePane(this.activePaneId);
+    this._updateURL();
+  }
+
+  // --- THIS IS THE FIX ---
+  // Renamed and rewritten to handle the full URL.
+  _updateURL() {
+      const info = this.getActivePaneInfo();
+      if (!info) return;
+      const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
+      
+      // Calculate the base path, same as in index.js, for correct URL construction.
+      const fullUrlPath = new URL(import.meta.url).pathname;
+      const srcIndex = fullUrlPath.lastIndexOf('/src/');
+      const basePath = srcIndex > -1 ? fullUrlPath.substring(0, srcIndex) : '';
+
+      const newPathname = `${basePath}/${encodeURIComponent(activeBuffer.garden)}`;
+      const newHash = `#${encodeURIComponent(activeBuffer.path)}`;
+      const newUrl = `${newPathname}${newHash}`;
+
+      // Only push a new state if the combined path is different,
+      // to avoid cluttering browser history.
+      if (window.location.pathname !== newPathname || window.location.hash !== newHash) {
+          window.history.pushState(null, '', newUrl);
+      }
+  }
+  // --- END OF FIX ---
+
+  getActivePaneInfo() {
+      if (!this.activePaneId) return null;
+      let foundNode = null;
+      const findNode = (node) => {
+          if (node.type === 'leaf' && node.id === this.activePaneId) {
+              foundNode = node;
+          } else if (node.type.startsWith('split-')) {
+              node.children.forEach(findNode);
+          }
+      };
+      findNode(this.paneTree);
+      
+      const pane = this.panes.get(this.activePaneId);
+      return (foundNode && pane) ? { node: foundNode, pane: pane } : null;
   }
 
   getActiveEditor() {
@@ -191,12 +257,14 @@ export class WorkspaceManager {
     return pane ? pane.editor : null;
   }
 
-  getActiveGitClient() {
-    const editor = this.getActiveEditor();
-    return editor ? editor.gitClient : null;
+  async getActiveGitClient() {
+    const info = this.getActivePaneInfo();
+    if (!info) return this.initialGitClient;
+    const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
+    return await this.getGitClient(activeBuffer.garden);
   }
 }
 
-export function initializeWorkspaceManager() {
-  return new WorkspaceManager();
+export function initializeWorkspaceManager(initialGitClient) {
+  return new WorkspaceManager(initialGitClient);
 }

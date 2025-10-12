@@ -4,8 +4,8 @@ import { executeFile } from '../executor.js';
 
 export class CommandPalette {
   constructor({ gitClient, editor }) {
-    this.gitClient = gitClient;
-    this.editor = editor;
+    this.gitClient = gitClient; // Stays for now for cross-garden indexing
+    this.editor = editor; // Stays for now for cross-garden indexing
 
     this.isOpen = false;
     this.query = '';
@@ -73,8 +73,8 @@ export class CommandPalette {
   }
 
   async open(mode = 'search') {
-    if (!this.gitClient || !this.editor) {
-      console.error("CommandPalette cannot open: gitClient or editor is not initialized.");
+    if (!window.thoughtform.workspace.getActiveEditor()) {
+      console.error("CommandPalette cannot open: no active editor found.");
       return;
     }
 
@@ -107,7 +107,7 @@ export class CommandPalette {
       this.input.focus();
     }
     
-    this.search('');
+    await this.search('');
   }
 
   close() {
@@ -122,23 +122,28 @@ export class CommandPalette {
     
     document.removeEventListener('keydown', this.handleKeyDown);
 
-    if (this.editor && this.editor.editorView) {
-      this.editor.editorView.focus();
+    const activeEditor = window.thoughtform.workspace.getActiveEditor();
+    if (activeEditor && activeEditor.editorView) {
+      activeEditor.editorView.focus();
     }
   }
 
-  search(query) {
+  async search(query) {
     this.query = query.toLowerCase();
     
     let sourceFiles = this.crossGardenFileCache;
 
     if (this.mode === 'execute') {
-        // Find all .js files across ALL gardens
         sourceFiles = this.crossGardenFileCache.filter(file => file.path.endsWith('.js'));
     }
+    
+    // --- THIS IS THE FIX ---
+    // We must now 'await' this call as it is asynchronous.
+    const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
+    const currentGardenName = activeGitClient ? activeGitClient.gardenName : '';
 
     if (!this.query) {
-      this.results = (this.mode === 'execute' ? sourceFiles : sourceFiles.filter(file => file.garden === this.gitClient.gardenName)).slice(0, 100);
+      this.results = (this.mode === 'execute' ? sourceFiles : sourceFiles.filter(file => file.garden === currentGardenName)).slice(0, 100);
     } else {
       this.results = sourceFiles.filter(file => {
         let queryIndex = 0;
@@ -151,8 +156,8 @@ export class CommandPalette {
         }
         return queryIndex === this.query.length;
       }).sort((a, b) => {
-        const aIsCurrent = a.garden === this.gitClient.gardenName;
-        const bIsCurrent = b.garden === this.gitClient.gardenName;
+        const aIsCurrent = a.garden === currentGardenName;
+        const bIsCurrent = b.garden === currentGardenName;
         if (aIsCurrent && !bIsCurrent) return -1;
         if (!aIsCurrent && bIsCurrent) return 1;
         return 0;
@@ -163,12 +168,15 @@ export class CommandPalette {
     this.renderResults();
   }
 
-  renderResults() {
+  async renderResults() {
     this.resultsList.innerHTML = '';
     if (this.results.length === 0) {
       this.resultsList.innerHTML = '<li class="command-no-results">No matches found</li>';
       return;
     }
+    
+    const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
+    const currentGardenName = activeGitClient ? activeGitClient.gardenName : '';
 
     this.results.forEach((file, index) => {
       const li = document.createElement('li');
@@ -177,7 +185,7 @@ export class CommandPalette {
 
       const pathText = file.path.startsWith('/') ? file.path.substring(1) : file.path;
       
-      if (file.garden !== this.gitClient.gardenName) {
+      if (file.garden !== currentGardenName) {
         li.innerHTML = `<span class="command-path">${pathText}</span> <span class="command-garden">${file.garden}</span>`;
       } else {
         li.textContent = pathText;
@@ -199,26 +207,20 @@ export class CommandPalette {
     
     if (this.mode === 'execute') {
       this.close();
-      // Use the 'garden#path' format that the Universal Executor expects
-      const fullPath = `${file.garden}#${file.path}`;
-      executeFile(fullPath, this.editor, this.gitClient);
-
-    } else { // 'search' mode
-      if (file.garden !== this.gitClient.gardenName) {
-        const fullPath = new URL(import.meta.url).pathname;
-        const srcIndex = fullPath.lastIndexOf('/src/');
-        const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
-        
-        window.location.href = `${window.location.origin}${basePath}/${encodeURIComponent(file.garden)}#${encodeURIComponent(file.path)}`;
-      } else {
-        window.location.hash = `#${encodeURIComponent(file.path)}`;
+      const editor = window.thoughtform.workspace.getActiveEditor();
+      const git = await window.thoughtform.workspace.getActiveGitClient();
+      if (editor && git) {
+          const fullPath = `${file.garden}#${file.path}`;
+          executeFile(fullPath, editor, git);
       }
+    } else { // 'search' mode
+      window.thoughtform.workspace.openFile(file.garden, file.path);
       this.close();
     }
   }
 
-  handleInput(e) {
-    this.search(e.target.value);
+  async handleInput(e) {
+    await this.search(e.target.value);
   }
   
   handleResultClick(e) {
