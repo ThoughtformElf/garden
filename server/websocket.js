@@ -1,4 +1,3 @@
-// server/index.js
 const WebSocket = require('ws');
 const http = require('http');
 const crypto = require('crypto');
@@ -36,11 +35,11 @@ wss.on('connection', (ws, req) => {
     ws.on('pong', heartbeat);
 
     const ip = getRealClientIp(req);
-    const peerId = crypto.randomUUID();
-    ws.peerId = peerId;
+    // Assign a temporary ID for logging until a session is joined.
+    ws.peerId = crypto.randomUUID();
     
-    console.log(`New connection established from ${ip}: ${peerId}`);
-    ws.send(JSON.stringify({ type: 'welcome', peerId: peerId }));
+    console.log(`New connection established from ${ip}: temp ID ${ws.peerId}`);
+    ws.send(JSON.stringify({ type: 'welcome' }));
 
     ws.on('message', (message) => {
         try {
@@ -50,44 +49,52 @@ wss.on('connection', (ws, req) => {
 
             switch (data.type) {
                 case 'join_session':
-                    console.log(`Received 'join_session' from ${peerId} for session ${sessionId}`);
+                    // --- THIS IS THE FIX (Part 1) ---
+                    // Generate the final peer ID now, applying a prefix if provided.
+                    let finalPeerId = crypto.randomUUID();
+                    if (data.peerNamePrefix) {
+                        const sanitizedPrefix = String(data.peerNamePrefix)
+                            .replace(/[^a-zA-Z0-9_-]/g, '')
+                            .slice(0, 15);
+                        
+                        if (sanitizedPrefix) {
+                            const randomPart = finalPeerId.split('-')[0];
+                            finalPeerId = `${sanitizedPrefix}-${randomPart}`;
+                        }
+                    }
+                    console.log(`Peer with temp ID ${ws.peerId} is joining ${sessionId}. Final ID: ${finalPeerId}`);
+                    ws.peerId = finalPeerId;
+                    
                     if (!sessions.has(sessionId)) {
                         sessions.set(sessionId, new Set());
                     }
                     const peerSet = sessions.get(sessionId);
-
-                    // --- THIS IS THE FIX (Part 1) ---
-                    // Add the new peer to the set FIRST.
-                    peerSet.add(ws);
-                    ws.sessionId = sessionId;
                     
-                    // Now, get the list of OTHER peers.
                     const otherPeers = Array.from(peerSet).filter(p => p !== ws);
-                    // --- END OF FIX (Part 1) ---
                     
-                    // Introduce the new peer to a subset of existing peers.
                     const peersToIntroduce = otherPeers
                         .sort(() => 0.5 - Math.random())
                         .slice(0, MAX_PEERS_TO_INTRODUCE);
                     
-                    if (peersToIntroduce.length > 0) {
-                        ws.send(JSON.stringify({
-                            type: 'peer_list',
-                            peers: peersToIntroduce.map(p => p.peerId)
-                        }));
-                    }
+                    // Send confirmation back to the joining peer with their final ID and a list of peers.
+                    ws.send(JSON.stringify({
+                        type: 'session_joined',
+                        peerId: ws.peerId,
+                        peers: peersToIntroduce.map(p => p.peerId)
+                    }));
                     
-                    // --- THIS IS THE FIX (Part 2) ---
-                    // Announce the new peer to EVERYONE who was already there.
-                    console.log(`Announcing new peer ${peerId} to ${otherPeers.length} existing peers.`);
+                    // Add the new peer to the session and announce them to everyone else.
+                    peerSet.add(ws);
+                    ws.sessionId = sessionId;
+                    
+                    console.log(`Announcing new peer ${ws.peerId} to ${otherPeers.length} existing peers.`);
                     otherPeers.forEach(peer => {
                         if (peer.readyState === WebSocket.OPEN) {
                             peer.send(JSON.stringify({ type: 'peer_joined', peerId: ws.peerId }));
                         }
                     });
-                    // --- END OF FIX (Part 2) ---
-
-                    console.log(`Peer ${peerId} has successfully joined session ${sessionId}. Total peers: ${peerSet.size}`);
+                    // --- END OF FIX (Part 1) ---
+                    console.log(`Peer ${ws.peerId} has successfully joined session ${sessionId}. Total peers: ${peerSet.size}`);
                     break;
                 
                 case 'signal':
@@ -105,12 +112,12 @@ wss.on('connection', (ws, req) => {
                     break;
             }
         } catch (err) {
-            console.error(`Error processing message from peer ${peerId}:`, err);
+            console.error(`Error processing message from peer ${ws.peerId}:`, err);
         }
     });
 
     ws.on('close', () => {
-        console.log(`Connection closed: ${peerId}`);
+        console.log(`Connection closed: ${ws.peerId}`);
         if (ws.sessionId) {
             const session = sessions.get(ws.sessionId);
             if (!session) return;
@@ -128,7 +135,7 @@ wss.on('connection', (ws, req) => {
         }
     });
 
-    ws.on('error', (err) => console.error(`WebSocket error for peer ${peerId}:`, err));
+    ws.on('error', (err) => console.error(`WebSocket error for peer ${ws.peerId}:`, err));
 });
 
 const interval = setInterval(() => {

@@ -13,6 +13,7 @@ export class SyncUI {
     
     this.connectBtn = null;
     this.nameInput = null;
+    this.peerPrefixInput = null;
     this.autoConnectCheckbox = null;
   }
   
@@ -34,6 +35,10 @@ export class SyncUI {
                 <label for="sync-name-input" class="sync-label">Sync Name:</label>
                 <input type="text" id="sync-name-input" class="eruda-input" placeholder="e.g., my-devices">
                 <button id="sync-connect-btn" class="eruda-button">Connect</button>
+              </div>
+              <div class="sync-row">
+                <label for="sync-peer-prefix-input" class="sync-label">Peer Name Prefix:</label>
+                <input type="text" id="sync-peer-prefix-input" class="eruda-input flex-grow" placeholder="e.g., laptop, desktop (optional)">
               </div>
               <div class="sync-row space-between">
                 <label class="flex-center">
@@ -65,6 +70,7 @@ export class SyncUI {
       this.syncMethodIndicatorEl = this.sync._container.querySelector('#sync-method-indicator');
       this.connectBtn = this.sync._container.querySelector('#sync-connect-btn');
       this.nameInput = this.sync._container.querySelector('#sync-name-input');
+      this.peerPrefixInput = this.sync._container.querySelector('#sync-peer-prefix-input');
       this.autoConnectCheckbox = this.sync._container.querySelector('#sync-autoconnect-checkbox');
     }
   }
@@ -76,20 +82,23 @@ export class SyncUI {
     }
     
     this.nameInput.value = localStorage.getItem('thoughtform_sync_name') || '';
+    this.peerPrefixInput.value = localStorage.getItem('thoughtform_peer_prefix') || '';
     this.autoConnectCheckbox.checked = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
     
     this.connectBtn.addEventListener('click', () => {
       const currentState = this.sync.connectionState;
       if (currentState === 'disconnected' || currentState === 'error') {
         const syncName = this.nameInput.value.trim();
+        const peerPrefix = this.peerPrefixInput.value.trim();
         const autoConnect = this.autoConnectCheckbox.checked;
         if (!syncName) {
           this.addMessage("Please enter a Sync Name.");
           return;
         }
         localStorage.setItem('thoughtform_sync_name', syncName);
+        localStorage.setItem('thoughtform_peer_prefix', peerPrefix);
         localStorage.setItem('thoughtform_sync_auto_connect', autoConnect);
-        this.sync.connect(syncName);
+        this.sync.connect(syncName, peerPrefix);
       } else {
         this.sync.disconnect();
       }
@@ -170,6 +179,7 @@ export class SyncUI {
       else this.connectBtn.textContent = 'Disconnect';
     }
     if (this.nameInput) this.nameInput.disabled = !isDisconnected;
+    if (this.peerPrefixInput) this.peerPrefixInput.disabled = !isDisconnected;
     if (this.autoConnectCheckbox) this.autoConnectCheckbox.disabled = !isDisconnected;
     const shouldEnableFileSync = (state === 'connected-p2p' || state === 'connected-signal');
     this.sync._container.querySelectorAll('.sync-actions button').forEach(btn => btn.disabled = !shouldEnableFileSync);

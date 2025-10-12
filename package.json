@@ -10,7 +10,7 @@
     "deploy:ws": "fly deploy",
     "deploy:proxy": "fly deploy --config fly.proxy.toml",
     "deploy:all": "npm run deploy:ws && npm run deploy:proxy",
-    "ws": "node server/index.js",
+    "ws": "node server/websocket.js",
     "git": "node server/git.js",
     "preview": "vite preview",
     "proxy": "node server/proxy.js --local",

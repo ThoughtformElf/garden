@@ -10,18 +10,23 @@ export class SignalingMessageHandler {
         const syncInstance = this.signaling.sync;
         switch (data.type) {
             case 'welcome':
-                this.signaling.peerId = data.peerId;
-                // ***** THIS IS THE FIX *****
-                // The moment we are welcomed by the server, we are in a stable,
-                // connected-but-waiting state. This prevents the "failed to connect" error.
-                syncInstance.updateConnectionState('connected-signal', 'Connected to tracker, waiting for peers...');
-                // ***** END OF FIX *****
+                // The server has acknowledged our connection. We can now join a session.
+                debug.log("Received welcome from signaling server.");
                 break;
             
-            case 'peer_list': // Server is introducing us to existing peers
-                data.peers.forEach(peerId => {
-                    this.signaling.connectToPeer(peerId);
-                });
+            case 'session_joined':
+                // --- THIS IS THE FIX ---
+                // The server has confirmed our session and provided our final peer ID.
+                this.signaling.peerId = data.peerId;
+                syncInstance.updateConnectionState('connected-signal', 'Connected to tracker, waiting for peers...');
+                
+                // Now we can connect to the peers the server introduced us to.
+                if (data.peers && data.peers.length > 0) {
+                    data.peers.forEach(peerId => {
+                        this.signaling.connectToPeer(peerId);
+                    });
+                }
+                // --- END OF FIX ---
                 break;
 
             case 'peer_joined': // A new peer has joined the swarm

@@ -158,7 +158,7 @@ export class Modal {
    * Shows a modal for selecting items grouped by a category (e.g., peers).
    * @param {Object} options
    * @param {string} options.title - The title for the modal.
-   * @param {Map<string, {gardens: string[]}>} options.peerData - A map of peers and their data.
+   * @param {Map<string, {id: string, gardens: string[]}>} options.peerData - A map of peers and their data.
    * @param {string} options.okText - The text for the confirmation button.
    * @returns {Promise<Object|null>} A promise that resolves with the selection object or null if cancelled.
    *                                 Example selection: { 'peerId-123': ['gardenA'], 'peerId-456': ['gardenB'] }
@@ -181,10 +181,9 @@ export class Modal {
       let contentHTML = '<div class="peer-selection-container">';
       
       peerData.forEach((data, peerId) => {
-        const shortId = peerId.substring(0, 8);
         contentHTML += `
           <div class="peer-group" data-peer-id="${peerId}">
-            <strong class="peer-title">Peer: ${shortId}...</strong>
+            <strong class="peer-title">Peer: ${data.id}</strong>
             <div class="garden-checkbox-list">
               ${data.gardens.map(garden => `
                 <label>
@@ -243,7 +242,7 @@ export class Modal {
         const groupIdentifier = groupTitle.replace(/\s/g, '');
         const itemCheckboxes = items.map(item => {
           const value = isPeers ? item.id : item;
-          const label = isPeers ? `${item.id.substring(0, 8)}...` : item;
+          const label = isPeers ? item.id : item;
           return `
             <label>
               <input type="checkbox" class="modal-select-checkbox" data-group="${groupIdentifier}" value="${value}">
@@ -264,7 +263,7 @@ export class Modal {
         `;
       };
 
-      const peerItems = Array.from(peerData.keys()).map(id => ({ id }));
+      const peerItems = Array.from(peerData.values());
 
       let contentHTML = '<div class="modal-send-container">';
       contentHTML += createChecklistUI('Gardens to Send', gardenData);

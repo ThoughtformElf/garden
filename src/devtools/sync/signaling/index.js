@@ -49,10 +49,10 @@ export class SyncSignaling {
     }
     // --- END OF FIX ---
     
-    async joinSession(syncName) {
+    async joinSession(syncName, peerNamePrefix) {
         try {
             await this._webSocketManager.connectToSignalingServer();
-            this._webSocketManager.sendJoinSessionRequest(syncName);
+            this._webSocketManager.sendJoinSessionRequest(syncName, peerNamePrefix);
         } catch (error) {
             this.sync.updateConnectionState('error', `Failed to connect to signaling server.`);
         }

@@ -45,13 +45,17 @@ export class WebSocketManager {
         });
     }
 
-    sendJoinSessionRequest(syncName) {
+    sendJoinSessionRequest(syncName, peerNamePrefix) {
         const ws = this.signaling.ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
+            const payload = {
                 type: 'join_session',
                 sessionId: syncName 
-            }));
+            };
+            if (peerNamePrefix) {
+                payload.peerNamePrefix = peerNamePrefix;
+            }
+            ws.send(JSON.stringify(payload));
         } else {
             debug.error("Cannot send join session request, WebSocket is not open.");
         }

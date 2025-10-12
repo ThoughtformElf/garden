@@ -34,16 +34,19 @@ export class Sync {
     }
     const autoConnect = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
     const savedSyncName = localStorage.getItem('thoughtform_sync_name');
+    const savedPeerPrefix = localStorage.getItem('thoughtform_peer_prefix') || '';
     if (autoConnect && savedSyncName) {
-        this.connect(savedSyncName);
+        this.connect(savedSyncName, savedPeerPrefix);
     }
+    // Expose this instance on the global thoughtform object
+    if (window.thoughtform) window.thoughtform.sync = this;
   }
 
-  async connect(syncName) {
+  async connect(syncName, peerNamePrefix) {
       if (this.connectionState !== 'disconnected' && this.connectionState !== 'error') return;
       this.syncName = syncName;
       this.updateConnectionState('connecting', 'Connecting...');
-      await this.signaling.joinSession(this.syncName);
+      await this.signaling.joinSession(this.syncName, peerNamePrefix);
   }
 
   disconnect() {
@@ -146,17 +149,18 @@ export class Sync {
   handlePeerIntroduction(payload) {
       if (!payload.peerId || payload.peerId === this.signaling.peerId) return;
       const isNewPeer = !this.connectedPeers.has(payload.peerId);
-      this.connectedPeers.set(payload.peerId, { gardens: payload.gardens });
+      this.connectedPeers.set(payload.peerId, { id: payload.peerId, gardens: payload.gardens });
       if (isNewPeer) {
-        this.addMessage(`Peer ${payload.peerId.substring(0, 8)}... discovered.`);
+        this.addMessage(`Peer ${payload.peerId} discovered.`);
       }
       if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} peer${this.connectedPeers.size === 1 ? '' : 's'})`);
   }
   
   handlePeerLeft(peerId) {
       if (this.connectedPeers.has(peerId)) {
+          const peerInfo = this.connectedPeers.get(peerId);
           this.connectedPeers.delete(peerId);
-          this.addMessage(`Peer ${peerId.substring(0, 8)}... disconnected.`);
+          this.addMessage(`Peer ${peerInfo.id} disconnected.`);
       }
       
       const pc = this.peerConnections.get(peerId);
@@ -167,15 +171,15 @@ export class Sync {
           this.peerConnections.delete(peerId);
       }
       
-      // --- THIS IS THE FIX ---
-      // After cleanup, check if we are now alone. If so, revert to the "waiting" state.
       if (this.peerConnections.size === 0 && this.connectionState === 'connected-p2p') {
           this.updateConnectionState('connected-signal', 'Connected to tracker, waiting for peers...');
       } else {
-          // Otherwise, just update the peer count.
           if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} total)`);
       }
-      // --- END OF FIX ---
+  }
+  
+  getPeerId() {
+    return this.signaling.peerId;
   }
 
   setGitClient(gitClient) { this.gitClient = gitClient; this.fileSync.setGitClient(gitClient); }
