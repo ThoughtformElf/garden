@@ -112,6 +112,56 @@ fly certs check proxy.thoughtform.garden -a garden-proxy
 
 Once both show as "configured", your custom domains are live!
 
+---
+
+## Local Git Server for Backup & Collaboration
+
+This section explains how to use the built-in Git server to create a local backup of your gardens. This is ideal for keeping a secure copy of your data on your own machine or for collaborating across devices on your local network.
+
+**Step 1: Create a Backups Folder**
+
+First, create a `backups` folder in your user's home directory. The Git server is pre-configured to look here.
+
+```bash
+# On macOS or Linux
+mkdir ~/backups
+```
+On Windows, you can create a `backups` folder in your `C:\Users\YourUsername` directory.
+
+**Step 2: Create a Bare Repository**
+
+Navigate into your new backups folder and create a "bare" repository. This will act as the central remote for your garden.
+
+```bash
+# Navigate to the backups folder
+cd ~/backups
+
+# Create the bare repository (you can name it anything)
+git init --bare my-garden.git
+```
+
+**Step 3: Run the Local Git Server**
+
+Navigate back to the root directory of the Thoughtform Garden project and use the built-in script to start the server.
+
+```bash
+# From the project root of thoughtform.garden
+npm run git
+```
+
+The server will start and log a message like `Git server running on http://localhost:8081`.
+
+**Step 4: Connect from Thoughtform Garden**
+
+1.  In the Thoughtform Garden app, open the **Git** tab in the sidebar.
+2.  In the "Remote URL" field, combine the server address with your repository name. For example:
+    `http://localhost:8081/my-garden.git`
+3.  If you are connecting from another device on the same network, replace `localhost` with your computer's local IP address (e.g., `http://192.168.1.5:8081/my-garden.git`).
+4.  Leave the "Username or Token" field blank.
+5.  Click **Push** to save your garden to your local backup.
+
+---
+
 ## Configuration Files
 
 ### fly.toml (WebSocket Server)
@@ -134,8 +184,7 @@ Includes Chromium and all dependencies for Puppeteer/headless browsing.
 
 ### View Logs
 
-```
-# WebSocket server
+```# WebSocket server
 fly logs -a garden-summer-rain-983
 
 # Proxy server

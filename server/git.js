@@ -2,8 +2,10 @@ const http = require('http');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const url = require('url');
+const os = require('os');
+const path = require('path');
 
-const REPOS_PATH = '/home/qrx/backups';
+const REPOS_PATH = path.join(os.homedir(), 'backups');
 
 function findGitHttpBackend() {
   const paths = [
