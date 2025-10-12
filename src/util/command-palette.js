@@ -1,6 +1,6 @@
 // src/util/command-palette.js
 import { Git } from './git-integration.js';
-import { executeFile } from '../executor.js';
+import { executeFile } from '../workspace/executor.js';
 
 export class CommandPalette {
   constructor({ gitClient, editor }) {

@@ -1,4 +1,3 @@
-// src/keymaps.js
 import { Compartment } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 import { executeFile } from './executor.js';

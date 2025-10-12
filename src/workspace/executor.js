@@ -1,5 +1,4 @@
-// src/executor.js
-import { Git } from './util/git-integration.js';
+import { Git } from '../util/git-integration.js';
 
 /**
  * The Universal Executor for Thoughtform.Garden.

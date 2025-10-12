@@ -13,11 +13,11 @@ import { CommandPalette } from './util/command-palette.js';
 import { runMigration } from './util/migration.js';
 import { initializeAiService } from './ai/index.js';
 import { initializeConfigService } from './config.js';
-import { initializeEventBus } from './events.js';
-import { HookRunner } from './hooks.js';
+import { initializeEventBus } from './workspace/events.js';
+import { HookRunner } from './workspace/hooks.js';
 import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';
-import { initializeWorkspaceManager } from './workspace.js'; // Import the new manager
+import { initializeWorkspaceManager } from './workspace/index.js'; // Import the new manager
 
 // Handles browser back/forward buttons.
 function initializeNavigationListener() {

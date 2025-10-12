@@ -1,4 +1,3 @@
-// src/hooks.js
 import { executeFile } from './executor.js';
 
 const eventToHookFileMap = {

@@ -1,5 +1,3 @@
-// src/events.js
-
 class EventBus {
   constructor() {
     this.subscribers = {};

@@ -10,7 +10,7 @@ import { getLanguageExtension } from './languages.js';
 import { diffCompartment, createDiffExtension } from './diff.js';
 import { statusBarCompartment, createStatusBarExtension } from './status-bar.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
-import { KeymapService } from '../keymaps.js';
+import { KeymapService } from '../workspace/keymaps.js';
 import { Modal } from '../util/modal.js';
 import { createEditorExtensions } from './extensions.js';
 

@@ -1,6 +1,5 @@
-// src/workspace.js
-import { Editor } from './editor/editor.js';
-import { Git } from './util/git-integration.js';
+import { Editor } from '../editor/editor.js';
+import { Git } from '../util/git-integration.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,
