@@ -53,7 +53,7 @@ export class SyncUI {
             <div class="sync-panel sync-actions">
               <h4>File Sync Actions</h4>
               <div class="sync-row">
-                <button id="sync-all-files-btn" class="eruda-button">Send All Files</button>
+                <button id="send-to-peers-btn" class="eruda-button">Send to Peers...</button>
                 <button id="request-all-files-btn" class="eruda-button">Request from Peer...</button>
               </div>
             </div>
@@ -110,13 +110,28 @@ export class SyncUI {
       });
     }
     
-    const syncAllBtn = this.sync._container.querySelector('#sync-all-files-btn');
+    const sendToPeersBtn = this.sync._container.querySelector('#send-to-peers-btn');
     const requestAllBtn = this.sync._container.querySelector('#request-all-files-btn');
     
-    if (syncAllBtn) {
-      syncAllBtn.addEventListener('click', async () => {
-        this.showSyncProgressModal();
-        await this.sync.fileSync.syncAllFiles();
+    if (sendToPeersBtn) {
+      sendToPeersBtn.addEventListener('click', async () => {
+        const gardensRaw = localStorage.getItem('thoughtform_gardens');
+        const gardenData = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
+        const peerData = this.sync.connectedPeers;
+
+        const selection = await Modal.sendSelection({
+            title: 'Send Gardens to Peers',
+            peerData: peerData,
+            gardenData: gardenData
+        });
+        
+        if (selection) {
+            debug.log('User initiated send:', selection);
+            this.showSyncProgressModal();
+            this.sync.fileSync.sendGardensToPeers(selection); 
+        } else {
+            debug.log('Garden send cancelled by user.');
+        }
       });
     }
     

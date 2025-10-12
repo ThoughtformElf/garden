@@ -56,9 +56,9 @@ export class SyncFiles extends EventEmitterMixin {
         }
     }
 
-    async syncAllFiles() {
+    async sendGardensToPeers(selection) {
         this.resetFullSyncState();
-        await SyncActions.syncAllFiles(this);
+        await SyncActions.sendGardensToPeers(this, selection);
     }
     
     requestSpecificGardens(selection) {

@@ -155,7 +155,6 @@ export class Modal {
   }
 
   /**
-   * --- NEW METHOD ---
    * Shows a modal for selecting items grouped by a category (e.g., peers).
    * @param {Object} options
    * @param {string} options.title - The title for the modal.
@@ -219,6 +218,83 @@ export class Modal {
         modal.destroy();
       };
       
+      modal.addFooterButton(okText, submit);
+      modal.addFooterButton('Cancel', cancel);
+      modal.show();
+    });
+  }
+  
+  static sendSelection({ title, peerData, gardenData, okText = 'Send' }) {
+    return new Promise((resolve) => {
+      if (peerData.size === 0) {
+        const infoModal = new Modal({ title: 'No Peers Found' });
+        infoModal.updateContent('<p>There are no other peers currently connected to this sync session.</p>');
+        infoModal.addFooterButton('OK', () => {
+          infoModal.destroy();
+          resolve(null);
+        });
+        infoModal.show();
+        return;
+      }
+
+      const modal = new Modal({ title });
+
+      const createChecklistUI = (groupTitle, items, isPeers = false) => {
+        const groupIdentifier = groupTitle.replace(/\s/g, '');
+        const itemCheckboxes = items.map(item => {
+          const value = isPeers ? item.id : item;
+          const label = isPeers ? `${item.id.substring(0, 8)}...` : item;
+          return `
+            <label>
+              <input type="checkbox" class="modal-select-checkbox" data-group="${groupIdentifier}" value="${value}">
+              <span>${label}</span>
+            </label>
+          `;
+        }).join('');
+
+        return `
+          <div class="modal-selection-group" id="group-${groupIdentifier}">
+            <strong>${groupTitle}</strong>
+            <div class="modal-selection-controls">
+              <button type="button" class="select-all-btn">Select All</button>
+              <button type="button" class="select-none-btn">Deselect All</button>
+            </div>
+            <div class="modal-selection-list">${itemCheckboxes}</div>
+          </div>
+        `;
+      };
+
+      const peerItems = Array.from(peerData.keys()).map(id => ({ id }));
+
+      let contentHTML = '<div class="modal-send-container">';
+      contentHTML += createChecklistUI('Gardens to Send', gardenData);
+      contentHTML += createChecklistUI('Peers to Receive', peerItems, true);
+      contentHTML += '</div>';
+
+      modal.updateContent(contentHTML);
+
+      modal.content.querySelectorAll('.modal-selection-group').forEach(group => {
+        group.querySelector('.select-all-btn').onclick = () => group.querySelectorAll('.modal-select-checkbox').forEach(cb => cb.checked = true);
+        group.querySelector('.select-none-btn').onclick = () => group.querySelectorAll('.modal-select-checkbox').forEach(cb => cb.checked = false);
+      });
+      
+      const submit = () => {
+        const selectedGardens = Array.from(modal.content.querySelectorAll('#group-GardenstoSend .modal-select-checkbox:checked')).map(cb => cb.value);
+        const selectedPeers = Array.from(modal.content.querySelectorAll('#group-PeerstoReceive .modal-select-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedGardens.length > 0 && selectedPeers.length > 0) {
+          resolve({ gardens: selectedGardens, peers: selectedPeers });
+        } else {
+          resolve(null);
+        }
+        modal.destroy();
+      };
+      
+      const cancel = () => {
+        resolve(null);
+        modal.destroy();
+      };
+
       modal.addFooterButton(okText, submit);
       modal.addFooterButton('Cancel', cancel);
       modal.show();

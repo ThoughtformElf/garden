@@ -11,7 +11,6 @@ export class MessageHandler {
                 await FileOperations.handleFileUpdate(instance, data);
                 break;
             case 'request_gardens':
-                // --- THIS IS THE FIX (Part 1) ---
                 await this.handleRequestGardens(instance, data.gardens, data.requesterId);
                 break;
             case 'garden_zip_chunk':
@@ -29,11 +28,7 @@ export class MessageHandler {
         }
     }
 
-    // --- THIS IS THE FIX (Part 2: Function signature updated) ---
     static async handleRequestGardens(instance, gardens = [], requesterId) {
-        if (!gardens || gardens.length === 0) return;
-        
-        // --- THIS IS THE FIX (Part 3: Validate requesterId) ---
         if (!requesterId) {
             const errorMsg = 'Error: Received garden request without a requesterId. Cannot send response.';
             console.error(errorMsg);
@@ -41,23 +36,17 @@ export class MessageHandler {
             return;
         }
 
-        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Received request for gardens: ${gardens.join(', ')}.`, type: 'info' } }));
+        instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Received request for gardens: ${gardens.join(', ')} from ${requesterId.substring(0,8)}...`, type: 'info' } }));
+        await this.sendGardens(instance, gardens, [requesterId]);
+    }
 
+    static async sendGardens(instance, gardens, targetPeerIds) {
+        if (!gardens || gardens.length === 0 || !targetPeerIds || targetPeerIds.length === 0) return;
+        
         const CHUNK_SIZE = 64 * 1024; // 64KB chunks
-        
-        // --- THIS IS THE FIX (Part 4: Backpressure handling) ---
         const HIGH_WATER_MARK = 10 * 1024 * 1024; // 10MB buffer limit
-        
-        const peerConnection = instance.sync.peerConnections.get(requesterId);
-        if (!peerConnection || !peerConnection.dataChannel || peerConnection.dataChannel.readyState !== 'open') {
-             const errorMsg = `Error: Cannot send files to ${requesterId.substring(0,8)}... because no open data channel was found.`;
-             console.error(errorMsg);
-             instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: errorMsg, type: 'error' } }));
-             return;
-        }
-        const dataChannel = peerConnection.dataChannel;
 
-        const waitForBuffer = () => {
+        const waitForBuffer = (dataChannel) => {
             return new Promise(resolve => {
                 if (dataChannel.bufferedAmount < HIGH_WATER_MARK) {
                     resolve();
@@ -72,7 +61,6 @@ export class MessageHandler {
                 }
             });
         };
-        // --- END OF FIX (Part 4) ---
 
         try {
             for (const gardenName of gardens) {
@@ -97,59 +85,63 @@ export class MessageHandler {
                     compressionOptions: { level: 6 }
                 });
                 
-                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Zip created (${(zipData.length / 1024 / 1024).toFixed(2)} MB). Sending in chunks...`, type: 'info' } }));
+                const zipSizeMB = (zipData.length / 1024 / 1024).toFixed(2);
+                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Zip created for ${gardenName} (${zipSizeMB} MB).`, type: 'info' } }));
                 
                 const totalChunks = Math.ceil(zipData.length / CHUNK_SIZE);
                 const transferId = crypto.randomUUID();
-                
-                for (let i = 0; i < totalChunks; i++) {
-                    // --- THIS IS THE FIX (Part 5: Await the backpressure check) ---
-                    await waitForBuffer();
 
-                    const start = i * CHUNK_SIZE;
-                    const end = Math.min(start + CHUNK_SIZE, zipData.length);
-                    const chunk = zipData.slice(start, end);
-                    
-                    // --- THIS IS THE FIX (Part 6: Send chunk to the specific requester) ---
-                    instance.sync.sendSyncMessage({
-                        type: 'garden_zip_chunk',
-                        gardenName: gardenName,
-                        transferId: transferId,
-                        chunkIndex: i,
-                        totalChunks: totalChunks,
-                        data: Buffer.from(chunk).toString('base64'),
-                        zipSize: zipData.length
-                    }, requesterId);
-                    
-                    if (i % 20 === 0 || i === totalChunks - 1) {
-                        instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                            detail: { 
-                                message: `Sent chunk ${i + 1} of ${totalChunks} for ${gardenName}...`, 
-                                type: 'info' 
-                            } 
-                        }));
+                for (const peerId of targetPeerIds) {
+                    const peerConnection = instance.sync.peerConnections.get(peerId);
+                    if (!peerConnection || !peerConnection.dataChannel || peerConnection.dataChannel.readyState !== 'open') {
+                         const errorMsg = `Error: Cannot send files to ${peerId.substring(0,8)}... No open data channel.`;
+                         console.error(errorMsg);
+                         instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: errorMsg, type: 'error' } }));
+                         continue; // Skip to the next peer
                     }
+                    const dataChannel = peerConnection.dataChannel;
+
+                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Sending ${gardenName} to ${peerId.substring(0,8)}...`, type: 'info' } }));
+                    
+                    for (let i = 0; i < totalChunks; i++) {
+                        await waitForBuffer(dataChannel);
+
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, zipData.length);
+                        const chunk = zipData.slice(start, end);
+                        
+                        instance.sync.sendSyncMessage({
+                            type: 'garden_zip_chunk',
+                            gardenName: gardenName,
+                            transferId: transferId,
+                            chunkIndex: i,
+                            totalChunks: totalChunks,
+                            data: Buffer.from(chunk).toString('base64'),
+                            zipSize: zipData.length
+                        }, peerId);
+                    }
+                    
+                    instance.sync.sendSyncMessage({
+                        type: 'garden_zip_complete',
+                        gardenName: gardenName,
+                        transferId: transferId
+                    }, peerId);
+                    
+                    instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Finished sending ${gardenName} to ${peerId.substring(0,8)}.`, type: 'info' } }));
                 }
-                
-                // --- THIS IS THE FIX (Part 7: Send completion to the specific requester) ---
-                instance.sync.sendSyncMessage({
-                    type: 'garden_zip_complete',
-                    gardenName: gardenName,
-                    transferId: transferId
-                }, requesterId);
-                
-                instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Finished sending ${gardenName}.`, type: 'info' } }));
             }
             
-            // --- THIS IS THE FIX (Part 8: Send final completion to the specific requester) ---
-            instance.sync.sendSyncMessage({ type: 'full_sync_complete' }, requesterId);
-            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `All gardens sent successfully.`, type: 'complete' } }));
+            for (const peerId of targetPeerIds) {
+                instance.sync.sendSyncMessage({ type: 'full_sync_complete' }, peerId);
+            }
+            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `All selected gardens sent successfully.`, type: 'complete' } }));
             
         } catch (error) {
-            console.error('Error handling garden request:', error);
+            console.error('Error handling garden send/request:', error);
             instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Error: ${error.message}`, type: 'error' } }));
         }
     }
+
 
     static async getAllFilesIncludingGit(pfs, dir) {
         let fileList = [];
