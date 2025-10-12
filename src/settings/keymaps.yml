@@ -30,3 +30,9 @@
 
 - key: "Alt-ArrowRight"
   run: "keymaps/browser-forward.js"
+
+- key: "Mod-\\"
+  run: "keymaps/split-pane-vertical.js"
+
+- key: "Mod-Shift-\\"
+  run: "keymaps/split-pane-horizontal.js"

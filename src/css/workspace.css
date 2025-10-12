@@ -1,4 +1,98 @@
 /* src/css/workspace.css */
 
 /* This file will contain styles for the new pane and workspace management system. */
-/* For Phase 0, it will remain empty as no new UI is being introduced. */
+
+main {
+    display: flex;
+    flex: 1; /* Make the main area grow to fill available space */
+    flex-direction: column; /* Fallback for when it's not a grid */
+    overflow: hidden; /* Prevent scrollbars on the main container */
+}
+
+.pane-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+}
+
+.pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    outline: 1px solid transparent;
+    transition: outline-color 0.2s ease-in-out;
+}
+
+.pane.is-active-pane {
+    outline-color: var(--base-accent-action);
+}
+
+/* Make the CodeMirror editor instance grow to fill the pane */
+.pane .cm-editor {
+    flex: 1;
+    overflow: hidden; /* The editor's internal scroller will handle content overflow */
+}
+.cm-content {
+  padding-top: 0 !important;
+}
+
+/* Hide the inactive component within a pane */
+.pane.is-editor .media-viewer-container {
+    display: none;
+}
+
+.pane.is-media-preview .cm-editor,
+.pane.is-media-preview .token-status-bar {
+    display: none;
+}
+
+/* Style the media viewer to fill its pane and center its content */
+.pane.is-media-preview .media-viewer-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: auto;
+    background-color: var(--color-background-secondary);
+}
+
+.pane .media-viewer-container img,
+.pane .media-viewer-container video,
+.pane .media-viewer-container audio {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+
+.pane .token-status-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+}
+
+.pane-resizer {
+    background-color: var(--color-background-hover);
+    z-index: 100;
+}
+
+.pane-resizer-vertical {
+    width: 0.5rem;
+    cursor: col-resize;
+    height: 100%; /* <-- THIS IS THE FIX */
+}
+
+.pane-resizer-horizontal {
+    height: 0.5rem;
+    cursor: row-resize;
+    width: 100%; /* <-- Explicitly set width for consistency */
+}

@@ -19,7 +19,7 @@ const programmaticChange = Annotation.define();
 export class Editor {
   static editors = [];
 
-  constructor({ url, target = 'body main', editorConfig = {}, gitClient, commandPalette }) {
+  constructor({ url, target, editorConfig = {}, gitClient, commandPalette }) {
     if (!gitClient) throw new Error('Editor requires a gitClient instance.');
     if (!commandPalette) throw new Error('Editor requires a commandPalette instance.');
 
@@ -27,7 +27,7 @@ export class Editor {
       window.location.hash = '#home';
     }
     
-    this.targetSelector = target;
+    this.targetElement = typeof target === 'string' ? document.querySelector(target) : target;
     this.url = url || window.location.hash;
     this.editorConfig = editorConfig;
     this.gitClient = gitClient;
@@ -37,7 +37,6 @@ export class Editor {
     this.sidebar = null;
     this.filePath = this.getFilePath(this.url);
     this.isReady = false;
-    this.mainContainer = null;
     this.keymapService = null;
 
     this.languageCompartment = new Compartment();
@@ -52,23 +51,30 @@ export class Editor {
   }
 
   async init() {
-    this.mainContainer = document.querySelector(this.targetSelector);
-    if (!this.mainContainer) {
-      console.error(`Target container not found: ${this.targetSelector}`);
+    if (!this.targetElement) {
+      console.error(`Target container not found or provided.`);
       return;
     }
 
-    await this.gitClient.initRepo();
+    // Only the first editor initializes the sidebar.
+    if (!document.querySelector('#sidebar').hasChildNodes()) {
+      await this.gitClient.initRepo();
 
-    this.sidebar = new Sidebar({
-      target: '#sidebar',
-      gitClient: this.gitClient,
-      editor: this
-    });
-    await this.sidebar.init();
-    
-    initializeDragAndDrop(this.gitClient, this.sidebar);
-    
+      this.sidebar = new Sidebar({
+        target: '#sidebar',
+        gitClient: this.gitClient,
+        editor: this
+      });
+      await this.sidebar.init();
+      
+      initializeDragAndDrop(this.gitClient, this.sidebar);
+      const loadingIndicator = document.getElementById('loading-indicator');
+      if(loadingIndicator) loadingIndicator.remove();
+      document.querySelector('.main-content').style.display = 'flex';
+    } else {
+      this.sidebar = window.thoughtform.sidebar;
+    }
+
     const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
     const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
     const audioExtensions = ['mp3', 'wav', 'flac'];
@@ -80,13 +86,9 @@ export class Editor {
         initialContent = await this.loadFileContent(this.filePath);
     }
 
-    const loadingIndicator = document.getElementById('loading-indicator');
-    if(loadingIndicator) loadingIndicator.remove();
-    this.mainContainer.style.display = 'flex';
-
     this.mediaViewerElement = document.createElement('div');
     this.mediaViewerElement.className = 'media-viewer-container';
-    this.mainContainer.appendChild(this.mediaViewerElement);
+    this.targetElement.appendChild(this.mediaViewerElement);
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged && !update.transactions.some(t => t.annotation(programmaticChange))) {
@@ -119,7 +121,7 @@ export class Editor {
     this.editorView = new EditorView({
       doc: initialContent,
       extensions: extensions,
-      parent: this.mainContainer,
+      parent: this.targetElement,
     });
     
     this.keymapService.editorView = this.editorView;
@@ -127,6 +129,9 @@ export class Editor {
 
     Editor.editors.push(this);
     this.isReady = true;
+    
+    if (!window.thoughtform.sidebar) window.thoughtform.sidebar = this.sidebar;
+
     this.listenForNavigation();
     this.loadFile(this.filePath);
     this.editorView.focus();
@@ -208,13 +213,21 @@ export class Editor {
   }
 
   listenForNavigation() {
-    window.addEventListener('hashchange', async () => {
-      this.hideDiff();
-      const newFilePath = this.getFilePath(window.location.hash);
-      if (newFilePath && this.filePath !== newFilePath) {
-        await this.loadFile(newFilePath);
-      }
-    });
+    // Only the first editor instance should control the URL hash
+    if (Editor.editors.length === 1) {
+      window.addEventListener('hashchange', async () => {
+        // Notify all editors of the change
+        for (const editor of Editor.editors) {
+          if (editor === window.thoughtform.workspace.getActiveEditor()) {
+            editor.hideDiff();
+            const newFilePath = editor.getFilePath(window.location.hash);
+            if (newFilePath && editor.filePath !== newFilePath) {
+              await editor.loadFile(newFilePath);
+            }
+          }
+        }
+      });
+    }
   }
 
   async previewHistoricalFile(filepath, oid, parentOid) {
@@ -245,8 +258,12 @@ export class Editor {
     if (mediaExtensions.includes(extension)) {
       this.hideDiff();
       
-      this.mainContainer.classList.remove('is-editor');
-      this.mainContainer.classList.add('is-media-preview');
+      // --- THIS IS THE FIX ---
+      // Apply classes to the pane element, not the global main container
+      this.targetElement.classList.remove('is-editor');
+      this.targetElement.classList.add('is-media-preview');
+      // --- END OF FIX ---
+      
       this.mediaViewerElement.innerHTML = '<p>Loading media...</p>';
 
       const buffer = await this.gitClient.readFileAsBuffer(filepath);
@@ -275,16 +292,14 @@ export class Editor {
         
         this.mediaViewerElement.innerHTML = mediaElementHTML;
 
-        // --- THIS IS THE FIX (Part 1) ---
         const mediaElement = this.mediaViewerElement.querySelector('video, audio');
         if (mediaElement) {
             mediaElement.onerror = (e) => {
                 console.error("Media playback error:", e);
                 this.mediaViewerElement.innerHTML = `<p class="error">Error playing media. The file format or codec might not be supported by your browser.</p>`;
             };
-            mediaElement.load(); // Explicitly tell the element to load the new source
+            mediaElement.load();
         }
-        // --- END OF FIX ---
 
       } else {
         this.mediaViewerElement.innerHTML = `<p class="error">Could not load media: ${filepath}</p>`;
@@ -297,8 +312,11 @@ export class Editor {
       return;
     }
 
-    this.mainContainer.classList.remove('is-media-preview');
-    this.mainContainer.classList.add('is-editor');
+    // --- THIS IS THE FIX ---
+    // Apply classes to the pane element, not the global main container
+    this.targetElement.classList.remove('is-media-preview');
+    this.targetElement.classList.add('is-editor');
+    // --- END OF FIX ---
 
     if (this.currentMediaObjectUrl) {
       URL.revokeObjectURL(this.currentMediaObjectUrl);

@@ -89,43 +89,39 @@ async function main() {
     window.thoughtform.ui.toggleDevtools?.(true, 'console');
   };
 
+  // The editor instance is now created and managed by the WorkspaceManager.
+  // We keep a reference to it for components that are not yet fully refactored.
+  // This is a temporary shim.
+  const editorShim = { gitClient }; 
+  window.thoughtform.editor = editorShim;
+
   const commandPalette = new CommandPalette({ gitClient: null, editor: null });
   window.thoughtform.commandPalette = commandPalette;
 
-  // Now we can create the editor
-  const editor = new Editor({
-    target: 'main',
-    gitClient: gitClient,
-    commandPalette: commandPalette
-  });
-
-  // Attach the editor instance to the global object so other modules can access it.
-  // DEPRECATED: Use window.thoughtform.workspace.getActiveEditor() instead.
-  // We keep this for now for components that haven't been refactored yet.
+  // Render the initial workspace layout. This will create the first editor instance.
+  await window.thoughtform.workspace.render();
+  
+  const editor = window.thoughtform.workspace.getActiveEditor();
+  if (!editor) {
+      console.error("FATAL: Workspace manager failed to create an initial editor.");
+      return;
+  }
+  
+  // Update shims with the real editor instance
   window.thoughtform.editor = editor;
+  commandPalette.gitClient = editor.gitClient;
+  commandPalette.editor = editor;
 
-  // Register the single editor instance with the workspace manager.
-  window.thoughtform.workspace.registerEditor(editor);
-
-  const checkEditorReady = setInterval(() => {
-    if (editor.isReady) {
-      clearInterval(checkEditorReady);
-      
-      commandPalette.gitClient = gitClient; // TODO: Refactor to use workspace
-      commandPalette.editor = editor; // TODO: Refactor to use workspace
-
-      // Initialize the config service now that the editor is ready
-      window.thoughtform.config.initialize();
-
-      // Initialize and start the HookRunner
-      const hookRunner = new HookRunner(window.thoughtform.events);
-      hookRunner.initialize();
-      window.thoughtform.hooks = hookRunner;
-
-      // Publish the app:load event
-      window.thoughtform.events.publish('app:load');
-    }
-  }, 100);
+  // Initialize the config service now that the editor is ready
+  window.thoughtform.config.initialize();
+  
+  // Initialize and start the HookRunner
+  const hookRunner = new HookRunner(window.thoughtform.events);
+  hookRunner.initialize();
+  window.thoughtform.hooks = hookRunner;
+  
+  // Publish the app:load event
+  window.thoughtform.events.publish('app:load');
 }
 
 main();

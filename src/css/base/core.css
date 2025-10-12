@@ -54,8 +54,6 @@ main {
   align-items: center;
   background-color: var(--color-background-primary);
   flex-direction: column;
-  padding-bottom: 0.8rem;
-  padding-top: 0.4rem;
 }
 #loading-indicator {
   color: var(--color-text-primary);

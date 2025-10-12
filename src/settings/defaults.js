@@ -18,6 +18,8 @@ import defaultNewFileJs from './keymaps/new-file.js?raw';
 import defaultHookCreateJs from './hooks/create.js?raw';
 import defaultHookLoadJs from './hooks/load.js?raw';
 import defaultHookDeleteJs from './hooks/delete.js?raw';
+import defaultSplitVerticalJs from './keymaps/split-pane-vertical.js?raw';
+import defaultSplitHorizontalJs from './keymaps/split-pane-horizontal.js?raw';
 
 export const defaultFiles = [
   ['/interface.yml', defaultInterfaceYml],
@@ -31,6 +33,8 @@ export const defaultFiles = [
   ['/keymaps/browser-forward.js', defaultBrowserForwardJs],
   ['/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],
   ['/keymaps/new-file.js', defaultNewFileJs],
+  ['/keymaps/split-pane-vertical.js', defaultSplitVerticalJs],
+  ['/keymaps/split-pane-horizontal.js', defaultSplitHorizontalJs],
   ['/hooks/create.js', defaultHookCreateJs],
   ['/hooks/load.js', defaultHookLoadJs],
   ['/hooks/delete.js', defaultHookDeleteJs]

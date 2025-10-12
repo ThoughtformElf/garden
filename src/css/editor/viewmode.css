@@ -6,12 +6,12 @@
 */
 
 /* When in editor mode, the media viewer is hidden. */
-main.is-editor .media-viewer-container {
+.is-editor .media-viewer-container {
   display: none !important;
 }
 
 /* When in media preview mode, the CodeMirror editor is hidden. */
-main.is-media-preview .cm-editor {
+.is-media-preview .cm-editor {
   display: none !important;
 }
 

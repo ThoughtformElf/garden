@@ -19,14 +19,16 @@ const tokenCounterPlugin = ViewPlugin.fromClass(
       this.countElement.className = 'token-count';
       this.statusBar.appendChild(this.countElement);
 
-      // Append the status bar to the main editor container
-      const editorContainer = view.dom.closest('main');
-      if (editorContainer) {
-        editorContainer.appendChild(this.statusBar);
+      // --- THIS IS THE FIX ---
+      // Append the status bar to the editor's direct parent (the .pane element)
+      // instead of the global <main> container. This ensures each pane has its own
+      // status bar and doesn't interfere with the main grid layout.
+      if (view.dom.parentElement) {
+        view.dom.parentElement.appendChild(this.statusBar);
       } else {
-        // Fallback to appending after the editor if main isn't found
-        view.dom.parentNode.insertBefore(this.statusBar, view.dom.nextSibling);
+        console.error("Could not find a parent element for the editor view to attach the status bar.");
       }
+      // --- END OF FIX ---
       
       // Debounce the update function to avoid performance issues
       this.debouncedUpdate = debounce(this.updateTokenCount.bind(this), 250);
