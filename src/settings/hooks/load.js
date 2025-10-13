@@ -3,4 +3,4 @@
 // The 'event' variable is available in this script's scope.
 // For 'app:load', it is null.
 
-console.log('HOOK::', window.location.origin + '/Settings#hooks/load.js');
+console.log('HOOK::', window.location.origin + '/Settings#settings/hooks/load.js');

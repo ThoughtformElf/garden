@@ -1,53 +1,52 @@
 # Thoughtform.Garden Keymap Settings
 #
 # This file maps keyboard shortcuts to executable script files.
-# The 'run' path is relative to the garden where this file resides,
-# or can be a full path like 'Settings#keymaps/some-script.js'.
+# The 'run' path is the literal path from the root of the garden where this file resides.
 
 - key: "Mod-["
-  run: "keymaps/toggle-sidebar.js"
+  run: "settings/keymaps/toggle-sidebar.js"
 
 - key: "Mod-Enter"
-  run: "keymaps/navigate-or-prompt.js"
+  run: "settings/keymaps/navigate-or-prompt.js"
 
 - key: "Mod-`"
-  run: "keymaps/toggle-devtools.js"
+  run: "settings/keymaps/toggle-devtools.js"
 
 - key: "Mod-p"
-  run: "keymaps/search-files.js"
+  run: "settings/keymaps/search-files.js"
 
 - key: "Mod-Shift-p"
-  run: "keymaps/execute-command.js"
+  run: "settings/keymaps/execute-command.js"
 
 - key: "Mod-Shift-d"
-  run: "keymaps/duplicate-current-file.js"
+  run: "settings/keymaps/duplicate-current-file.js"
 
 - key: "Mod-Alt-n"
-  run: "keymaps/new-file.js"
+  run: "settings/keymaps/new-file.js"
 
 - key: "Alt-ArrowLeft"
-  run: "keymaps/browser-back.js"
+  run: "settings/keymaps/browser-back.js"
 
 - key: "Alt-ArrowRight"
-  run: "keymaps/browser-forward.js"
+  run: "settings/keymaps/browser-forward.js"
 
 - key: "Mod-\\"
-  run: "keymaps/split-pane-vertical.js"
+  run: "settings/keymaps/split-pane-vertical.js"
 
 - key: "Mod-Shift-\\"
-  run: "keymaps/split-pane-horizontal.js"
+  run: "settings/keymaps/split-pane-horizontal.js"
 
 - key: "Alt-Shift-ArrowRight"
-  run: "keymaps/select-next-pane.js"
+  run: "settings/keymaps/select-next-pane.js"
 
 - key: "Alt-Shift-ArrowLeft"
-  run: "keymaps/select-prev-pane.js"
+  run: "settings/keymaps/select-prev-pane.js"
 
 - key: "Alt-Shift-ArrowDown"
-  run: "keymaps/move-pane-down.js"
+  run: "settings/keymaps/move-pane-down.js"
 
 - key: "Alt-Shift-ArrowUp"
-  run: "keymaps/move-pane-up.js"
+  run: "settings/keymaps/move-pane-up.js"
 
 - key: "Alt-Shift-x"
-  run: "keymaps/close-pane.js"
+  run: "settings/keymaps/close-pane.js"

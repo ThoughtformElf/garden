@@ -270,9 +270,9 @@ export async function resetDefaultSettings(log) {
   const settingsGit = new Git('Settings');
   await settingsGit.initRepo();
 
-  // Also ensure the directories exist, making the function more robust.
-  await settingsGit.ensureDir('/keymaps');
-  await settingsGit.ensureDir('/hooks');
+  // THIS IS THE FIX: The incorrect, explicit directory creation calls have been removed.
+  // The writeFile method below is now the single source of truth for creating
+  // the correct directory structure (e.g., /settings/keymaps) as needed.
 
   for (const [path, content] of defaultFiles) {
     try {

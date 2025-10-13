@@ -33,11 +33,8 @@ function initializeNavigationListener() {
         gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
         gardenName = decodeURIComponent(gardenName);
 
-        // --- THIS IS THE FIX ---
-        // Use decodeURI for consistency with the encoding method.
         let filePath = (window.location.hash || '#/home').substring(1);
         filePath = decodeURI(filePath);
-        // --- END OF FIX ---
 
         // Tell the workspace to load this state into the active pane.
         await window.thoughtform.workspace.openFile(gardenName, filePath);
@@ -130,8 +127,6 @@ async function main() {
   window.thoughtform.editor = editor;
   commandPalette.gitClient = editor.gitClient;
   commandPalette.editor = editor;
-
-  window.thoughtform.config.initialize();
   
   const hookRunner = new HookRunner(window.thoughtform.events);
   hookRunner.initialize();

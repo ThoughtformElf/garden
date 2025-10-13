@@ -131,8 +131,6 @@ export const fileActions = {
         });
       });
       
-      // --- THIS IS THE FIX ---
-      // Intercept link clicks to use the new buffer system
       this.contentContainer.querySelectorAll('a[data-filepath]').forEach(link => {
           link.addEventListener('click', (e) => {
               e.preventDefault();
@@ -141,7 +139,6 @@ export const fileActions = {
               window.thoughtform.workspace.openFile(garden, path);
           });
       });
-      // --- END OF FIX ---
 
       let draggedElement = null;
       const self = this;
@@ -326,7 +323,8 @@ export const fileActions = {
 
     if (confirmed) {
       try {
-        window.thoughtform.events.publish('file:delete', { path: path, isDirectory: stat.isDirectory() });
+        // CORRECTED: Publish the gardenName with the event
+        window.thoughtform.events.publish('file:delete', { path: path, isDirectory: stat.isDirectory(), gardenName: gitClient.gardenName });
         await gitClient.rmrf(path);
         await this.refresh();
         // TODO: Close buffers in workspace manager if the file was open

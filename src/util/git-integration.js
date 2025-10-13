@@ -56,12 +56,13 @@ export class Git {
   
   async populateDefaultSettings() {
     console.log('[Git] Populating "Settings" garden with default files...');
-    await this.ensureDir('/keymaps');
-    await this.ensureDir('/hooks');
+    // The writeFile method now handles creating directories automatically,
+    // so explicit ensureDir calls here were redundant and a source of bugs.
+    // They have been removed for simplicity and correctness.
     
     for (const [path, content] of defaultFiles) {
       try {
-        await this.pfs.writeFile(path, content, 'utf8');
+        await this.writeFile(path, content, 'utf8');
       } catch (error) {
         console.error(`[Git] Failed to write default setting file: ${path}`, error);
       }
@@ -184,7 +185,7 @@ export class Git {
         const headStatus = statusEntry[1];
         if (headStatus === 0) {
             await this.pfs.unlink(filepath);
-            window.thoughtform.events.publish('file:delete', { path: filepath, isDirectory: false });
+            window.thoughtform.events.publish('file:delete', { path: filepath, isDirectory: false, gardenName: this.gardenName });
         } else {
             await git.checkout({ fs: this.fs, dir: '/', filepaths: [cleanPath], force: true });
         }
@@ -276,7 +277,10 @@ export class Git {
     try {
       return await this.pfs.readFile(absolutePath, 'utf8');
     } catch (e) {
-      return `// "${absolutePath.substring(1)}" does not exist yet, type anywhere to create it.`;
+        if (e.code === 'ENOENT') {
+            throw new Error(`File "${absolutePath.substring(1)}" does not exist.`);
+        }
+        throw e;
     }
   }
   

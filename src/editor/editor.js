@@ -114,20 +114,28 @@ export class Editor {
     Editor.editors.push(this);
     this.isReady = true;
 
-    this.loadFile(this.filePath);
+    await this.loadFile(this.filePath);
     this.editorView.focus();
-    this._applyUserSettings();
   }
 
   async _applyUserSettings() {
-    const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode');
+    // Pass `this` editor instance as the context for config resolution.
+    const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode', this);
+    
     if (editingMode === 'vim') {
       Vim.map('jj', '<Esc>', 'insert');
       this.editorView.dispatch({
         effects: this.vimCompartment.reconfigure(vim())
       });
+    } else {
+       this.editorView.dispatch({
+        effects: this.vimCompartment.reconfigure([])
+      });
     }
-    await this.keymapService.updateKeymaps();
+    
+    if (this.keymapService) {
+      await this.keymapService.updateKeymaps();
+    }
   }
 
   async navigateTo(linkContent) {
@@ -239,6 +247,7 @@ export class Editor {
       }
       this.filePath = filepath;
       if (this.sidebar) await this.sidebar.refresh();
+      await this._applyUserSettings();
       return;
     }
 
@@ -266,6 +275,7 @@ export class Editor {
     });
 
     if (this.sidebar) await this.sidebar.refresh();
+    await this._applyUserSettings();
     this.editorView.focus();
   }
   
@@ -299,7 +309,8 @@ export class Editor {
 
       try {
           await this.gitClient.writeFile(newPath, '');
-          window.thoughtform.events.publish('file:create', { path: newPath });
+          // CORRECTED: Publish the gardenName with the event
+          window.thoughtform.events.publish('file:create', { path: newPath, gardenName: this.gitClient.gardenName });
           window.thoughtform.workspace.openFile(this.gitClient.gardenName, newPath);
       } catch (writeError) {
           console.error('Error creating file:', writeError);

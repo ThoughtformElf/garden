@@ -38,15 +38,10 @@ export class WorkspaceManager {
   }
 
   async render() {
-    // --- THIS IS THE FIX ---
-    // Reset the main container's styles before every render to ensure
-    // that old grid layouts are cleared when we go back to a single pane.
     this.mainContainer.style.display = 'flex';
     this.mainContainer.style.gridTemplateColumns = '';
     this.mainContainer.style.gridTemplateRows = '';
-    // --- END OF FIX ---
 
-    // Before wiping the DOM, destroy old editor instances to prevent memory leaks
     this.panes.forEach(({ editor }) => {
         if (editor && editor.editorView) {
             editor.editorView.destroy();
@@ -170,7 +165,6 @@ export class WorkspaceManager {
       pane.element.classList.toggle('is-active-pane', id === paneId);
     });
     
-    // Focus the editor in the newly active pane
     const activePane = this.panes.get(paneId);
     activePane?.editor?.editorView.focus();
     
@@ -181,7 +175,7 @@ export class WorkspaceManager {
   async switchGarden(gardenName) {
     const editor = this.getActiveEditor();
     if (!editor || editor.gitClient.gardenName === gardenName) {
-      return; // Do nothing if no editor or already in the target garden
+      return;
     }
 
     console.log(`Switching garden to: "${gardenName}"`);
@@ -191,10 +185,10 @@ export class WorkspaceManager {
     // Update the editor's internal git client reference
     editor.gitClient = newGitClient;
     
-    // Update the sidebar's git client reference
     window.thoughtform.sidebar.gitClient = newGitClient;
 
-    // Reconfigure the editor's context state field with the new git client
+    // Reconfigure the editor's context with the new git client.
+    // This state change will be picked up by the KeymapService.
     editor.editorView.dispatch({
       effects: editor.appContextCompartment.reconfigure(appContextField.init(() => ({
         gitClient: newGitClient,
@@ -203,21 +197,21 @@ export class WorkspaceManager {
       })))
     });
 
-    // Re-apply settings from the new garden's context (e.g., vim mode, keymaps)
-    await editor._applyUserSettings();
-
-    // Set the active sidebar tab to 'Files' for the new garden
-    sessionStorage.setItem('sidebarActiveTab', 'Files');
-    
-    // Load the default file for the new garden. This will handle URL updates and
-    // sidebar file list rendering automatically via its internal calls.
+    // Load the default file, which will trigger the necessary settings/keymap update.
     await this.openFile(gardenName, '/home');
+    
+    // Explicitly set active tab after a garden switch.
+    if (window.thoughtform.sidebar) {
+        window.thoughtform.sidebar.activeTab = 'Files';
+        sessionStorage.setItem('sidebarActiveTab', 'Files');
+    }
+    // Final refresh to ensure everything is in sync.
+    await window.thoughtform.sidebar.refresh();
   }
   
   async splitPane(paneIdToSplit, direction) {
     let newPaneId = null; 
 
-    // Helper to generate unique scratchpad filenames
     const generateScratchpadPath = () => {
         const now = new Date();
         const year = String(now.getFullYear()).slice(-2);
@@ -234,10 +228,8 @@ export class WorkspaceManager {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
             newPaneId = `pane-${Date.now()}`;
             
-            // Get the current garden from the pane being split
             const currentGarden = node.buffers[node.activeBufferIndex].garden;
             
-            // Create a new leaf for the scratchpad
             const newLeaf = {
                 type: 'leaf',
                 id: newPaneId,
@@ -275,7 +267,8 @@ export class WorkspaceManager {
     if (!activePaneInfo) return;
     
     const { node, pane } = activePaneInfo;
-    
+    const editor = pane.editor;
+
     const existingBufferIndex = node.buffers.findIndex(b => b.garden === garden && b.path === path);
 
     if (existingBufferIndex !== -1) {
@@ -285,12 +278,28 @@ export class WorkspaceManager {
       node.activeBufferIndex = node.buffers.length - 1;
     }
 
-    const gitClient = await this.getGitClient(garden);
-    pane.editor.gitClient = gitClient;
-    await pane.editor.loadFile(path);
+    const newGitClient = await this.getGitClient(garden);
+    const hasGardenChanged = editor.gitClient.gardenName !== garden;
     
+    // Update the editor's git client if the garden has changed.
+    if (hasGardenChanged) {
+        editor.gitClient = newGitClient;
+        // Dispatch an update to the editor's context field. This is crucial for the
+        // KeymapService to see the change.
+        editor.editorView.dispatch({
+            effects: editor.appContextCompartment.reconfigure(appContextField.init(() => ({
+                gitClient: newGitClient,
+                sidebar: window.thoughtform.sidebar,
+                editor: editor,
+            })))
+        });
+    }
+
+    // `loadFile` will now internally call `_applyUserSettings`, which updates the keymaps.
+    await editor.loadFile(path);
+    
+    // Ensure the pane remains active and the URL is correct.
     this.setActivePane(this.activePaneId);
-    this._updateURL();
   }
 
   _updateURL() {

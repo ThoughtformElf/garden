@@ -5,7 +5,6 @@ import { parse } from 'yaml';
 // --- Vite Raw Imports for Hardcoded Defaults ---
 import defaultInterface from './settings/interface.yml?raw';
 import defaultKeymaps from './settings/keymaps.yml?raw';
-// We will add more here as we create more default hooks and configs.
 
 const hardcodedDefaults = {
   'interface.yml': parse(defaultInterface),
@@ -15,63 +14,81 @@ const hardcodedDefaults = {
 class ConfigService {
   constructor() {
     this.cache = new Map();
-    this.isInitialized = false;
-  }
-
-  async initialize() {
-    if (this.isInitialized) return;
-    
-    this.isInitialized = true;
   }
 
   /**
-   * Gets a configuration value and its source.
+   * Gets a configuration value, cascading through the correct context.
    * @param {string} file - The configuration file name (e.g., 'interface.yml').
    * @param {string} [key] - Optional specific key to retrieve from the file.
+   * @param {object|string} [context] - The context for the request, either an editor instance or a garden name string.
    * @returns {Promise<{value: any, sourceGarden: string|null}>} The configuration value and its source garden.
    */
-  async get(file, key) {
-    await this.initialize();
-
-    const currentGarden = window.thoughtform.editor?.gitClient.gardenName;
-    if (!currentGarden) return { value: this._getHardcoded(file, key), sourceGarden: null };
-
-    // 1. Frontmatter (To be implemented in a future phase)
-
-    // 2. Current Garden's settings/ folder
-    if (currentGarden !== 'Settings') {
-      const gardenSpecificPath = `settings/${file}`;
-      const { value: gardenValue, sourceGarden } = await this._readAndCache(currentGarden, gardenSpecificPath, key);
-      if (gardenValue !== undefined) return { value: gardenValue, sourceGarden };
+  async get(file, key, context) {
+    let gardenName;
+    if (typeof context === 'string') {
+      gardenName = context;
+    } else if (context && context.gitClient) {
+      gardenName = context.gitClient.gardenName;
+    } else {
+      const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
+      gardenName = activeGitClient.gardenName;
     }
 
-    // 3. Global Settings Garden
-    const { value: globalValue, sourceGarden: globalSource } = await this._readAndCache('Settings', file, key);
-    if (globalValue !== undefined) return { value: globalValue, sourceGarden: globalSource };
+    if (!gardenName) {
+      console.warn('[ConfigService] Could not determine a garden context for get(). Using hardcoded defaults.');
+      return { value: this._getHardcoded(file, key), sourceGarden: null };
+    }
+    
+    const settingsFilePath = `settings/${file}`;
 
-    // 4. Hardcoded Default
+    // 1. Current Garden's settings folder
+    const { value: gardenValue, sourceGarden } = await this._readAndCache(gardenName, settingsFilePath, key);
+    if (gardenValue !== undefined) return { value: gardenValue, sourceGarden };
+    
+    // 2. Global Settings Garden (if we didn't already check it)
+    if (gardenName !== 'Settings') {
+        const { value: globalValue, sourceGarden: globalSource } = await this._readAndCache('Settings', settingsFilePath, key);
+        if (globalValue !== undefined) return { value: globalValue, sourceGarden: globalSource };
+    }
+
+    // 3. Hardcoded Default
     return { value: this._getHardcoded(file, key), sourceGarden: null };
   }
   
-  async getHook(hookFileName) {
-    const currentGarden = window.thoughtform.editor.gitClient.gardenName;
-    const hookSubPath = `hooks/${hookFileName}`;
-
-    if (currentGarden !== 'Settings') {
-      const gardenSpecificPath = `settings/${hookSubPath}`;
-      const gardenGit = new Git(currentGarden);
-      try {
-        await gardenGit.pfs.stat(`/${gardenSpecificPath}`);
-        return `${currentGarden}#${gardenSpecificPath}`;
-      } catch (e) { /* File does not exist, continue */ }
+  /**
+   * Gets the correct, cascaded path for a hook script.
+   * @param {string} hookFileName - The name of the hook file (e.g., 'create.js').
+   * @param {object|string} [context] - The context for the request.
+   * @returns {Promise<string|null>} The full, runnable path (e.g., 'MyGarden#settings/hooks/create.js') or null.
+   */
+  async getHook(hookFileName, context) {
+    let gardenName;
+    if (typeof context === 'string') {
+      gardenName = context;
+    } else if (context && context.gitClient) {
+      gardenName = context.gitClient.gardenName;
+    } else {
+      const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
+      gardenName = activeGitClient.gardenName;
     }
 
-    const globalPath = hookSubPath;
-    const settingsGit = new Git('Settings');
+    const hookPath = `settings/hooks/${hookFileName}`;
+
+    // 1. Check the context garden's settings
+    const gardenGit = new Git(gardenName);
     try {
-      await settingsGit.pfs.stat(`/${globalPath}`);
-      return `Settings#${globalPath}`;
-    } catch (e) { /* File does not exist */ }
+      await gardenGit.pfs.stat(`/${hookPath}`);
+      return `${gardenName}#${hookPath}`;
+    } catch (e) { /* File does not exist, continue */ }
+    
+    // 2. Check the global Settings garden (if different)
+    if (gardenName !== 'Settings') {
+        const settingsGit = new Git('Settings');
+        try {
+          await settingsGit.pfs.stat(`/${hookPath}`);
+          return `Settings#${hookPath}`;
+        } catch (e) { /* File does not exist */ }
+    }
 
     return null;
   }
@@ -102,7 +119,6 @@ class ConfigService {
       return { value, sourceGarden: gardenName };
 
     } catch (e) {
-      console.warn(`[ConfigService] Could not read or parse ${cacheKey}.`, e);
       this.cache.set(cacheKey, null);
       return { value: undefined, sourceGarden: null };
     }
@@ -114,7 +130,8 @@ class ConfigService {
   }
 
   invalidate(gardenName, filePath) {
-    const cacheKey = `${gardenName}#/${filePath}`;
+    const fullPath = filePath.startsWith('/') ? filePath : `/${filePath}`;
+    const cacheKey = `${gardenName}#${fullPath}`;
     this.cache.delete(cacheKey);
   }
 }
