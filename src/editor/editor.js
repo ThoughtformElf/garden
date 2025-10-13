@@ -119,7 +119,6 @@ export class Editor {
   }
 
   async _applyUserSettings() {
-    // Pass `this` editor instance as the context for config resolution.
     const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode', this);
     
     if (editingMode === 'vim') {
@@ -163,7 +162,17 @@ export class Editor {
       const rawContent = await this.gitClient.readFile(filepath);
       return rawContent;
     } catch (e) {
-      console.warn(`Could not read file ${filepath}, starting with empty content.`, e);
+      // THIS IS THE FIX:
+      // We check if the error is the specific "file not found" error.
+      // If it is, we suppress the console warning because this is expected behavior for new files.
+      // If it's any other error, we still log it because it might be an actual problem.
+      if (e.message && e.message.includes('does not exist')) {
+        // This is the expected case for a new file. Do nothing, just return the placeholder.
+      } else {
+        // This is an unexpected error. Log it for debugging purposes.
+        console.warn(`An unexpected error occurred while reading ${filepath}:`, e);
+      }
+      // For both expected and unexpected errors, we show the user a helpful placeholder.
       return `// "${filepath.substring(1)}" does not exist. Start typing to create it.`;
     }
   }
@@ -309,7 +318,6 @@ export class Editor {
 
       try {
           await this.gitClient.writeFile(newPath, '');
-          // CORRECTED: Publish the gardenName with the event
           window.thoughtform.events.publish('file:create', { path: newPath, gardenName: this.gitClient.gardenName });
           window.thoughtform.workspace.openFile(this.gitClient.gardenName, newPath);
       } catch (writeError) {
