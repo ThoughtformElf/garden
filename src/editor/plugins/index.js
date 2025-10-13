@@ -8,7 +8,8 @@ import { blockquotePlugin } from './blockquotes.js';
 import { rulerPlugin } from './ruler.js';
 import { embedPlugin } from './embeds.js';
 import { responseWrapperPlugin } from './response-wrapper.js';
-import { promptWrapperPlugin } from './prompt-wrapper.js'; // I am adding the new plugin here
+import { promptWrapperPlugin } from './prompt-wrapper.js';
+import { titleHeadingPlugin } from './title-headings.js'; // I am adding the new plugin here
 
 // Combine all custom plugins into a single array for export.
 export const allHighlightPlugins = [
@@ -21,5 +22,6 @@ export const allHighlightPlugins = [
   rulerPlugin,
   embedPlugin,
   responseWrapperPlugin,
-  promptWrapperPlugin, // And including it in the exported array
+  promptWrapperPlugin,
+  titleHeadingPlugin, // And including it in the exported array
 ];

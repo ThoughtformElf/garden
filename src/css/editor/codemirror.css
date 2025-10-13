@@ -140,3 +140,21 @@ html body .cm-activeLineGutter {
 .cm-activeLine.cm-prompt-wrapper > .cm-string {
   color: var(--base-white);
 }
+
+.cm-title-heading-word {
+  font-family: 'HaulageCommercial-Striped';
+  font-size: 2.5rem;
+}
+
+.cm-title-heading-word {
+  display: inline-block;
+  background: linear-gradient(to bottom, var(--base-white) 55%, var(--base-accent-action) 50%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.cm-title-heading-punctuation, .cm-title-heading-uppercase {
+  color: var(--secondary);
+  background: linear-gradient(to bottom, var(--base-accent-destructive) 55%, var(--base-accent-action) 50%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;  
+}
