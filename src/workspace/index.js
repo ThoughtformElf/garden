@@ -178,13 +178,40 @@ export class WorkspaceManager {
   }
   
   async splitPane(paneIdToSplit, direction) {
-    let newPaneId = null; 
+    let newPaneId = null;
+
+    // Helper to generate unique scratchpad filenames
+    const generateScratchpadPath = () => {
+        const now = new Date();
+        const year = String(now.getFullYear()).slice(-2);
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const randomKey = Math.random().toString(36).substring(2, 6);
+        const timestamp = `${year}${month}${day}-${hours}${minutes}`;
+        return `/scratchpad/${timestamp}-${randomKey}.md`;
+    };
 
     const findAndSplit = (node) => {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
-            newPaneId = `pane-${Date.now()}`; 
-            const newLeaf = JSON.parse(JSON.stringify(node)); 
-            newLeaf.id = newPaneId;
+            newPaneId = `pane-${Date.now()}`;
+            
+            // Get the current garden from the pane being split
+            const currentGarden = node.buffers[node.activeBufferIndex].garden;
+            
+            // Create a new leaf for the scratchpad
+            const newLeaf = {
+                type: 'leaf',
+                id: newPaneId,
+                activeBufferIndex: 0,
+                buffers: [
+                    {
+                        garden: currentGarden,
+                        path: generateScratchpadPath()
+                    }
+                ]
+            };
             
             return {
                 type: `split-${direction}`,
