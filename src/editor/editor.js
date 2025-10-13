@@ -115,7 +115,11 @@ export class Editor {
     this.isReady = true;
 
     await this.loadFile(this.filePath);
-    this.editorView.focus();
+    
+    // THIS IS THE FIX (Part 1):
+    // The focus command is removed from here. The WorkspaceManager is now the
+    // single source of truth for which pane should be focused.
+    // this.editorView.focus(); 
   }
 
   async _applyUserSettings() {
@@ -162,17 +166,11 @@ export class Editor {
       const rawContent = await this.gitClient.readFile(filepath);
       return rawContent;
     } catch (e) {
-      // THIS IS THE FIX:
-      // We check if the error is the specific "file not found" error.
-      // If it is, we suppress the console warning because this is expected behavior for new files.
-      // If it's any other error, we still log it because it might be an actual problem.
       if (e.message && e.message.includes('does not exist')) {
         // This is the expected case for a new file. Do nothing, just return the placeholder.
       } else {
-        // This is an unexpected error. Log it for debugging purposes.
         console.warn(`An unexpected error occurred while reading ${filepath}:`, e);
       }
-      // For both expected and unexpected errors, we show the user a helpful placeholder.
       return `// "${filepath.substring(1)}" does not exist. Start typing to create it.`;
     }
   }
@@ -285,7 +283,6 @@ export class Editor {
 
     if (this.sidebar) await this.sidebar.refresh();
     await this._applyUserSettings();
-    this.editorView.focus();
   }
   
   async forceReloadFile(filepath) {
@@ -325,7 +322,7 @@ export class Editor {
           await this.sidebar.showAlert({ title: 'Error', message: `Could not create file: ${writeError.message}` });
       }
     } finally {
-      this.editorView.focus();
+      // this.editorView.focus(); // Don't focus here, let the workspace manager do it.
     }
   }
 
@@ -360,7 +357,7 @@ export class Editor {
           await this.sidebar.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
         }
     } finally {
-        this.editorView.focus();
+        // this.editorView.focus(); // Don't focus here
     }
   }
 

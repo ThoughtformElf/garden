@@ -166,7 +166,14 @@ export class WorkspaceManager {
     });
     
     const activePane = this.panes.get(paneId);
-    activePane?.editor?.editorView.focus();
+
+    // THIS IS THE FIX (Part 2):
+    // The timeout is increased to 50ms. This gives the browser's event loop
+    // ample time to finish rendering, applying styles, and processing other
+    // queued tasks before we issue the final, authoritative focus command.
+    setTimeout(() => {
+      activePane?.editor?.editorView.focus();
+    }, 50);
     
     this._updateURL();
     window.thoughtform.sidebar?.refresh();
@@ -182,13 +189,10 @@ export class WorkspaceManager {
 
     const newGitClient = await this.getGitClient(gardenName);
     
-    // Update the editor's internal git client reference
     editor.gitClient = newGitClient;
     
     window.thoughtform.sidebar.gitClient = newGitClient;
 
-    // Reconfigure the editor's context with the new git client.
-    // This state change will be picked up by the KeymapService.
     editor.editorView.dispatch({
       effects: editor.appContextCompartment.reconfigure(appContextField.init(() => ({
         gitClient: newGitClient,
@@ -197,15 +201,12 @@ export class WorkspaceManager {
       })))
     });
 
-    // Load the default file, which will trigger the necessary settings/keymap update.
     await this.openFile(gardenName, '/home');
     
-    // Explicitly set active tab after a garden switch.
     if (window.thoughtform.sidebar) {
         window.thoughtform.sidebar.activeTab = 'Files';
         sessionStorage.setItem('sidebarActiveTab', 'Files');
     }
-    // Final refresh to ensure everything is in sync.
     await window.thoughtform.sidebar.refresh();
   }
   
@@ -281,11 +282,8 @@ export class WorkspaceManager {
     const newGitClient = await this.getGitClient(garden);
     const hasGardenChanged = editor.gitClient.gardenName !== garden;
     
-    // Update the editor's git client if the garden has changed.
     if (hasGardenChanged) {
         editor.gitClient = newGitClient;
-        // Dispatch an update to the editor's context field. This is crucial for the
-        // KeymapService to see the change.
         editor.editorView.dispatch({
             effects: editor.appContextCompartment.reconfigure(appContextField.init(() => ({
                 gitClient: newGitClient,
@@ -295,10 +293,8 @@ export class WorkspaceManager {
         });
     }
 
-    // `loadFile` will now internally call `_applyUserSettings`, which updates the keymaps.
     await editor.loadFile(path);
     
-    // Ensure the pane remains active and the URL is correct.
     this.setActivePane(this.activePaneId);
   }
 
