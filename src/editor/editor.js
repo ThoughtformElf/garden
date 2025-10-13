@@ -36,6 +36,7 @@ export class Editor {
 
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();
+    this.appContextCompartment = new Compartment();
     this.mediaViewerElement = null;
     this.currentMediaObjectUrl = null;
 
@@ -95,6 +96,7 @@ export class Editor {
       dynamicKeymapExtension,
       vimCompartment: this.vimCompartment,
       languageCompartment: this.languageCompartment,
+      appContextCompartment: this.appContextCompartment,
       updateListener,
       filePath: this.filePath,
       getLanguageExtension,
@@ -356,5 +358,3 @@ export class Editor {
     return filepath;
   }
 }
-
-window.Editor = Editor;

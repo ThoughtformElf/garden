@@ -1,5 +1,6 @@
 import { Editor } from '../editor/editor.js';
 import { Git } from '../util/git-integration.js';
+import { appContextField } from '../editor/navigation.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,
@@ -176,9 +177,45 @@ export class WorkspaceManager {
     this._updateURL();
     window.thoughtform.sidebar?.refresh();
   }
+
+  async switchGarden(gardenName) {
+    const editor = this.getActiveEditor();
+    if (!editor || editor.gitClient.gardenName === gardenName) {
+      return; // Do nothing if no editor or already in the target garden
+    }
+
+    console.log(`Switching garden to: "${gardenName}"`);
+
+    const newGitClient = await this.getGitClient(gardenName);
+    
+    // Update the editor's internal git client reference
+    editor.gitClient = newGitClient;
+    
+    // Update the sidebar's git client reference
+    window.thoughtform.sidebar.gitClient = newGitClient;
+
+    // Reconfigure the editor's context state field with the new git client
+    editor.editorView.dispatch({
+      effects: editor.appContextCompartment.reconfigure(appContextField.init(() => ({
+        gitClient: newGitClient,
+        sidebar: window.thoughtform.sidebar,
+        editor: editor,
+      })))
+    });
+
+    // Re-apply settings from the new garden's context (e.g., vim mode, keymaps)
+    await editor._applyUserSettings();
+
+    // Set the active sidebar tab to 'Files' for the new garden
+    sessionStorage.setItem('sidebarActiveTab', 'Files');
+    
+    // Load the default file for the new garden. This will handle URL updates and
+    // sidebar file list rendering automatically via its internal calls.
+    await this.openFile(gardenName, '/home');
+  }
   
   async splitPane(paneIdToSplit, direction) {
-    let newPaneId = null;
+    let newPaneId = null; 
 
     // Helper to generate unique scratchpad filenames
     const generateScratchpadPath = () => {
@@ -190,7 +227,7 @@ export class WorkspaceManager {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const randomKey = Math.random().toString(36).substring(2, 6);
         const timestamp = `${year}${month}${day}-${hours}${minutes}`;
-        return `/scratchpad/${timestamp}-${randomKey}.md`;
+        return `/scratchpad/${timestamp}.md`;
     };
 
     const findAndSplit = (node) => {

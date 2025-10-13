@@ -33,8 +33,11 @@ export const gardenActions = {
       
       this.contentContainer.querySelectorAll('[data-garden-name]').forEach(link => {
           link.addEventListener('click', (e) => {
-              if (this.gitClient.gardenName !== e.target.dataset.gardenName) {
-                  sessionStorage.setItem('sidebarActiveTab', 'Files');
+              e.preventDefault();
+              const gardenName = e.target.dataset.gardenName;
+              // Ensure we don't do anything if clicking the already active garden
+              if (window.thoughtform.workspace.getActiveGitClient().gardenName !== gardenName) {
+                  window.thoughtform.workspace.switchGarden(gardenName);
               }
           });
       });
@@ -59,8 +62,8 @@ export const gardenActions = {
       return;
     }
     
-    sessionStorage.setItem('sidebarActiveTab', 'Files');
-    window.location.pathname = `/${encodeURIComponent(newName)}`;
+    // Switch to the new garden without reloading
+    await window.thoughtform.workspace.switchGarden(newName);
   },
 
   async handleDuplicateGarden(sourceName) {
@@ -95,11 +98,10 @@ export const gardenActions = {
           await destGit.writeFile(file, content);
         }
         
-        sessionStorage.setItem('sidebarActiveTab', 'Files');
-        this.contentContainer.innerHTML = `<p class="sidebar-info">Duplication complete. Redirecting...</p>`;
+        this.contentContainer.innerHTML = `<p class="sidebar-info">Duplication complete. Switching...</p>`;
         
-        setTimeout(() => {
-          window.location.replace(`/${encodeURIComponent(newName)}`);
+        setTimeout(async () => {
+          await window.thoughtform.workspace.switchGarden(newName);
         }, 500);
 
       } catch(e) {
@@ -147,8 +149,7 @@ export const gardenActions = {
       });
 
       if (this.gitClient.gardenName === name) {
-        sessionStorage.setItem('sidebarActiveTab', 'Files');
-        window.location.pathname = '/home';
+        await window.thoughtform.workspace.switchGarden('home');
       } else {
         await this.refresh();
       }

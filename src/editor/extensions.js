@@ -20,6 +20,7 @@ import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'
  * @param {object} options.dynamicKeymapExtension - The keymap compartment.
  * @param {object} options.vimCompartment - The vim compartment.
  * @param {object} options.languageCompartment - The language compartment.
+ * @param {object} options.appContextCompartment - The app context compartment.
  * @param {Function} options.updateListener - The update listener.
  * @param {string} options.filePath - The initial file path.
  * @param {Function} options.getLanguageExtension - The function to get language extensions.
@@ -30,12 +31,13 @@ export function createEditorExtensions({
   dynamicKeymapExtension,
   vimCompartment,
   languageCompartment,
+  appContextCompartment,
   updateListener,
   filePath,
   getLanguageExtension,
 }) {
   return [
-    appContext,
+    appContextCompartment.of(appContext),
     dynamicKeymapExtension,
     vimCompartment.of([]),
     keymap.of([indentWithTab]),

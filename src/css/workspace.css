@@ -24,13 +24,13 @@ main {
     flex-direction: column;
     position: relative;
     overflow: hidden;
-    outline: 1px solid transparent;
-    transition: outline-color 0.2s ease-in-out;
     width: 100%; /* <-- THIS IS THE FIX */
+    border: 0.25rem solid var(--base-interactive);
+    box-sizing: border-box;
 }
 
 .pane.is-active-pane {
-    outline-color: var(--base-accent-action);
+    border: 0.25rem solid var(--base-accent-destructive);
 }
 
 /* Make the CodeMirror editor instance grow to fill the pane */
@@ -84,10 +84,9 @@ main {
     justify-content: space-between;
     align-items: center;
     padding: 0.2rem 0.8rem;
-    background-color: var(--color-background-secondary);
     border-top: 1px solid var(--color-border);
-    font-size: 0.8rem;
-    color: var(--color-text-secondary);
+    font-size: 1rem;
+    color: var(--base-accent-action);
 }
 /* --- END OF NEW STYLES --- */
 
