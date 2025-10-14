@@ -177,6 +177,8 @@ export class Editor {
   }
 
   // --- API Methods (Delegating to helper classes) ---
+
+  getFilePath(hash) { return this._files.getFilePath(hash); }
   loadFileContent(filepath) { return this._files.loadFileContent(filepath); }
   loadFile(filepath) { return this._files.loadFile(filepath); }
   forceReloadFile(filepath) { return this._files.forceReloadFile(filepath); }

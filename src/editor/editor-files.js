@@ -11,6 +11,18 @@ export class EditorFiles {
   }
 
   /**
+   * Parses a URL hash to determine a valid file path string.
+   * @param {string} hash - The URL hash (e.g., '#/path/to/file').
+   * @returns {string} A normalized file path.
+   */
+  getFilePath(hash) {
+    let filepath = hash.startsWith('#') ? hash.substring(1) : hash;
+    filepath = decodeURIComponent(filepath);
+    if (!filepath) filepath = 'home';
+    return filepath;
+  }
+
+  /**
    * Reads the content of a file from the git file system.
    * @param {string} filepath - The path to the file.
    * @returns {Promise<string>} The file content.
