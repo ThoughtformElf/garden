@@ -1,8 +1,7 @@
-// src/sidebar/sidebar.js
 import { ContextMenu } from '../util/context-menu.js';
 import { fileActions } from './files.js';
 import { gardenActions } from './gardens.js';
-import { gitActions } from './git.js';
+import { gitActions } from './git/index.js';
 import { Modal } from '../util/modal.js';
 
 export class Sidebar {

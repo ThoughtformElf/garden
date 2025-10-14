@@ -1,8 +1,8 @@
 // src/devtools/devtools.js
 import eruda from 'eruda';
 import { Sync } from './sync/index.js';
-import { addDataTool } from './data-tool.js';
-import { addAiTool } from './ai-tool.js';
+import { addDataTool } from './data/index.js';
+import { addAiTool } from './ai.js';
 
 export function initializeDevTools() {
   const el = document.getElementById('eruda-container');

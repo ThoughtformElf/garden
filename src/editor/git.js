@@ -1,4 +1,3 @@
-// src/editor/editor-git.js
 import { diffCompartment, createDiffExtension } from './diff.js';
 
 /**

@@ -1,5 +1,4 @@
-// src/index.js
-import './util/passive-events.js'; // Apply passive event listener patch globally
+import './util/passive-events.js';
 
 import { Buffer } from 'buffer';
 window.Buffer = Buffer;
@@ -13,7 +12,7 @@ import { CommandPalette } from './util/command-palette.js';
 import { runMigration } from './util/migration.js';
 import { initializeAiService } from './ai/index.js';
 import { initializeConfigService } from './config.js';
-import { initializeEventBus } from './workspace/events.js';
+import { initializeEventBus } from './workspace/manager/events.js';
 import { HookRunner } from './workspace/hooks.js';
 import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';

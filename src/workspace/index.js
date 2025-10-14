@@ -1,9 +1,8 @@
-// src/workspace/index.js
 import { Git } from '../util/git-integration.js';
 import { appContextField } from '../editor/navigation.js';
 import { WorkspaceRenderer } from './renderer.js';
-import { PaneManager } from './pane-manager.js';
-import { WorkspaceStateManager } from './state-manager.js';
+import { PaneManager } from './manager/pane.js';
+import { WorkspaceStateManager } from './manager/state.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,

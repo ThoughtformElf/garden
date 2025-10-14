@@ -12,9 +12,9 @@ import { KeymapService } from '../workspace/keymaps.js';
 import { createEditorExtensions } from './extensions.js';
 
 // Import the new action handlers
-import { EditorFiles } from './editor-files.js';
-import { EditorGit } from './editor-git.js';
-import { EditorState } from './editor-state.js';
+import { EditorFiles } from './files.js';
+import { EditorGit } from './git.js';
+import { EditorState } from './state.js';
 
 export class Editor {
   static editors = [];

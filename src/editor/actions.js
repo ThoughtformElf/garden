@@ -1,7 +1,6 @@
-// src/editor/editor-actions.js
-import { EditorState } from './editor-state.js';
-import { EditorGit } from './editor-git.js';
-import { EditorFiles } from './editor-files.js';
+import { EditorState } from './state.js';
+import { EditorGit } from './git.js';
+import { EditorFiles } from './files.js';
 
 /**
  * A composite class that groups all editor-related actions.

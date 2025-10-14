@@ -1,6 +1,5 @@
-// src/devtools/data-tool.js
 import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens, resetDefaultSettings } from './data.js';
-import { Modal } from '../util/modal.js';
+import { Modal } from '../../util/modal.js';
 
 function createSelectionUI(title, items, allChecked = true) {
   const itemCheckboxes = items.map(item => `

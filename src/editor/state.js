@@ -1,5 +1,3 @@
-// src/editor/editor-state.js
-
 /**
  * Manages getting and restoring the state of an editor pane,
  * including selection and scroll position.

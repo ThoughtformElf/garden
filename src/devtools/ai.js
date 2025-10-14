@@ -1,5 +1,3 @@
-// src/devtools/ai-tool.js
-
 class AiTool {
   constructor(eruda) {
     this.eruda = eruda;

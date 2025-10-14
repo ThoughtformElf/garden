@@ -1,5 +1,3 @@
-// src/workspace/pane-manager.js
-
 export class PaneManager {
   constructor(workspace) {
     this.workspace = workspace;

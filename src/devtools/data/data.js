@@ -1,8 +1,7 @@
-// src/devtools/data.js
 import JSZip from 'jszip';
-import { Git } from '../util/git-integration.js';
-import { Modal } from '../util/modal.js';
-import { defaultFiles } from '../settings/defaults.js';
+import { Git } from '../../util/git-integration.js';
+import { Modal } from '../../util/modal.js';
+import { defaultFiles } from '../../settings/defaults.js';
 
 async function listAllFiles(gitClient, dir) {
   const pfs = gitClient.pfs;

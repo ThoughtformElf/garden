@@ -1,6 +1,5 @@
-// src/sidebar/git.js
-import { GitUI } from './git-ui.js';
-import { GitEvents } from './git-events.js';
+import { GitUI } from './ui.js';
+import { GitEvents } from './events.js';
 
 export const gitActions = {
   async renderGitView() {

@@ -1,5 +1,3 @@
-// src/workspace/state-manager.js
-
 export class WorkspaceStateManager {
   constructor(workspace) {
     this.workspace = workspace;

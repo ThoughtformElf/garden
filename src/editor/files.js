@@ -1,4 +1,3 @@
-// src/editor/editor-files.js
 import { Modal } from '../util/modal.js';
 import { getLanguageExtension } from './languages.js';
 

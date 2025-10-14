@@ -1,5 +1,3 @@
-// src/sidebar/git-ui.js
-
 export class GitUI {
   constructor(sidebarContext) {
     this.sidebar = sidebarContext;

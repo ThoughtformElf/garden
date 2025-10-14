@@ -1,5 +1,3 @@
-// src/sidebar/git-events.js
-
 export class GitEvents {
   constructor(sidebarContext) {
     this.sidebar = sidebarContext;
