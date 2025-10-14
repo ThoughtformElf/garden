@@ -16,6 +16,10 @@ export class WorkspaceManager {
     this.isResizing = false;
     this.gitClients = new Map(); // Cache for Git clients
     this.gitClients.set(initialGitClient.gardenName, initialGitClient);
+    
+    // --- Broadcast Channel for cross-context sync ---
+    this.broadcastChannel = new BroadcastChannel('thoughtform_garden_sync');
+    this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
   }
 
   createInitialPaneTree() {
@@ -68,7 +72,8 @@ export class WorkspaceManager {
         target: paneElement,
         gitClient: gitClient,
         commandPalette: window.thoughtform.commandPalette,
-        initialFile: activeBuffer.path
+        initialFile: activeBuffer.path,
+        paneId: node.id // Pass the paneId to the editor
       });
       
       await new Promise(resolve => {
@@ -445,6 +450,55 @@ export class WorkspaceManager {
     if (!info) return this.initialGitClient;
     const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
     return await this.getGitClient(activeBuffer.garden);
+  }
+  
+  /**
+   * Central handler to notify all relevant contexts of a file update.
+   * This handles both intra-tab (panes) and inter-tab (broadcast) updates.
+   * @param {string} gardenName - The garden of the updated file.
+   * @param {string} filePath - The path of the updated file.
+   * @param {string} sourcePaneId - The ID of the pane that initiated the change.
+   */
+  async notifyFileUpdate(gardenName, filePath, sourcePaneId) {
+    // 1. Broadcast to other tabs/windows. They won't receive their own message.
+    this.broadcastChannel.postMessage({
+        type: 'file_updated',
+        gardenName,
+        filePath,
+        sourcePaneId
+    });
+
+    // 2. Manually notify other panes within THIS tab.
+    for (const [paneId, pane] of this.panes.entries()) {
+        if (paneId === sourcePaneId) {
+            continue; // Don't reload the pane that triggered the save
+        }
+        const editor = pane.editor;
+        if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
+            console.log(`[Internal Sync] Reloading ${gardenName}#${filePath} in pane ${paneId}.`);
+            await editor.forceReloadFile(filePath);
+        }
+    }
+  }
+
+  /**
+   * Handles incoming messages from other browser contexts (tabs/panes).
+   * @param {MessageEvent} event - The event from the BroadcastChannel.
+   */
+  async handleBroadcastMessage(event) {
+    const { type, gardenName, filePath, sourcePaneId } = event.data;
+    if (type === 'file_updated') {
+        // Iterate over all panes managed by this workspace
+        for (const [paneId, pane] of this.panes.entries()) {
+            // Because this message is from another tab, we don't need to check the sourcePaneId.
+            // Any pane in this tab is a valid target for an update.
+            const editor = pane.editor;
+            if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
+                console.log(`[Broadcast] Reloading ${gardenName}#${filePath} in pane ${paneId} due to external change.`);
+                await editor.forceReloadFile(filePath);
+            }
+        }
+    }
   }
 }
 

@@ -19,7 +19,7 @@ const programmaticChange = Annotation.define();
 export class Editor {
   static editors = [];
 
-  constructor({ target, editorConfig = {}, gitClient, commandPalette, initialFile }) {
+  constructor({ target, editorConfig = {}, gitClient, commandPalette, initialFile, paneId }) {
     if (!gitClient) throw new Error('Editor requires a gitClient instance.');
     if (!commandPalette) throw new Error('Editor requires a commandPalette instance.');
 
@@ -27,6 +27,7 @@ export class Editor {
     this.editorConfig = editorConfig;
     this.gitClient = gitClient;
     this.commandPalette = commandPalette;
+    this.paneId = paneId;
     
     this.editorView = null;
     this.sidebar = null;
@@ -364,6 +365,8 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     await this.gitClient.writeFile(this.filePath, newContent);
+    // After writing, broadcast the change.
+    window.thoughtform.workspace.notifyFileUpdate(this.gitClient.gardenName, this.filePath, this.paneId);
     if (this.sidebar) await this.sidebar.refresh();
   }
 
