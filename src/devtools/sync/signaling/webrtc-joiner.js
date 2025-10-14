@@ -1,4 +1,3 @@
-// src/devtools/sync/signaling/webrtc-joiner.js
 import debug from '../../../util/debug.js';
 
 export class WebRtcJoiner {

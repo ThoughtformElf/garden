@@ -1,4 +1,3 @@
-// src/ai/index.js
 import { streamChatCompletion as streamGemini } from './models/gemini.js';
 import { Agent } from '../agent/index.js'; // Import the new Agent class
 

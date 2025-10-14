@@ -1,4 +1,3 @@
-// src/editor/extensions.js
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, highlightActiveLine } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { history, historyKeymap, indentWithTab } from '@codemirror/commands';

@@ -1,4 +1,3 @@
-// src/sidebar/gardens.js
 import { Git } from '../util/git-integration.js';
 import { Modal } from '../util/modal.js';
 

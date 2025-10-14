@@ -1,4 +1,3 @@
-// src/config.js
 import { Git } from './util/git-integration.js';
 import { parse } from 'yaml';
 

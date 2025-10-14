@@ -1,4 +1,3 @@
-// src/editor/status-bar.js
 import { ViewPlugin } from '@codemirror/view';
 import { Compartment } from '@codemirror/state';
 import { countTokens } from 'gpt-tokenizer';

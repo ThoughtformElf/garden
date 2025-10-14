@@ -1,4 +1,3 @@
-// src/devtools/sync/files/data-channel.js
 import debug from '../../../util/debug.js';
 
 export class DataChannelHandler {

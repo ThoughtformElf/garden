@@ -1,4 +1,3 @@
-// src/editor/navigation.js
 import { StateField } from '@codemirror/state';
 
 /**

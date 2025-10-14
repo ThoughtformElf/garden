@@ -1,4 +1,3 @@
-// src/util/migration.js
 import { Git } from './git-integration.js';
 
 /**

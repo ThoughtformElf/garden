@@ -1,4 +1,3 @@
-// src/devtools/sync/files/sync-actions.js
 import { Modal } from '../../../util/modal.js';
 import debug from '../../../util/debug.js';
 import { FileOperations } from './operations.js';

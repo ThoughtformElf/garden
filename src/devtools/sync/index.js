@@ -1,4 +1,3 @@
-// src/devtools/sync/index.js
 import { SyncSignaling } from './signaling/index.js';
 import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';

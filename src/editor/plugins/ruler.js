@@ -1,4 +1,3 @@
-// src/editor/plugins/ruler.js
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 

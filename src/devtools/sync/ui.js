@@ -1,4 +1,3 @@
-// src/devtools/sync/ui.js
 import debug from '../../util/debug.js';
 import { Modal } from '../../util/modal.js';
 

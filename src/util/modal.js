@@ -1,4 +1,3 @@
-// src/util/modal.js
 export class Modal {
   constructor({ title = 'Notice' } = {}) {
     this.overlay = document.createElement('div');

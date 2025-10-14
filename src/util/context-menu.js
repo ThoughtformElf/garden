@@ -1,5 +1,3 @@
-// src/context-menu.js
-
 /**
  * A reusable class for creating custom context menus.
  */

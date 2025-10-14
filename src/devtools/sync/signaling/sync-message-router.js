@@ -1,4 +1,3 @@
-// src/devtools/sync/signaling/sync-message-router.js
 import debug from '../../../util/debug.js';
 
 const MESSAGE_CACHE_MAX_SIZE = 500; // Store the last 500 message IDs to prevent loops

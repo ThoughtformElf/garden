@@ -1,4 +1,3 @@
-// src/editor/keymaps/prompt.js
 import { keymap, EditorView } from '@codemirror/view';
 
 /**

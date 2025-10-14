@@ -1,4 +1,3 @@
-// src/editor/plugins/embeds.js
 import { WidgetType, Decoration, ViewPlugin } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';

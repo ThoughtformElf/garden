@@ -1,4 +1,3 @@
-// src/devtools/sync/signaling/signaling-message-handler.js
 import debug from '../../../util/debug.js';
 
 export class SignalingMessageHandler {

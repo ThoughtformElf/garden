@@ -1,4 +1,3 @@
-// src/editor/plugins/response-wrapper.js
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 

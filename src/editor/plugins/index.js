@@ -1,4 +1,3 @@
-// src/editor/plugins/index.js
 import { hashtagPlugin } from './hashtags.js';
 import { wikilinkPlugin } from './wikilinks.js';
 import { checkboxPlugin } from './checkboxes.js';

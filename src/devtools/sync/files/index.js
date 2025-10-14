@@ -1,4 +1,3 @@
-// src/devtools/sync/files/index.js
 import { EventEmitterMixin } from './event-emitter.js';
 import { GitClientHelper } from './git-client.js';
 import { DataChannelHandler } from './data-channel.js';

@@ -1,4 +1,3 @@
-// src/devtools/sync/signaling/index.js
 import debug from '../../../util/debug.js';
 import { WebSocketManager } from './websocket-manager.js';
 import { SignalingMessageHandler } from './signaling-message-handler.js';

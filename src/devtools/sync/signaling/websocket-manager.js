@@ -1,4 +1,3 @@
-// src/devtools/sync/signaling/websocket-manager.js
 import debug from '../../../util/debug.js';
 
 export class WebSocketManager {

@@ -1,4 +1,3 @@
-// src/util/drag-drop.js
 import JSZip from 'jszip';
 import { Modal } from './modal.js';
 

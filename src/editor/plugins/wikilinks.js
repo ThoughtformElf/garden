@@ -1,4 +1,3 @@
-// src/editor/plugins/wikilinks.js
 import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { appContextField } from '../navigation.js';

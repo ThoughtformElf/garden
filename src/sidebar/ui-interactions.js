@@ -1,4 +1,3 @@
-// src/sidebar/ui-interactions.js
 import { ContextMenu } from '../util/context-menu.js';
 
 /**

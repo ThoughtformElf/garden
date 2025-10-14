@@ -1,4 +1,3 @@
-// src/sidebar/files.js
 import { Modal } from '../util/modal.js';
 
 /**

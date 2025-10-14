@@ -1,5 +1,3 @@
-// src/ai/models/gemini.js
-
 /**
  * Communicates with the Google Gemini API to get a streaming chat completion.
  * @param {string} apiKey - The Google Gemini API key.

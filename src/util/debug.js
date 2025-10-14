@@ -1,5 +1,3 @@
-// src/util/debug.js
-
 /**
  * Utility to manage debug logging based on a query parameter.
  * Checks for '?debug' in the URL.

@@ -1,4 +1,3 @@
-// src/editor/editor.js
 import { EditorView } from '@codemirror/view';
 import { EditorState as CodeMirrorEditorState, Compartment, Annotation } from '@codemirror/state';
 import { vim, Vim } from '@replit/codemirror-vim';

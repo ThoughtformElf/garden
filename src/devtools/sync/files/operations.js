@@ -1,4 +1,3 @@
-// src/devtools/sync/files/operations.js
 import debug from '../../../util/debug.js';
 import { Git } from '../../../util/git-integration.js';
 

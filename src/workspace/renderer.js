@@ -1,4 +1,3 @@
-// src/workspace/renderer.js
 import { Editor } from '../editor/editor.js';
 
 export class WorkspaceRenderer {

@@ -1,4 +1,3 @@
-// src/devtools/devtools.js
 import eruda from 'eruda';
 import { Sync } from './sync/index.js';
 import { addDataTool } from './data/index.js';

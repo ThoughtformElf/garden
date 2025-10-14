@@ -1,4 +1,3 @@
-// src/devtools/sync/signaling/webrtc-initiator.js
 import debug from '../../../util/debug.js';
 
 export class WebRtcInitiator {

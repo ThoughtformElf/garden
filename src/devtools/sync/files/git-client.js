@@ -1,4 +1,3 @@
-// src/devtools/sync/files/git-client-helper.js
 import debug from '../../../util/debug.js';
 
 // Helper class/module for gitClient logic

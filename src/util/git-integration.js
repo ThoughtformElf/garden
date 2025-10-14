@@ -1,5 +1,3 @@
-// src/util/git-integration.js
-
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';

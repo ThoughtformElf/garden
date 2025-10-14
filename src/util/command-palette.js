@@ -1,4 +1,3 @@
-// src/util/command-palette.js
 import { Git } from './git-integration.js';
 import { executeFile } from '../workspace/executor.js';
 
