@@ -190,8 +190,6 @@ export class WorkspaceManager {
       return;
     }
 
-    console.log(`Switching garden to: "${gardenName}"`);
-
     const newGitClient = await this.getGitClient(gardenName);
     
     editor.gitClient = newGitClient;
@@ -493,7 +491,6 @@ export class WorkspaceManager {
             // Any pane in this tab is a valid target for an update.
             const editor = pane.editor;
             if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
-                console.log(`[Broadcast] Reloading ${gardenName}#${filePath} in pane ${paneId} due to external change.`);
                 await editor.forceReloadFile(filePath);
             }
         }
