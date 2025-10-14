@@ -286,8 +286,55 @@ export class Editor {
     await this._applyUserSettings();
   }
   
+  /**
+   * Reloads the content of a file from the backend into the editor
+   * while preserving the user's cursor position and scroll state.
+   * @param {string} filepath - The path of the file to reload.
+   */
   async forceReloadFile(filepath) {
-      await this.loadFile(filepath);
+    if (this.filePath !== filepath || !this.editorView) {
+        // If the file to reload isn't the one currently open, or the editor isn't ready,
+        // use the standard loadFile method which handles all cases.
+        await this.loadFile(filepath);
+        return;
+    }
+
+    // 1. Capture the current editor state (selection and scroll).
+    const oldSelection = this.editorView.state.selection;
+    const oldScrollTop = this.editorView.scrollDOM.scrollTop;
+
+    // 2. Fetch the latest content from the filesystem.
+    const newContent = await this.loadFileContent(filepath);
+    const currentDoc = this.editorView.state.doc;
+
+    // 3. If the content is identical, do nothing to prevent unnecessary updates and screen flicker.
+    if (newContent === currentDoc.toString()) {
+        return;
+    }
+
+    // 4. Create a single transaction that both replaces the content and restores the selection.
+    // This is more efficient than two separate transactions.
+    const newDocLength = newContent.length;
+    const transactionSpec = {
+        changes: { from: 0, to: currentDoc.length, insert: newContent },
+        annotations: programmaticChange.of(true),
+        selection: {
+            // Ensure the restored cursor position is not out of bounds in the new content.
+            anchor: Math.min(oldSelection.main.anchor, newDocLength),
+            head: Math.min(oldSelection.main.head, newDocLength),
+        }
+    };
+
+    // 5. Dispatch the combined transaction.
+    this.editorView.dispatch(transactionSpec);
+
+    // 6. Restore the scroll position. We use requestAnimationFrame to ensure this
+    // runs *after* the browser has painted the DOM changes from the transaction.
+    requestAnimationFrame(() => {
+        if (this.editorView && this.editorView.scrollDOM) {
+            this.editorView.scrollDOM.scrollTop = oldScrollTop;
+        }
+    });
   }
   
   async newFile() {
@@ -365,7 +412,7 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     await this.gitClient.writeFile(this.filePath, newContent);
-    // After writing, broadcast the change.
+    // After writing, notify the workspace manager to update other contexts.
     window.thoughtform.workspace.notifyFileUpdate(this.gitClient.gardenName, this.filePath, this.paneId);
     if (this.sidebar) await this.sidebar.refresh();
   }

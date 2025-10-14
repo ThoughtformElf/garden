@@ -475,7 +475,6 @@ export class WorkspaceManager {
         }
         const editor = pane.editor;
         if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
-            console.log(`[Internal Sync] Reloading ${gardenName}#${filePath} in pane ${paneId}.`);
             await editor.forceReloadFile(filePath);
         }
     }
