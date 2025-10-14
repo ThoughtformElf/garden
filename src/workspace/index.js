@@ -9,17 +9,62 @@ import { appContextField } from '../editor/navigation.js';
 export class WorkspaceManager {
   constructor(initialGitClient) {
     this.initialGitClient = initialGitClient; // Store the initial client
-    this.paneTree = this.createInitialPaneTree(); // The data structure for the layout
     this.panes = new Map(); // Map of paneId -> { element, editor }
-    this.activePaneId = 'pane-1';
     this.mainContainer = document.querySelector('main');
     this.isResizing = false;
     this.gitClients = new Map(); // Cache for Git clients
     this.gitClients.set(initialGitClient.gardenName, initialGitClient);
     
-    // --- Broadcast Channel for cross-context sync ---
     this.broadcastChannel = new BroadcastChannel('thoughtform_garden_sync');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
+    
+    // --- NEW: Load state from sessionStorage on initialization ---
+    const savedState = this._loadStateFromSession();
+    if (savedState) {
+        this.paneTree = savedState.paneTree;
+        this.activePaneId = savedState.activePaneId;
+        this.initialEditorStates = savedState.editorStates || {};
+    } else {
+        this.paneTree = this.createInitialPaneTree();
+        this.activePaneId = 'pane-1';
+        this.initialEditorStates = {};
+    }
+  }
+  
+  _loadStateFromSession() {
+    try {
+        const saved = sessionStorage.getItem('thoughtform_workspace_layout');
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (e) {
+        console.error("Failed to load or parse workspace state from sessionStorage:", e);
+        sessionStorage.removeItem('thoughtform_workspace_layout');
+    }
+    return null;
+  }
+  
+  _saveStateToSession() {
+      if (!this.paneTree) return;
+
+      const editorStates = {};
+      this.panes.forEach((pane, paneId) => {
+          if (pane.editor) {
+              editorStates[paneId] = pane.editor.getCurrentState();
+          }
+      });
+      
+      const stateToSave = {
+          paneTree: this.paneTree,
+          activePaneId: this.activePaneId,
+          editorStates: editorStates
+      };
+
+      try {
+          sessionStorage.setItem('thoughtform_workspace_layout', JSON.stringify(stateToSave));
+      } catch (e) {
+          console.error("Failed to save workspace state to sessionStorage:", e);
+      }
   }
 
   createInitialPaneTree() {
@@ -73,7 +118,7 @@ export class WorkspaceManager {
         gitClient: gitClient,
         commandPalette: window.thoughtform.commandPalette,
         initialFile: activeBuffer.path,
-        paneId: node.id // Pass the paneId to the editor
+        paneId: node.id
       });
       
       await new Promise(resolve => {
@@ -86,6 +131,11 @@ export class WorkspaceManager {
       });
 
       this.panes.set(node.id, { element: paneElement, editor: editor });
+      
+      // Restore editor state after it's ready
+      if (this.initialEditorStates[node.id]) {
+          editor.restoreState(this.initialEditorStates[node.id]);
+      }
 
       paneElement.addEventListener('click', () => {
         this.setActivePane(node.id);
@@ -151,6 +201,7 @@ export class WorkspaceManager {
         document.removeEventListener('mouseup', endResize);
         document.removeEventListener('touchmove', handleMove);
         document.removeEventListener('touchend', endResize);
+        this._saveStateToSession(); // Save after resizing
       };
 
       document.addEventListener('mousemove', handleMove);
@@ -172,16 +223,13 @@ export class WorkspaceManager {
     
     const activePane = this.panes.get(paneId);
 
-    // THIS IS THE FIX (Part 2):
-    // The timeout is increased to 50ms. This gives the browser's event loop
-    // ample time to finish rendering, applying styles, and processing other
-    // queued tasks before we issue the final, authoritative focus command.
     setTimeout(() => {
       activePane?.editor?.editorView.focus();
     }, 50);
     
     this._updateURL();
     window.thoughtform.sidebar?.refresh();
+    this._saveStateToSession(); // Save on pane change
   }
 
   async switchGarden(gardenName) {
@@ -189,6 +237,8 @@ export class WorkspaceManager {
     if (!editor || editor.gitClient.gardenName === gardenName) {
       return;
     }
+
+    console.log(`Switching garden to: "${gardenName}"`);
 
     const newGitClient = await this.getGitClient(gardenName);
     
@@ -299,6 +349,7 @@ export class WorkspaceManager {
     await editor.loadFile(path);
     
     this.setActivePane(this.activePaneId);
+    this._saveStateToSession(); // Save on file change
   }
 
   _updateURL() {
@@ -450,15 +501,7 @@ export class WorkspaceManager {
     return await this.getGitClient(activeBuffer.garden);
   }
   
-  /**
-   * Central handler to notify all relevant contexts of a file update.
-   * This handles both intra-tab (panes) and inter-tab (broadcast) updates.
-   * @param {string} gardenName - The garden of the updated file.
-   * @param {string} filePath - The path of the updated file.
-   * @param {string} sourcePaneId - The ID of the pane that initiated the change.
-   */
   async notifyFileUpdate(gardenName, filePath, sourcePaneId) {
-    // 1. Broadcast to other tabs/windows. They won't receive their own message.
     this.broadcastChannel.postMessage({
         type: 'file_updated',
         gardenName,
@@ -466,31 +509,25 @@ export class WorkspaceManager {
         sourcePaneId
     });
 
-    // 2. Manually notify other panes within THIS tab.
     for (const [paneId, pane] of this.panes.entries()) {
         if (paneId === sourcePaneId) {
-            continue; // Don't reload the pane that triggered the save
+            continue; 
         }
         const editor = pane.editor;
         if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
+            console.log(`[Internal Sync] Reloading ${gardenName}#${filePath} in pane ${paneId}.`);
             await editor.forceReloadFile(filePath);
         }
     }
   }
 
-  /**
-   * Handles incoming messages from other browser contexts (tabs/panes).
-   * @param {MessageEvent} event - The event from the BroadcastChannel.
-   */
   async handleBroadcastMessage(event) {
-    const { type, gardenName, filePath, sourcePaneId } = event.data;
+    const { type, gardenName, filePath } = event.data;
     if (type === 'file_updated') {
-        // Iterate over all panes managed by this workspace
-        for (const [paneId, pane] of this.panes.entries()) {
-            // Because this message is from another tab, we don't need to check the sourcePaneId.
-            // Any pane in this tab is a valid target for an update.
+        for (const [, pane] of this.panes.entries()) {
             const editor = pane.editor;
             if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
+                console.log(`[Broadcast] Reloading ${gardenName}#${filePath} in pane ${pane.id} due to external change.`);
                 await editor.forceReloadFile(filePath);
             }
         }
