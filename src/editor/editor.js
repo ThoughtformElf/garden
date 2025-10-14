@@ -418,13 +418,14 @@ export class Editor {
         try {
           const rawContent = await this.gitClient.readFile(path);
           await this.gitClient.writeFile(newPath, rawContent);
-          await this.sidebar.refresh();
+          // Open the new file in the active pane. This also handles sidebar refresh and focus.
+          window.thoughtform.workspace.openFile(this.gitClient.gardenName, newPath);
         } catch (e) {
           console.error('Error duplicating file:', e);
           await this.sidebar.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
         }
     } finally {
-        // this.editorView.focus(); // Don't focus here
+        // Focus is now handled by the workspace manager after opening the new file.
     }
   }
 

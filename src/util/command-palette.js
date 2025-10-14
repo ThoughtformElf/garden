@@ -13,11 +13,28 @@ export class CommandPalette {
     this.selectedIndex = 0;
     this.mode = 'search';
     this.crossGardenFileCache = null;
+    this.indexingPromise = null; // To track background indexing
+
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleInput = this.handleInput.bind(this);
     this.handleResultClick = this.handleResultClick.bind(this);
     this.close = this.close.bind(this);
     this.createDOMElements();
+    this.listenForFileChanges(); // Subscribe to events
+  }
+  
+  // Listen for file creation/deletion to invalidate the cache.
+  listenForFileChanges() {
+    if (window.thoughtform && window.thoughtform.events) {
+        window.thoughtform.events.subscribe('file:create', () => {
+            console.log('[CommandPalette] File change detected, invalidating index cache.');
+            this.crossGardenFileCache = null;
+        });
+        window.thoughtform.events.subscribe('file:delete', () => {
+            console.log('[CommandPalette] File change detected, invalidating index cache.');
+            this.crossGardenFileCache = null;
+        });
+    }
   }
   
   createDOMElements() {
@@ -95,18 +112,20 @@ export class CommandPalette {
     
     document.addEventListener('keydown', this.handleKeyDown);
 
-    if (!this.crossGardenFileCache) {
+    // If cache is empty and not already being built, start indexing in the background.
+    if (!this.crossGardenFileCache && !this.indexingPromise) {
       const originalPlaceholder = this.input.placeholder;
       this.input.placeholder = 'Indexing all gardens...';
-      this.input.disabled = true;
 
-      await this._buildCrossGardenIndex();
-
-      this.input.placeholder = originalPlaceholder;
-      this.input.disabled = false;
-      this.input.focus();
+      this.indexingPromise = this._buildCrossGardenIndex().finally(() => {
+        this.input.placeholder = originalPlaceholder;
+        this.indexingPromise = null;
+        // Re-run the current search now that the index is ready.
+        this.search(this.input.value);
+      });
     }
     
+    // Immediately search with whatever is in the cache (which may be empty).
     await this.search('');
   }
 
@@ -131,14 +150,13 @@ export class CommandPalette {
   async search(query) {
     this.query = query.toLowerCase();
     
-    let sourceFiles = this.crossGardenFileCache;
+    // Use the cache if it exists, otherwise use an empty array while indexing.
+    let sourceFiles = this.crossGardenFileCache || [];
 
     if (this.mode === 'execute') {
-        sourceFiles = this.crossGardenFileCache.filter(file => file.path.endsWith('.js'));
+        sourceFiles = sourceFiles.filter(file => file.path.endsWith('.js'));
     }
     
-    // --- THIS IS THE FIX ---
-    // We must now 'await' this call as it is asynchronous.
     const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
     const currentGardenName = activeGitClient ? activeGitClient.gardenName : '';
 
@@ -170,7 +188,7 @@ export class CommandPalette {
 
   async renderResults() {
     this.resultsList.innerHTML = '';
-    if (this.results.length === 0) {
+    if (this.results.length === 0 && !this.indexingPromise) {
       this.resultsList.innerHTML = '<li class="command-no-results">No matches found</li>';
       return;
     }
