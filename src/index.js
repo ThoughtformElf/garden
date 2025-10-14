@@ -17,6 +17,7 @@ import { HookRunner } from './workspace/hooks.js';
 import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace/index.js'; // Import the new manager
+import { initializeQueryLoader } from './workspace/query-loader.js';
 
 // Handles browser back/forward buttons.
 function initializeNavigationListener() {
@@ -132,6 +133,8 @@ async function main() {
   window.thoughtform.hooks = hookRunner;
   
   initializeNavigationListener();
+
+  await initializeQueryLoader();
 
   window.thoughtform.events.publish('app:load');
 }

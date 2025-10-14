@@ -25,6 +25,7 @@ import defaultSelectPrevPaneJs from './keymaps/select-prev-pane.js?raw';
 import defaultMovePaneUpJs from './keymaps/move-pane-up.js?raw';
 import defaultMovePaneDownJs from './keymaps/move-pane-down.js?raw';
 import defaultClosePaneJs from './keymaps/close-pane.js?raw';
+import defaultQueryTestJs from './query/test.js?raw';
 
 export const defaultFiles = [
   ['/settings/interface.yml', defaultInterfaceYml],
@@ -47,5 +48,6 @@ export const defaultFiles = [
   ['/settings/keymaps/close-pane.js', defaultClosePaneJs],
   ['/settings/hooks/create.js', defaultHookCreateJs],
   ['/settings/hooks/load.js', defaultHookLoadJs],
-  ['/settings/hooks/delete.js', defaultHookDeleteJs]
+  ['/settings/hooks/delete.js', defaultHookDeleteJs],
+  ['/settings/query/test.js', defaultQueryTestJs]
 ];
