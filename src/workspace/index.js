@@ -1,6 +1,9 @@
-import { Editor } from '../editor/editor.js';
+// src/workspace/index.js
 import { Git } from '../util/git-integration.js';
 import { appContextField } from '../editor/navigation.js';
+import { WorkspaceRenderer } from './renderer.js';
+import { PaneManager } from './pane-manager.js';
+import { WorkspaceStateManager } from './state-manager.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,
@@ -8,66 +11,34 @@ import { appContextField } from '../editor/navigation.js';
  */
 export class WorkspaceManager {
   constructor(initialGitClient) {
-    this.initialGitClient = initialGitClient; // Store the initial client
-    this.panes = new Map(); // Map of paneId -> { element, editor }
+    this.initialGitClient = initialGitClient;
+    this.panes = new Map();
     this.mainContainer = document.querySelector('main');
     this.isResizing = false;
-    this.gitClients = new Map(); // Cache for Git clients
+    this.gitClients = new Map();
     this.gitClients.set(initialGitClient.gardenName, initialGitClient);
     
     this.broadcastChannel = new BroadcastChannel('thoughtform_garden_sync');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
     
-    // --- NEW: Load state from sessionStorage on initialization ---
-    const savedState = this._loadStateFromSession();
+    // Instantiate helper classes
+    this._renderer = new WorkspaceRenderer(this);
+    this._paneManager = new PaneManager(this);
+    this._stateManager = new WorkspaceStateManager(this);
+
+    const savedState = this._stateManager.loadState();
     if (savedState) {
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
         this.initialEditorStates = savedState.editorStates || {};
     } else {
-        this.paneTree = this.createInitialPaneTree();
+        this.paneTree = this._createInitialPaneTree();
         this.activePaneId = 'pane-1';
         this.initialEditorStates = {};
     }
   }
-  
-  _loadStateFromSession() {
-    try {
-        const saved = sessionStorage.getItem('thoughtform_workspace_layout');
-        if (saved) {
-            return JSON.parse(saved);
-        }
-    } catch (e) {
-        console.error("Failed to load or parse workspace state from sessionStorage:", e);
-        sessionStorage.removeItem('thoughtform_workspace_layout');
-    }
-    return null;
-  }
-  
-  _saveStateToSession() {
-      if (!this.paneTree) return;
 
-      const editorStates = {};
-      this.panes.forEach((pane, paneId) => {
-          if (pane.editor) {
-              editorStates[paneId] = pane.editor.getCurrentState();
-          }
-      });
-      
-      const stateToSave = {
-          paneTree: this.paneTree,
-          activePaneId: this.activePaneId,
-          editorStates: editorStates
-      };
-
-      try {
-          sessionStorage.setItem('thoughtform_workspace_layout', JSON.stringify(stateToSave));
-      } catch (e) {
-          console.error("Failed to save workspace state to sessionStorage:", e);
-      }
-  }
-
-  createInitialPaneTree() {
+  _createInitialPaneTree() {
     const initialPath = (window.location.hash || '#/home').substring(1);
     return {
       type: 'leaf',
@@ -86,133 +57,6 @@ export class WorkspaceManager {
       return this.gitClients.get(gardenName);
   }
 
-  async render() {
-    this.mainContainer.style.display = 'flex';
-    this.mainContainer.style.gridTemplateColumns = '';
-    this.mainContainer.style.gridTemplateRows = '';
-
-    this.panes.forEach(({ editor }) => {
-        if (editor && editor.editorView) {
-            editor.editorView.destroy();
-        }
-    });
-    this.panes.clear();
-
-    this.mainContainer.innerHTML = '';
-    await this._renderNode(this.paneTree, this.mainContainer);
-    this.setActivePane(this.activePaneId);
-  }
-
-  async _renderNode(node, parentElement) {
-    if (node.type === 'leaf') {
-      const paneElement = document.createElement('div');
-      paneElement.className = 'pane';
-      paneElement.dataset.paneId = node.id;
-      parentElement.appendChild(paneElement);
-
-      const activeBuffer = node.buffers[node.activeBufferIndex];
-      const gitClient = await this.getGitClient(activeBuffer.garden);
-      
-      const editor = new Editor({
-        target: paneElement,
-        gitClient: gitClient,
-        commandPalette: window.thoughtform.commandPalette,
-        initialFile: activeBuffer.path,
-        paneId: node.id
-      });
-      
-      await new Promise(resolve => {
-        const check = setInterval(() => {
-          if (editor.isReady) {
-            clearInterval(check);
-            resolve();
-          }
-        }, 50);
-      });
-
-      this.panes.set(node.id, { element: paneElement, editor: editor });
-      
-      // Restore editor state after it's ready
-      if (this.initialEditorStates[node.id]) {
-          editor.restoreState(this.initialEditorStates[node.id]);
-      }
-
-      paneElement.addEventListener('click', () => {
-        this.setActivePane(node.id);
-      });
-
-    } else if (node.type.startsWith('split-')) {
-      const direction = node.type.split('-')[1];
-      parentElement.style.display = 'grid';
-
-      const [child1, child2] = node.children;
-      const child1Element = document.createElement('div');
-      child1Element.className = 'pane-container';
-      const child2Element = document.createElement('div');
-      child2Element.className = 'pane-container';
-
-      const resizerElement = document.createElement('div');
-      resizerElement.className = `pane-resizer pane-resizer-${direction}`;
-
-      if (direction === 'vertical') {
-        parentElement.style.gridTemplateColumns = `${node.splitPercentage}% auto 1fr`;
-      } else {
-        parentElement.style.gridTemplateRows = `${node.splitPercentage}% auto 1fr`;
-      }
-
-      parentElement.appendChild(child1Element);
-      parentElement.appendChild(resizerElement);
-      parentElement.appendChild(child2Element);
-      
-      this._initializeResizer(resizerElement, parentElement, node, direction);
-
-      await this._renderNode(child1, child1Element);
-      await this._renderNode(child2, child2Element);
-    }
-  }
-  
-  _initializeResizer(resizer, parent, node, direction) {
-    const startResize = (e) => {
-      e.preventDefault();
-      this.isResizing = true;
-      const overlay = document.getElementById('resize-overlay');
-      overlay.style.display = 'block';
-      overlay.style.cursor = direction === 'vertical' ? 'col-resize' : 'row-resize';
-
-      const handleMove = (moveEvent) => {
-        if (!this.isResizing) return;
-        const parentRect = parent.getBoundingClientRect();
-        if (direction === 'vertical') {
-          const newPercentage = ((moveEvent.clientX - parentRect.left) / parentRect.width) * 100;
-          node.splitPercentage = Math.max(10, Math.min(90, newPercentage));
-          parent.style.gridTemplateColumns = `${node.splitPercentage}% auto 1fr`;
-        } else {
-          const newPercentage = ((moveEvent.clientY - parentRect.top) / parentRect.height) * 100;
-          node.splitPercentage = Math.max(10, Math.min(90, newPercentage));
-          parent.style.gridTemplateRows = `${node.splitPercentage}% auto 1fr`;
-        }
-      };
-
-      const endResize = () => {
-        this.isResizing = false;
-        overlay.style.display = 'none';
-        overlay.style.cursor = 'default';
-        document.removeEventListener('mousemove', handleMove);
-        document.removeEventListener('mouseup', endResize);
-        document.removeEventListener('touchmove', handleMove);
-        document.removeEventListener('touchend', endResize);
-        this._saveStateToSession(); // Save after resizing
-      };
-
-      document.addEventListener('mousemove', handleMove);
-      document.addEventListener('mouseup', endResize);
-      document.addEventListener('touchmove', handleMove, { passive: false });
-      document.addEventListener('touchend', endResize);
-    };
-    resizer.addEventListener('mousedown', startResize);
-    resizer.addEventListener('touchstart', startResize, { passive: false });
-  }
-
   setActivePane(paneId) {
     if (!this.panes.has(paneId)) return;
     this.activePaneId = paneId;
@@ -229,7 +73,7 @@ export class WorkspaceManager {
     
     this._updateURL();
     window.thoughtform.sidebar?.refresh();
-    this._saveStateToSession(); // Save on pane change
+    this._stateManager.saveState();
   }
 
   async switchGarden(gardenName) {
@@ -238,12 +82,8 @@ export class WorkspaceManager {
       return;
     }
 
-    console.log(`Switching garden to: "${gardenName}"`);
-
     const newGitClient = await this.getGitClient(gardenName);
-    
     editor.gitClient = newGitClient;
-    
     window.thoughtform.sidebar.gitClient = newGitClient;
 
     editor.editorView.dispatch({
@@ -263,61 +103,8 @@ export class WorkspaceManager {
     await window.thoughtform.sidebar.refresh();
   }
   
-  async splitPane(paneIdToSplit, direction) {
-    let newPaneId = null; 
-
-    const generateScratchpadPath = () => {
-        const now = new Date();
-        const year = String(now.getFullYear()).slice(-2);
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const randomKey = Math.random().toString(36).substring(2, 6);
-        const timestamp = `${year}${month}${day}-${hours}${minutes}`;
-        return `/scratchpad/${timestamp}.md`;
-    };
-
-    const findAndSplit = (node) => {
-        if (node.type === 'leaf' && node.id === paneIdToSplit) {
-            newPaneId = `pane-${Date.now()}`;
-            
-            const currentGarden = node.buffers[node.activeBufferIndex].garden;
-            
-            const newLeaf = {
-                type: 'leaf',
-                id: newPaneId,
-                activeBufferIndex: 0,
-                buffers: [
-                    {
-                        garden: currentGarden,
-                        path: generateScratchpadPath()
-                    }
-                ]
-            };
-            
-            return {
-                type: `split-${direction}`,
-                splitPercentage: 50,
-                children: [ node, newLeaf ]
-            };
-        }
-        if (node.type.startsWith('split-')) {
-            node.children = node.children.map(child => findAndSplit(child));
-        }
-        return node;
-    };
-    
-    this.paneTree = findAndSplit(this.paneTree);
-    await this.render(); 
-
-    if (newPaneId) {
-        this.setActivePane(newPaneId); 
-    }
-  }
-  
   async openFile(garden, path) {
-    const activePaneInfo = this.getActivePaneInfo();
+    const activePaneInfo = this._paneManager.getActivePaneInfo();
     if (!activePaneInfo) return;
     
     const { node, pane } = activePaneInfo;
@@ -333,9 +120,7 @@ export class WorkspaceManager {
     }
 
     const newGitClient = await this.getGitClient(garden);
-    const hasGardenChanged = editor.gitClient.gardenName !== garden;
-    
-    if (hasGardenChanged) {
+    if (editor.gitClient.gardenName !== garden) {
         editor.gitClient = newGitClient;
         editor.editorView.dispatch({
             effects: editor.appContextCompartment.reconfigure(appContextField.init(() => ({
@@ -347,13 +132,12 @@ export class WorkspaceManager {
     }
 
     await editor.loadFile(path);
-    
     this.setActivePane(this.activePaneId);
-    this._saveStateToSession(); // Save on file change
+    this._stateManager.saveState();
   }
 
   _updateURL() {
-      const info = this.getActivePaneInfo();
+      const info = this._paneManager.getActivePaneInfo();
       if (!info) return;
       const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
       
@@ -369,138 +153,7 @@ export class WorkspaceManager {
           window.history.pushState(null, '', newUrl);
       }
   }
-  
-  _getPaneList() {
-    const paneList = [];
-    const traverse = (node) => {
-        if (node.type === 'leaf') {
-            paneList.push(node);
-        } else if (node.type.startsWith('split-')) {
-            node.children.forEach(traverse);
-        }
-    };
-    traverse(this.paneTree);
-    return paneList;
-  }
 
-  selectNextPane() {
-    const panes = this._getPaneList();
-    const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
-    if (currentIndex === -1) return;
-    const nextIndex = (currentIndex + 1) % panes.length;
-    this.setActivePane(panes[nextIndex].id);
-  }
-  
-  selectPrevPane() {
-    const panes = this._getPaneList();
-    const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
-    if (currentIndex === -1) return;
-    const prevIndex = (currentIndex - 1 + panes.length) % panes.length;
-    this.setActivePane(panes[prevIndex].id);
-  }
-  
-  _findAndSwap(direction) {
-    let parentNode = null;
-    let nodeIndex = -1;
-
-    const findParent = (node) => {
-        if (node.type.startsWith('split-')) {
-            const index = node.children.findIndex(child => child.id === this.activePaneId);
-            if (index !== -1) {
-                parentNode = node;
-                nodeIndex = index;
-                return;
-            }
-            node.children.forEach(findParent);
-        }
-    };
-    findParent(this.paneTree);
-
-    if (parentNode) {
-      if (direction === 'up' && nodeIndex > 0) {
-        [parentNode.children[nodeIndex], parentNode.children[nodeIndex - 1]] = [parentNode.children[nodeIndex - 1], parentNode.children[nodeIndex]];
-        this.render();
-      } else if (direction === 'down' && nodeIndex < parentNode.children.length - 1) {
-        [parentNode.children[nodeIndex], parentNode.children[nodeIndex + 1]] = [parentNode.children[nodeIndex + 1], parentNode.children[nodeIndex]];
-        this.render();
-      }
-    }
-  }
-  
-  movePaneUp() {
-    this._findAndSwap('up');
-  }
-
-  movePaneDown() {
-    this._findAndSwap('down');
-  }
-  
-  async closeActivePane() {
-      const panes = this._getPaneList();
-      if (panes.length <= 1) {
-          console.log("Cannot close the last pane.");
-          return;
-      }
-
-      const currentIndex = panes.findIndex(p => p.id === this.activePaneId);
-      if (currentIndex === -1) return;
-
-      const nextIndex = (currentIndex + 1) % panes.length;
-      const nextActivePaneId = panes[nextIndex === currentIndex ? 0 : nextIndex].id;
-
-      const findAndRemove = (node) => {
-          if (!node || node.type === 'leaf') {
-              return node;
-          }
-
-          const childIndexToRemove = node.children.findIndex(child => child.id === this.activePaneId);
-          if (childIndexToRemove !== -1) {
-              const remainingChildIndex = 1 - childIndexToRemove;
-              return node.children[remainingChildIndex];
-          }
-
-          node.children = node.children.map(child => findAndRemove(child)).filter(Boolean);
-          
-          if (node.children.length === 1) {
-              return node.children[0];
-          }
-          return node;
-      };
-
-      this.paneTree = findAndRemove(this.paneTree);
-      
-      await this.render();
-      this.setActivePane(nextActivePaneId);
-  }
-
-  getActivePaneInfo() {
-      if (!this.activePaneId) return null;
-      let foundNode = null;
-      const findNode = (node) => {
-          if (node.type === 'leaf' && node.id === this.activePaneId) {
-              foundNode = node;
-          } else if (node.type.startsWith('split-')) {
-              node.children.forEach(findNode);
-          }
-      };
-      findNode(this.paneTree);
-      
-      const pane = this.panes.get(this.activePaneId);
-      return (foundNode && pane) ? { node: foundNode, pane: pane } : null;
-  }
-
-  getActiveEditor() {
-    const pane = this.panes.get(this.activePaneId);
-    return pane ? pane.editor : null;
-  }
-
-  async getActiveGitClient() {
-    const info = this.getActivePaneInfo();
-    if (!info) return this.initialGitClient;
-    const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
-    return await this.getGitClient(activeBuffer.garden);
-  }
-  
   async notifyFileUpdate(gardenName, filePath, sourcePaneId) {
     this.broadcastChannel.postMessage({
         type: 'file_updated',
@@ -510,13 +163,8 @@ export class WorkspaceManager {
     });
 
     for (const [paneId, pane] of this.panes.entries()) {
-        if (paneId === sourcePaneId) {
-            continue; 
-        }
-        const editor = pane.editor;
-        if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
-            console.log(`[Internal Sync] Reloading ${gardenName}#${filePath} in pane ${paneId}.`);
-            await editor.forceReloadFile(filePath);
+        if (paneId !== sourcePaneId && pane.editor.gitClient.gardenName === gardenName && pane.editor.filePath === filePath) {
+            await pane.editor.forceReloadFile(filePath);
         }
     }
   }
@@ -525,14 +173,34 @@ export class WorkspaceManager {
     const { type, gardenName, filePath } = event.data;
     if (type === 'file_updated') {
         for (const [, pane] of this.panes.entries()) {
-            const editor = pane.editor;
-            if (editor.gitClient.gardenName === gardenName && editor.filePath === filePath) {
-                console.log(`[Broadcast] Reloading ${gardenName}#${filePath} in pane ${pane.id} due to external change.`);
-                await editor.forceReloadFile(filePath);
+            if (pane.editor.gitClient.gardenName === gardenName && pane.editor.filePath === filePath) {
+                await pane.editor.forceReloadFile(filePath);
             }
         }
     }
   }
+
+  getActiveEditor() {
+    const pane = this.panes.get(this.activePaneId);
+    return pane ? pane.editor : null;
+  }
+
+  async getActiveGitClient() {
+    const info = this._paneManager.getActivePaneInfo();
+    if (!info) return this.initialGitClient;
+    const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
+    return await this.getGitClient(activeBuffer.garden);
+  }
+  
+  // Delegated Public API
+  render() { return this._renderer.render(); }
+  splitPane(paneId, direction) { return this._paneManager.splitPane(paneId, direction); }
+  closeActivePane() { return this._paneManager.closeActivePane(); }
+  selectNextPane() { return this._paneManager.selectNextPane(); }
+  selectPrevPane() { return this._paneManager.selectPrevPane(); }
+  movePaneUp() { return this._paneManager.movePaneUp(); }
+  movePaneDown() { return this._paneManager.movePaneDown(); }
+  _saveStateToSession() { return this._stateManager.saveState(); }
 }
 
 export function initializeWorkspaceManager(initialGitClient) {
