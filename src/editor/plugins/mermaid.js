@@ -5,9 +5,107 @@ import mermaid from 'mermaid';
 
 // Initialize Mermaid.js
 mermaid.initialize({
-  startOnLoad: false,
-  theme: 'dark',
+  startOnLoad: true,
+  theme: 'base', // 'base' is required to use themeVariables
   securityLevel: 'loose',
+  themeVariables: {
+    /* * =========================================================================
+     * Hardcoded values based on your theme's CSS variables.
+     * =========================================================================
+     */
+
+    /* Base variables */
+    background: '#050f0e',                // from --color-background-primary
+    primaryColor: '#12ffbc',              // from --base-accent-action
+    secondaryColor: '#07443b',       // from --color-border-primary
+    
+    primaryTextColor: '#000000',            // from --color-text-on-accent
+    secondaryTextColor: '#ffffff',        // from --color-text-bright
+    tertiaryTextColor: '#ffffff',         // from --color-text-bright
+    
+    lineColor: '#12ffbc',                 // from --base-accent-action
+    textColor: '#dddddd',                 // from --color-text-primary
+
+    mainBkg: '#12ffbc',                   // from --base-accent-action
+    secondBkg: '#07443b',       // from --color-border-primary
+    border1: '#12ffbc',                   // from --color-border-interactive
+    border2: '#07443b',                   // from --color-border-primary
+    arrowheadColor: '#dddddd',            // from --color-text-primary
+
+    fontFamily: '"trebuchet ms", verdana, arial, sans-serif',
+    fontSize: '1rem',
+    labelBackground: 'rgba(0, 0, 0, 0.7)',// from --base-overlay
+    THEME_COLOR_LIMIT: 12,
+
+    /* Flowchart variables */
+    nodeBkg: '#12ffbc',                   // from --base-accent-action
+    nodeBorder: '#12ffbc',                // from --color-border-interactive
+    clusterBkg: '#07443b',       // from --color-border-primary
+    clusterBorder: '#07443b',             // from --color-border-primary
+    defaultLinkColor: '#dddddd',          // from --color-text-primary
+    titleColor: '#ffffff',                // from --color-text-bright
+    edgeLabelBackground: '#050f0e',       // from --color-background-secondary
+
+    /* Sequence Diagram variables */
+    actorBorder: '#12ffbc',               // from --color-border-interactive
+    actorBkg: '#12ffbc',                  // from --base-accent-action
+    actorTextColor: '#000000',            // from --color-text-on-accent
+    actorLineColor: '#3d996b',            // from --color-text-secondary
+    signalColor: '#dddddd',               // from --color-text-primary
+    signalTextColor: '#dddddd',           // from --color-text-primary
+    labelBoxBkgColor: '#07443b',       // from --color-border-primary
+    labelBoxBorderColor: '#07443b',       // from --color-border-primary
+    labelTextColor: '#ffffff',            // from --color-text-bright
+    loopTextColor: '#dddddd',             // from --color-text-primary
+    noteBorderColor: '#eb9b27',           // from --base-accent-emphasis
+    noteBkgColor: '#07443b',              // from --base-interactive
+    noteTextColor: '#dddddd',             // from --color-text-primary
+    activationBorderColor: '#12ffbc',     // from --color-border-interactive
+    activationBkgColor: '#050f0e',        // from --color-background-tertiary
+    sequenceNumberColor: '#000000',       // from --color-text-on-accent
+
+    /* Gantt chart variables */
+    sectionBkgColor: '#07443b',           // from --base-interactive
+    altSectionBkgColor: '#050f0e',        // from --color-background-primary
+    sectionBkgColor2: '#07443b',       // from --color-border-primary
+    excludeBkgColor: 'rgba(50, 50, 50, 0.5)', // (custom value)
+    taskBorderColor: '#12ffbc',           // from --color-border-interactive
+    taskBkgColor: '#12ffbc',              // from --base-accent-action
+    taskTextLightColor: '#000000',        // from --color-text-on-accent
+    taskTextColor: '#000000',             // from --color-text-on-accent
+    taskTextDarkColor: '#000000',         // from --color-text-on-accent
+    taskTextOutsideColor: '#dddddd',      // from --color-text-primary
+    taskTextClickableColor: '#4dc3f5',    // from --color-text-link
+    activeTaskBorderColor: '#eb9b27',     // from --base-accent-emphasis
+    activeTaskBkgColor: '#12ffbc',        // from --base-accent-action
+    gridColor: '#07443b',                 // from --color-border-primary
+    doneTaskBkgColor: '#12ffbc',          // from --base-syntax-done-bg -> --base-accent-action
+    doneTaskBorderColor: '#12ffbc',       // from --base-accent-action
+    critBorderColor: '#ff1342',           // from --base-accent-destructive
+    critBkgColor: '#ff1342',              // from --base-accent-destructive
+    todayLineColor: '#eb9b27',            // from --base-accent-emphasis
+    vertLineColor: '#07443b',             // from --color-border-secondary
+    
+    /* C4 Diagram variables */
+    personBorder: '#12ffbc',              // from --color-border-interactive
+    personBkg: '#12ffbc',                 // from --base-accent-action
+
+    /* Architecture Diagram variables */
+    archEdgeColor: '#07443b',             // from --color-border-primary
+    archEdgeArrowColor: '#dddddd',        // from --color-text-primary
+    archEdgeWidth: '3',
+    archGroupBorderColor: '#07443b',      // from --color-border-secondary
+    archGroupBorderWidth: '2px',
+
+    /* Entity Relationship Diagram variables */
+    rowOdd: '#050f0e',                    // from --color-background-primary
+    rowEven: '#07443b',                   // from --base-interactive
+    
+    /* State Diagram variables */
+    labelColor: '#ffffff',                // from --color-text-bright
+    errorBkgColor: '#ff1342',             // from --base-accent-destructive
+    errorTextColor: '#ffffff',            // from --color-text-on-destructive
+  }
 });
 
 // A cache to store rendered SVGs for performance.

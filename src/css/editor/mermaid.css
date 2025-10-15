@@ -1,0 +1,17 @@
+.cm-mermaid-container .edgeLabel p {
+  color: var(--base-white) !important;
+}
+
+.cm-mermaid-container .nodeLabel.markdown-node-label {
+  color: var(--base-black) !important;
+}
+
+.cm-mermaid-container .pieTitleText,
+.cm-mermaid-container .legend text,
+.cm-mermaid-container .title text {
+  fill: var(--base-white) !important;
+}
+
+.cm-mermaid-container .data-point {
+  fill: var(--base-accent-destructive)
+}
