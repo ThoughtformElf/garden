@@ -11,6 +11,7 @@ import defaultToggleSidebarJs from './keymaps/toggle-sidebar.js?raw';
 import defaultToggleDevtoolsJs from './keymaps/toggle-devtools.js?raw';
 import defaultSearchFilesJs from './keymaps/search-files.js?raw';
 import defaultExecuteCommandJs from './keymaps/execute-command.js?raw';
+import defaultGlobalSearchJs from './keymaps/global-search.js?raw'; // Import the new file
 import defaultBrowserBackJs from './keymaps/browser-back.js?raw';
 import defaultBrowserForwardJs from './keymaps/browser-forward.js?raw';
 import defaultDuplicateFileJs from './keymaps/duplicate-current-file.js?raw';
@@ -35,6 +36,7 @@ export const defaultFiles = [
   ['/settings/keymaps/toggle-devtools.js', defaultToggleDevtoolsJs],
   ['/settings/keymaps/search-files.js', defaultSearchFilesJs],
   ['/settings/keymaps/execute-command.js', defaultExecuteCommandJs],
+  ['/settings/keymaps/global-search.js', defaultGlobalSearchJs], // Add the new file to the list
   ['/settings/keymaps/browser-back.js', defaultBrowserBackJs],
   ['/settings/keymaps/browser-forward.js', defaultBrowserForwardJs],
   ['/settings/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],

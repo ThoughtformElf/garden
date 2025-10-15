@@ -38,6 +38,7 @@
     "codemirror": "^6.0.2",
     "eruda": "^3.4.3",
     "fast-diff": "^1.3.0",
+    "flexsearch": "^0.8.212",
     "gpt-tokenizer": "^3.0.1",
     "isomorphic-git": "^1.33.1",
     "jsdom": "^27.0.0",

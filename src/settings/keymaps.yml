@@ -18,6 +18,9 @@
 - key: "Mod-Shift-p"
   run: "settings/keymaps/execute-command.js"
 
+- key: "Mod-Shift-f"
+  run: "settings/keymaps/global-search.js"
+
 - key: "Mod-Shift-d"
   run: "settings/keymaps/duplicate-current-file.js"
 

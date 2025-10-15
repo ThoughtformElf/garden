@@ -9,6 +9,7 @@ import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js';
 import { CommandPalette } from './util/command-palette.js';
+import { GlobalSearch } from './util/global-search.js'; // Import the new class
 import { runMigration } from './util/migration.js';
 import { initializeAiService } from './ai/index.js';
 import { initializeConfigService } from './config.js';
@@ -71,7 +72,11 @@ async function main() {
     config: initializeConfigService(),
     events: initializeEventBus(),
     workspace: initializeWorkspaceManager(gitClient),
+    // globalSearch will be added below
   };
+  
+  // Initialize Global Search and add it to the API
+  window.thoughtform.globalSearch = new GlobalSearch();
 
   // --- PWA Update Logic ---
   const updateSW = registerSW({

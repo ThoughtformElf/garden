@@ -171,6 +171,14 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady) return;
     await this.gitClient.writeFile(this.filePath, newContent);
+    
+    // THIS IS THE FIX: Publish an event for the global search index to consume
+    window.thoughtform.events.publish('file:update', {
+        gardenName: this.gitClient.gardenName,
+        path: this.filePath,
+        content: newContent
+    });
+    
     window.thoughtform.workspace.notifyFileUpdate(this.gitClient.gardenName, this.filePath, this.paneId);
     if (this.sidebar) await this.sidebar.refresh();
   }
