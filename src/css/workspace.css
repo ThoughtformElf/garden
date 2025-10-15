@@ -108,23 +108,45 @@ main {
 }
 
 /* Styling for rendered Mermaid.js diagrams in the editor */
-.cm-mermaid-container {
-  background-color: var(--color-background-secondary);
-  padding: 1rem;
-  border-radius: 4px;
-  margin: 1rem 0;
-  text-align: center;
+/* This is the line that receives our special attribute from the plugin. */
+.cm-mermaid-render-line {
+  position: relative;
+  /* Reserve space for the diagram that will appear after this line. */
+  /* This prevents content from jumping around as diagrams load. */
+  margin-bottom: 320px; 
 }
 
-/* Mermaid SVGs often look best on a light background, even in a dark theme. */
-.cm-mermaid-container svg {
-  max-width: 100%;
-  height: auto;
-  background-color: white;
+/* This is the pseudo-element that will contain our rendered SVG diagram. */
+.cm-mermaid-render-line::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 100%; /* Position the container directly after the line's content. */
+  left: 0;
+  width: 100%;
+  min-height: 300px;
+  
+  /* Styling for the container */
+  background-color: var(--color-background-secondary);
+  border: 1px solid var(--color-border-primary);
   border-radius: 4px;
+  margin-top: 1rem;
+  
+  /* This is where the magic happens. We display the SVG from the CSS variable. */
+  background-image: var(--mermaid-svg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain; /* This makes the diagram responsive. */
 }
 
 /* Styling for the error message if Mermaid can't parse the code. */
+.cm-mermaid-error-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 1rem;
+  box-sizing: border-box;
+}
 .cm-mermaid-error {
   color: var(--base-accent-destructive);
   white-space: pre-wrap;
