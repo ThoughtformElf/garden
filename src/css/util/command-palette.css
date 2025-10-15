@@ -59,7 +59,6 @@
   color: var(--color-text-primary);
   cursor: pointer;
   border-bottom: 1px solid var(--color-border-secondary);
-  display: flex;
   justify-content: space-between;
   align-items: center;
 }
@@ -75,7 +74,6 @@
   cursor: default;
 }
 .command-path {
-  flex-grow: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -88,14 +86,9 @@
   background-color: var(--base-accent-destructive);
   padding: 2px 6px;
   font-size: 1rem;
-  flex-shrink: 0;
   font-weight: bold;
 }
 
-
-.command-result-item.fuzzy-search {
-  display: block;
-}
 
 .command-no-results {
   color: var(--base-accent-destructive);
