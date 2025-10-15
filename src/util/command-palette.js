@@ -1,39 +1,59 @@
+import FlexSearch from 'flexsearch';
 import { Git } from './git-integration.js';
 import { executeFile } from '../workspace/executor.js';
 
-export class CommandPalette {
-  constructor({ gitClient, editor }) {
-    this.gitClient = gitClient; // Stays for now for cross-garden indexing
-    this.editor = editor; // Stays for now for cross-garden indexing
+// A set of common binary extensions to skip during indexing.
+const binaryExtensions = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp', 'tiff',
+  'mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a',
+  'mp4', 'webm', 'mov', 'mkv', 'avi', 'flv',
+  'woff', 'woff2', 'ttf', 'otf', 'eot',
+  'zip', 'rar', '7z', 'tar', 'gz',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+  'db', 'sqlite', 'bin', 'exe', 'dll', 'iso'
+]);
 
+// Debounce function to limit how often search is called
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+export class CommandPalette {
+  constructor() {
     this.isOpen = false;
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
-    this.mode = 'search';
-    this.crossGardenFileCache = null;
-    this.indexingPromise = null; // To track background indexing
+    this.mode = 'searchFiles'; // Default mode
+    
+    this.isIndexing = false;
+    this.indexPromise = null;
+    this.isIndexBuilt = false;
+
+    // The new unified index for paths and content
+    this.unifiedIndex = new FlexSearch.Document({
+        document: {
+            id: "id",
+            index: ["pathSearch", "content"], // Index both a path string and the content
+            store: ["garden", "path"]
+        },
+        tokenize: "forward"
+    });
 
     this.handleKeyDown = this.handleKeyDown.bind(this);
-    this.handleInput = this.handleInput.bind(this);
+    this.handleInput = debounce(this.handleInput.bind(this), 150);
     this.handleResultClick = this.handleResultClick.bind(this);
     this.close = this.close.bind(this);
     this.createDOMElements();
-    this.listenForFileChanges(); // Subscribe to events
-  }
-  
-  // Listen for file creation/deletion to invalidate the cache.
-  listenForFileChanges() {
-    if (window.thoughtform && window.thoughtform.events) {
-        window.thoughtform.events.subscribe('file:create', () => {
-            console.log('[CommandPalette] File change detected, invalidating index cache.');
-            this.crossGardenFileCache = null;
-        });
-        window.thoughtform.events.subscribe('file:delete', () => {
-            console.log('[CommandPalette] File change detected, invalidating index cache.');
-            this.crossGardenFileCache = null;
-        });
-    }
+    this.listenForFileChanges();
   }
   
   createDOMElements() {
@@ -64,82 +84,134 @@ export class CommandPalette {
     document.body.appendChild(this.overlay);
   }
 
-  async _buildCrossGardenIndex() {
-    const gardensRaw = localStorage.getItem('thoughtform_gardens');
-    const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
-    const fileIndex = [];
-    
-    await Promise.all(gardens.map(async (gardenName) => {
-      const tempGitClient = new Git(gardenName);
-      const allPaths = await this.editor.sidebar.listAllPaths(tempGitClient, '/');
-      
-      for (const file of allPaths) {
-        if (!file.isDirectory) {
-            const filePath = file.path;
-            fileIndex.push({
-              garden: gardenName,
-              path: filePath,
-              searchString: `${gardenName} ${filePath.substring(1)}`.toLowerCase()
-            });
+  listenForFileChanges() {
+    if (window.thoughtform && window.thoughtform.events) {
+        const updateIndex = (eventType, data) => {
+            if (!this.isIndexBuilt || this.isIndexing) return;
+
+            const extension = data.path.split('.').pop()?.toLowerCase();
+            if (binaryExtensions.has(extension) && eventType !== 'file:delete') return;
+
+            switch(eventType) {
+                case 'file:create':
+                    window.thoughtform.workspace.getGitClient(data.gardenName).then(git => {
+                        git.readFile(data.path).then(content => {
+                            const pathSearch = `${data.gardenName} ${data.path.substring(1)}`.toLowerCase();
+                            this.unifiedIndex.add({ id: `${data.gardenName}#${data.path}`, garden: data.gardenName, path: data.path, pathSearch, content });
+                        });
+                    });
+                    break;
+                case 'file:update':
+                    const pathSearch = `${data.gardenName} ${data.path.substring(1)}`.toLowerCase();
+                    this.unifiedIndex.update({ id: `${data.gardenName}#${data.path}`, garden: data.gardenName, path: data.path, pathSearch, content: data.content });
+                    break;
+                case 'file:delete':
+                    this.unifiedIndex.remove(`${data.gardenName}#${data.path}`);
+                    break;
+            }
+        };
+
+        window.thoughtform.events.subscribe('file:create', (data) => updateIndex('file:create', data));
+        window.thoughtform.events.subscribe('file:update', (data) => updateIndex('file:update', data));
+        window.thoughtform.events.subscribe('file:delete', (data) => updateIndex('file:delete', data));
+    }
+  }
+  
+  async _buildIndex() {
+    try {
+        this.isIndexing = true;
+        this.input.placeholder = 'Indexing... please wait';
+        this.resultsList.innerHTML = '<li class="command-no-results">Scanning gardens...</li>';
+
+        const gardensRaw = localStorage.getItem('thoughtform_gardens');
+        const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
+        let indexedCount = 0;
+        
+        for (const gardenName of gardens) {
+            const tempGitClient = await window.thoughtform.workspace.getGitClient(gardenName);
+            const allPaths = await window.thoughtform.sidebar.listAllPaths(tempGitClient, '/');
+            
+            for (const file of allPaths) {
+                if (!file.isDirectory) {
+                    const extension = file.path.split('.').pop()?.toLowerCase();
+                    const pathSearch = `${gardenName} ${file.path.substring(1)}`.toLowerCase();
+
+                    if (binaryExtensions.has(extension)) {
+                        this.unifiedIndex.add({ id: `${gardenName}#${file.path}`, garden: gardenName, path: file.path, pathSearch, content: "" });
+                        indexedCount++;
+                        continue;
+                    }
+
+                    try {
+                        const content = await tempGitClient.readFile(file.path);
+                        if (typeof content === 'string') {
+                            this.unifiedIndex.add({ id: `${gardenName}#${file.path}`, garden: gardenName, path: file.path, pathSearch, content });
+                            indexedCount++;
+                        }
+                    } catch (e) { /* Silently fail on unreadable files */ }
+                }
+                if (indexedCount > 0 && indexedCount % 50 === 0) {
+                 this.resultsList.innerHTML = `<li class="command-no-results">Indexing... (${indexedCount} files scanned)</li>`;
+                 await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            }
         }
-      }
-    }));
-    
-    this.crossGardenFileCache = fileIndex;
+        this.input.placeholder = `Search across ${this.unifiedIndex.size} documents...`;
+        this.isIndexing = false;
+        this.isIndexBuilt = true;
+    } catch (error) {
+        this.resultsList.innerHTML = `<li class="command-no-results" style="color: red;">Error during indexing.</li>`;
+        this.isIndexing = false;
+    }
   }
 
-  async open(mode = 'search') {
-    if (!window.thoughtform.workspace.getActiveEditor()) {
-      console.error("CommandPalette cannot open: no active editor found.");
-      return;
-    }
-
+  async open(mode = 'searchFiles') {
     if (this.isOpen) return;
     this.isOpen = true;
     this.mode = mode;
 
-    if (this.mode === 'execute') {
-      this.titleElement.textContent = 'Executing a File...';
-      this.input.placeholder = 'Find a .js file to execute across all gardens...';
-    } else {
-      this.titleElement.textContent = 'Searching Files...';
-      this.input.placeholder = 'Find file across all gardens...';
+    // Configure UI based on mode
+    switch(this.mode) {
+        case 'executeCommand':
+            this.titleElement.textContent = 'Execute Command';
+            this.input.placeholder = 'Find a .js file to execute...';
+            break;
+        case 'searchContent':
+            this.titleElement.textContent = 'Global Content Search';
+            this.input.placeholder = 'Search content across all gardens...';
+            break;
+        case 'searchFiles':
+        default:
+            this.titleElement.textContent = 'Search Files';
+            this.input.placeholder = 'Find file across all gardens...';
+            break;
     }
 
     this.overlay.classList.remove('hidden');
     this.input.focus();
-    
     document.addEventListener('keydown', this.handleKeyDown);
 
-    // If cache is empty and not already being built, start indexing in the background.
-    if (!this.crossGardenFileCache && !this.indexingPromise) {
-      const originalPlaceholder = this.input.placeholder;
-      this.input.placeholder = 'Indexing all gardens...';
-
-      this.indexingPromise = this._buildCrossGardenIndex().finally(() => {
-        this.input.placeholder = originalPlaceholder;
-        this.indexingPromise = null;
-        // Re-run the current search now that the index is ready.
-        this.search(this.input.value);
-      });
+    if (!this.isIndexBuilt && !this.indexPromise) {
+        this.indexPromise = this._buildIndex().finally(() => {
+            this.indexPromise = null;
+            if (this.input.value) this.search(this.input.value);
+        });
+    } else if (this.isIndexBuilt) {
+        this.input.placeholder = `Search across ${this.unifiedIndex.size} documents...`;
     }
-    
-    // Immediately search with whatever is in the cache (which may be empty).
-    await this.search('');
+
+    this.search('');
   }
 
   close() {
     if (!this.isOpen) return;
     this.isOpen = false;
-
     this.overlay.classList.add('hidden');
     this.input.value = '';
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
-    
     document.removeEventListener('keydown', this.handleKeyDown);
-
     const activeEditor = window.thoughtform.workspace.getActiveEditor();
     if (activeEditor && activeEditor.editorView) {
       activeEditor.editorView.focus();
@@ -147,97 +219,124 @@ export class CommandPalette {
   }
 
   async search(query) {
-    this.query = query.toLowerCase();
+    this.query = query.toLowerCase().trim();
+    if (this.isIndexing) return;
     
-    // Use the cache if it exists, otherwise use an empty array while indexing.
-    let sourceFiles = this.crossGardenFileCache || [];
+    if (!this.isIndexBuilt) {
+        this.resultsList.innerHTML = `<li class="command-no-results">Waiting for index...</li>`;
+        return;
+    }
 
-    if (this.mode === 'execute') {
-        sourceFiles = sourceFiles.filter(file => file.path.endsWith('.js'));
+    let searchConfig = { enrich: true, limit: 100 };
+    let searchField = "pathSearch"; // Default for files and commands
+
+    if (this.mode === 'searchContent') {
+        searchField = "content";
+        searchConfig.limit = 50;
     }
     
+    let flatResults = [];
+    if (this.query) {
+        const searchResults = await this.unifiedIndex.searchAsync(this.query, { index: searchField, ...searchConfig });
+        flatResults = searchResults[0]?.result || [];
+    } else if (this.mode !== 'searchContent') {
+        // For file/command search, show all if query is empty
+        flatResults = this.unifiedIndex.search({ index: searchField, ...searchConfig })[0]?.result || [];
+    }
+
+    if (this.mode === 'executeCommand') {
+        flatResults = flatResults.filter(item => item.doc.path.endsWith('.js'));
+    }
+
     const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
     const currentGardenName = activeGitClient ? activeGitClient.gardenName : '';
-
-    if (!this.query) {
-      this.results = (this.mode === 'execute' ? sourceFiles : sourceFiles.filter(file => file.garden === currentGardenName)).slice(0, 100);
-    } else {
-      this.results = sourceFiles.filter(file => {
-        let queryIndex = 0;
-        let searchIndex = 0;
-        while (queryIndex < this.query.length && searchIndex < file.searchString.length) {
-          if (this.query[queryIndex] === file.searchString[searchIndex]) {
-            queryIndex++;
-          }
-          searchIndex++;
-        }
-        return queryIndex === this.query.length;
-      }).sort((a, b) => {
-        const aIsCurrent = a.garden === currentGardenName;
-        const bIsCurrent = b.garden === currentGardenName;
+    
+    flatResults.sort((a, b) => {
+        const aIsCurrent = a.doc.garden === currentGardenName;
+        const bIsCurrent = b.doc.garden === currentGardenName;
         if (aIsCurrent && !bIsCurrent) return -1;
         if (!aIsCurrent && bIsCurrent) return 1;
-        return 0;
-      });
-    }
+        return a.doc.path.localeCompare(b.doc.path); // Alphabetical sort as fallback
+    });
 
+    this.results = flatResults;
     this.selectedIndex = 0;
     this.renderResults();
+  }
+  
+  async getSnippet(gardenName, filePath) {
+    try {
+        const git = await window.thoughtform.workspace.getGitClient(gardenName);
+        const content = await git.readFile(filePath);
+        const lines = content.split('\n');
+        const queryLower = this.query.toLowerCase();
+        let bestLine = lines.find(line => line.toLowerCase().includes(queryLower));
+        
+        if (!bestLine) {
+            bestLine = lines.find(line => line.trim() !== '') || "No content preview available.";
+        }
+        const regex = new RegExp(this.query.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+        return bestLine.trim().replace(regex, '<mark>$&</mark>');
+    } catch (e) {
+        return "Could not load file preview.";
+    }
   }
 
   async renderResults() {
     this.resultsList.innerHTML = '';
-    if (this.results.length === 0 && !this.indexingPromise) {
-      this.resultsList.innerHTML = '<li class="command-no-results">No matches found</li>';
+    if (this.results.length === 0) {
+      this.resultsList.innerHTML = `<li class="command-no-results">${this.isIndexing ? 'Indexing...' : 'No matches found'}</li>`;
       return;
     }
     
-    const activeGitClient = await window.thoughtform.workspace.getActiveGitClient();
-    const currentGardenName = activeGitClient ? activeGitClient.gardenName : '';
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < this.results.length; index++) {
+        const file = this.results[index].doc;
+        const li = document.createElement('li');
+        li.className = 'command-result-item';
+        li.dataset.index = index;
 
-    this.results.forEach((file, index) => {
-      const li = document.createElement('li');
-      li.className = 'command-result-item';
-      li.dataset.index = index;
+        const pathText = file.path.startsWith('/') ? file.path.substring(1) : file.path;
+        const gardenSpan = ` <span class="command-garden">[${file.garden}]</span>`;
+        
+        if (this.mode === 'searchContent') {
+            const snippet = await this.getSnippet(file.garden, file.path);
+            li.innerHTML = `
+                <div class="command-path">${gardenSpan} ${pathText}</div>
+                <div class="global-search-snippet">${snippet}</div>
+            `;
+        } else {
+            li.innerHTML = `<div class="command-path">${gardenSpan} ${pathText}</div>`;
+        }
 
-      const pathText = file.path.startsWith('/') ? file.path.substring(1) : file.path;
-      
-      if (file.garden !== currentGardenName) {
-        li.innerHTML = `<span class="command-path">${pathText}</span> <span class="command-garden">${file.garden}</span>`;
-      } else {
-        li.textContent = pathText;
-      }
-
-      if (index === this.selectedIndex) {
-        li.classList.add('active');
-        li.scrollIntoView({ block: 'nearest' });
-      }
-
-      this.resultsList.appendChild(li);
-    });
-  }
-
-  async selectItem(index) {
-    if (index < 0 || index >= this.results.length) return;
-
-    const file = this.results[index];
-    
-    if (this.mode === 'execute') {
-      this.close();
-      const editor = window.thoughtform.workspace.getActiveEditor();
-      const git = await window.thoughtform.workspace.getActiveGitClient();
-      if (editor && git) {
-          const fullPath = `${file.garden}#${file.path}`;
-          executeFile(fullPath, editor, git);
-      }
-    } else { // 'search' mode
-      window.thoughtform.workspace.openFile(file.garden, file.path);
-      this.close();
+        if (index === this.selectedIndex) {
+            li.classList.add('active');
+            li.scrollIntoView({ block: 'nearest' });
+        }
+        fragment.appendChild(li);
     }
+    this.resultsList.appendChild(fragment);
   }
 
-  async handleInput(e) {
-    await this.search(e.target.value);
+  selectItem(index) {
+    if (index < 0 || index >= this.results.length) return;
+    const file = this.results[index].doc;
+    
+    if (this.mode === 'executeCommand') {
+        const editor = window.thoughtform.workspace.getActiveEditor();
+        const git = window.thoughtform.workspace.getActiveGitClient(); // This will be the active garden's client
+        if (editor && git) {
+            const fullPath = `${file.garden}#${file.path}`;
+            executeFile(fullPath, editor, git);
+        }
+    } else {
+        window.thoughtform.workspace.openFile(file.garden, file.path);
+    }
+    this.close();
+  }
+
+  handleInput(e) {
+    this.search(e.target.value);
   }
   
   handleResultClick(e) {
@@ -249,7 +348,6 @@ export class CommandPalette {
 
   handleKeyDown(e) {
     if (!this.isOpen) return;
-
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
