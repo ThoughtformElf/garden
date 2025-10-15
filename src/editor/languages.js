@@ -7,6 +7,7 @@ import { json } from '@codemirror/lang-json';
 import { xml } from '@codemirror/lang-xml';
 import { yaml } from '@codemirror/lang-yaml';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
+import { mermaid } from 'codemirror-lang-mermaid';
 
 // Define language extensions
 const shellLang = StreamLanguage.define(shell);
@@ -16,6 +17,7 @@ const markdownLang = markdown({
     LanguageDescription.of({ name: 'javascript', load: () => Promise.resolve(javascript()) }),
     LanguageDescription.of({ name: 'html', load: () => Promise.resolve(html()) }),
     LanguageDescription.of({ name: 'css', load: () => Promise.resolve(css()) }),
+    LanguageDescription.of({ name: 'mermaid', load: () => Promise.resolve(mermaid()) }),
   ],
 });
 

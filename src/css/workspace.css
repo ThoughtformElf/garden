@@ -106,3 +106,28 @@ main {
     cursor: row-resize;
     width: 100%;
 }
+
+/* Styling for rendered Mermaid.js diagrams in the editor */
+.cm-mermaid-container {
+  background-color: var(--color-background-secondary);
+  padding: 1rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+/* Mermaid SVGs often look best on a light background, even in a dark theme. */
+.cm-mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+  background-color: white;
+  border-radius: 4px;
+}
+
+/* Styling for the error message if Mermaid can't parse the code. */
+.cm-mermaid-error {
+  color: var(--base-accent-destructive);
+  white-space: pre-wrap;
+  text-align: left;
+  font-family: monospace;
+}
