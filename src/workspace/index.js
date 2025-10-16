@@ -20,6 +20,8 @@ export class WorkspaceManager {
     this.broadcastChannel = new BroadcastChannel('thoughtform_garden_sync');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
     
+    window.thoughtform.events.subscribe('file:rename', (data) => this.notifyFileRename(data));
+    
     // Instantiate helper classes
     this._renderer = new WorkspaceRenderer(this);
     this._paneManager = new PaneManager(this);
@@ -168,14 +170,61 @@ export class WorkspaceManager {
     }
   }
 
+  notifyFileRename({ oldPath, newPath, gardenName }) {
+    this._performRenameUpdate(oldPath, newPath, gardenName);
+    this.broadcastChannel.postMessage({
+      type: 'file_renamed',
+      oldPath,
+      newPath,
+      gardenName
+    });
+  }
+
+  _performRenameUpdate(oldPath, newPath, gardenName) {
+    let activePaneWasUpdated = false;
+
+    const updateTree = (node) => {
+      if (node.type === 'leaf') {
+        node.buffers.forEach(buffer => {
+          if (buffer.garden === gardenName && buffer.path === oldPath) {
+            buffer.path = newPath;
+          }
+        });
+      } else if (node.type.startsWith('split-')) {
+        node.children.forEach(updateTree);
+      }
+    };
+    updateTree(this.paneTree);
+
+    this.panes.forEach(pane => {
+      const editor = pane.editor;
+      if (editor.gitClient.gardenName === gardenName && editor.filePath === oldPath) {
+        editor.filePath = newPath;
+        editor.refreshStatusBar(); // Explicitly update the status bar
+        if (editor.paneId === this.activePaneId) {
+          activePaneWasUpdated = true;
+        }
+      }
+    });
+
+    if (activePaneWasUpdated) {
+      this._updateURL();
+    }
+    
+    window.thoughtform.sidebar?.refresh();
+    this._stateManager.saveState();
+  }
+
   async handleBroadcastMessage(event) {
-    const { type, gardenName, filePath } = event.data;
+    const { type, gardenName, filePath, sourcePaneId, oldPath, newPath } = event.data;
     if (type === 'file_updated') {
         for (const [, pane] of this.panes.entries()) {
             if (pane.editor.gitClient.gardenName === gardenName && pane.editor.filePath === filePath) {
                 await pane.editor.forceReloadFile(filePath);
             }
         }
+    } else if (type === 'file_renamed') {
+        this._performRenameUpdate(oldPath, newPath, gardenName);
     }
   }
 

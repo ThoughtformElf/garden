@@ -208,8 +208,12 @@ export const fileActions = {
     if (confirmed) {
         try {
             await gitClient.pfs.rename(sourcePath, newPath);
+            window.thoughtform.events.publish('file:rename', {
+                oldPath: sourcePath,
+                newPath: newPath,
+                gardenName: gitClient.gardenName
+            });
             await this.refresh();
-            // TODO: Update buffer paths in workspace manager if the file was open
         } catch(e) {
             console.error('Error moving file:', e);
             await this.showAlert({ title: 'Error', message: 'Failed to move the item. Check the console for details.' });
@@ -295,8 +299,12 @@ export const fileActions = {
         await gitClient.pfs.rename(tempPath, oldPath);
         throw e;
       }
+      window.thoughtform.events.publish('file:rename', {
+        oldPath: oldPath,
+        newPath: newPath,
+        gardenName: gitClient.gardenName
+      });
       await this.refresh();
-      // TODO: Update buffer paths in workspace manager if the file was open
     } catch (e) {
       console.error(`Error renaming file:`, e);
       await this.showAlert({ title: 'Error', message: `Failed to rename file: ${e.message}` });

@@ -9,6 +9,7 @@ import { getLanguageExtension } from './languages.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
 import { KeymapService } from '../workspace/keymaps.js';
 import { createEditorExtensions } from './extensions.js';
+import { statusBarPlugin } from './status-bar.js';
 
 // Import the new action handlers
 import { EditorFiles } from './files.js';
@@ -181,6 +182,15 @@ export class Editor {
     
     window.thoughtform.workspace.notifyFileUpdate(this.gitClient.gardenName, this.filePath, this.paneId);
     if (this.sidebar) await this.sidebar.refresh();
+  }
+
+  refreshStatusBar() {
+    if (this.editorView) {
+      const plugin = this.editorView.plugin(statusBarPlugin);
+      if (plugin) {
+        plugin.updateAll();
+      }
+    }
   }
 
   // --- API Methods (Delegating to helper classes) ---

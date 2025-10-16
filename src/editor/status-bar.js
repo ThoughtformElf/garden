@@ -6,7 +6,7 @@ import { appContextField } from './navigation.js'; // Import the context field
 
 export const statusBarCompartment = new Compartment();
 
-const statusBarPlugin = ViewPlugin.fromClass(
+export const statusBarPlugin = ViewPlugin.fromClass(
   class {
     constructor(view) {
       this.view = view;

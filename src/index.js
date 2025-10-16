@@ -70,8 +70,11 @@ async function main() {
     ai: initializeAiService(),
     config: initializeConfigService(),
     events: initializeEventBus(),
-    workspace: initializeWorkspaceManager(gitClient),
+    // workspace will be assigned below
   };
+
+  // Now that window.thoughtform.events exists, we can initialize the workspace.
+  window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
 
   // --- PWA Update Logic ---
   const updateSW = registerSW({
