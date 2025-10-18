@@ -1,7 +1,21 @@
-// @name buildKnowledgeBase
-// @description The ONLY tool you need for research. Give it the user's goal and the initial context. It will automatically scan for all links (internal and external), read their content, intelligently decide which ones are relevant, and return a complete knowledge base ready for synthesis.
-// @arg {string} goal - The user's original goal.
-// @arg {string} initialContent - The initial text to start scanning from.
+/*
+Description:
+A powerful research tool that recursively explores a topic by following internal [[wikilinks]]. It starts from an initial piece of content, finds all wikilinks, reads their content, and repeats this process to build a comprehensive knowledge base.
+
+This tool is best for broad research questions where you need to gather context from multiple connected notes within the user's garden.
+
+**IMPORTANT**: If you just need to read a single, specific external webpage (like a reddit link or a news article), use the `readURL` tool instead. This tool is for exploring the internal knowledge base.
+
+Arguments:
+- goal: The user's original goal or research question. This helps the tool filter for relevant information later.
+- initialContent: The starting text, which MUST contain one or more [[wikilinks]] for the tool to begin its exploration.
+
+Example Call (in JSON format):
+{
+  "goal": "understand the project's agentic computing features",
+  "initialContent": "The main features are described in the [[README]]."
+}
+*/
 
 if (!args.goal || !args.initialContent) {
   return "Error: 'goal' and 'initialContent' are required.";
@@ -41,7 +55,8 @@ while (queue.length > 0) {
 
   if (currentLink.startsWith('http')) {
       try {
-          const proxyUrl = `https://proxy.thoughtform.garden?thoughtformgardenproxy=${encodeURIComponent(currentLink)}`;
+          const baseUrl = localStorage.getItem('thoughtform_proxy_url')?.trim() || 'https://proxy.thoughtform.garden';
+          const proxyUrl = `${baseUrl}?thoughtformgardenproxy=${encodeURIComponent(currentLink)}`;
           const response = await fetch(proxyUrl);
           if(response.ok) newContent = await response.text();
       } catch {}

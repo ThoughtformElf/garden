@@ -73,7 +73,10 @@ class AiService {
         throw new Error("Cannot find active editor or gitClient instance for agent.");
       }
       
-      const initialContext = view.state.doc.toString();
+      // Get the full document content, but remove any previous token count comments.
+      const rawContext = view.state.doc.toString();
+      const initialContext = rawContext.replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
+
       const runner = new TaskRunner({
           gitClient: editor.gitClient,
           aiService: this,

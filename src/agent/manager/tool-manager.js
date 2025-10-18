@@ -10,14 +10,31 @@ const hardcodedTools = new Map(
 );
 
 function parseToolMetadata(code) {
-  const metadata = { name: '', description: '' };
-  const nameMatch = code.match(/@name\s+(.*)/);
-  const descriptionMatch = code.match(/@description\s+(.*)/);
-  if (nameMatch) metadata.name = nameMatch[1].trim();
-  if (descriptionMatch) metadata.description = descriptionMatch[1].trim();
-  if (!metadata.name) throw new Error('Tool code is missing a required @name declaration.');
-  return metadata;
+  // This regex finds ALL comment blocks, both multiline (/* ... */)
+  // and single-line (// ...), anywhere in the file.
+  const allCommentsRegex = /\/\*[\s\S]*?\*\/|\/\/.*/g;
+  const commentMatches = code.match(allCommentsRegex);
+
+  if (!commentMatches) {
+    // Return an empty description if no comments are found.
+    return '';
+  }
+
+  // Join all found comments into a single block of text.
+  const allCommentsText = commentMatches.join('\n');
+  
+  // Clean the entire concatenated comment block for the LLM.
+  const description = allCommentsText
+    .replace(/^\s*\/\*+\s*?/gm, '') // remove "/*"
+    .replace(/^\s*\*+\/\s*?$/gm, '') // remove "*/" on its own line
+    .replace(/\*\/$/, '')           // remove "*/" at the end of a line
+    .replace(/^\s*\*\s?/gm, '')      // remove leading "*" on each line
+    .replace(/^\s*\/\/\s?/gm, '')    // remove "//"
+    .trim();
+
+  return description;
 }
+
 
 async function loadTool(toolPath, contextGarden) {
   const cacheKey = `${contextGarden}#${toolPath}`;
@@ -47,11 +64,10 @@ async function loadTool(toolPath, contextGarden) {
   if (!code) return null;
 
   try {
-    const metadata = parseToolMetadata(code);
+    // The tool's name is now derived directly from its filename.
+    const name = toolPath.split('/').pop().replace('.js', '');
+    const description = parseToolMetadata(code);
     
-    // --- THIS IS THE FIX (Part 1) ---
-    // The sandboxed function is now simpler. It only expects 'args' and 'context'.
-    // The 'dependencies' will be a property *of* the context object.
     const execute = new Function('args', 'context', `
       return (async () => {
         try { ${code} } catch (e) {
@@ -61,7 +77,7 @@ async function loadTool(toolPath, contextGarden) {
       })();
     `);
     
-    const tool = { ...metadata, path: toolPath, execute };
+    const tool = { name, description, path: toolPath, execute };
     toolCache.set(cacheKey, tool);
     return tool;
   } catch (e) {

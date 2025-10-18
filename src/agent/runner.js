@@ -1,6 +1,7 @@
 import { getAllTools } from './manager/tool-manager.js';
 import { Traversal } from './traversal.js';
 import { Git } from '../util/git-integration.js';
+import { countTokens } from 'gpt-tokenizer';
 import selectToolPromptTemplate from '../settings/prompts/select-tool.md?raw';
 import critiqueStepPromptTemplate from '../settings/prompts/critique-step.md?raw';
 import synthesizeAnswerPromptTemplate from '../settings/prompts/synthesize-answer.md?raw';
@@ -65,7 +66,7 @@ export class TaskRunner {
             if (!jsonMatch) {
                  throw new Error("No valid JSON object with a 'thought' key found in the LLM response.");
             }
-            return JSON.parse(jsonMatch[0]);
+            return { responseText, responseJson: JSON.parse(jsonMatch[0]) };
         } catch (e) {
             console.error("[TaskRunner] Failed to parse JSON from LLM response:", e);
             console.error("[TaskRunner] Raw response was:", responseText);
@@ -80,6 +81,8 @@ export class TaskRunner {
         let scratchpad = `USER GOAL: ${goal}\n---\nINITIAL CONTEXT:\n${this.initialContext}\n---`;
         let loopCount = 0;
         let shouldFinish = false;
+        let totalInputTokens = 0;
+        let totalOutputTokens = 0;
         
         const dependencies = { Traversal, Git };
 
@@ -89,16 +92,23 @@ export class TaskRunner {
             const toolList = Array.from(this.tools.values()).map(t => `- ${t.name}: ${t.description}`).join('\n');
             const selectToolPrompt = this._fillPrompt(selectToolPromptTemplate, { scratchpad, tool_list: toolList });
             
-            this._sendStreamEvent(stream, 'status', `Loop ${loopCount}/${MAX_LOOPS}: Planning next step...`);
-            
-            let responseJson;
+            const inputTokens = countTokens(selectToolPrompt);
+            totalInputTokens += inputTokens;
+
+            let responseJson, responseText;
             try {
-                responseJson = await this._getJsonCompletion(selectToolPrompt);
+                const result = await this._getJsonCompletion(selectToolPrompt);
+                responseJson = result.responseJson;
+                responseText = result.responseText;
             } catch (error) {
                 this._sendStreamEvent(stream, 'status', `Error: AI returned an invalid plan. Retrying.`);
                 scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${error.message}`;
                 continue;
             }
+            
+            const outputTokens = countTokens(responseText);
+            totalOutputTokens += outputTokens;
+            this._sendStreamEvent(stream, 'status', `Loop ${loopCount}/${MAX_LOOPS}: Planning next step... [${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out]`);
             
             const thought = responseJson.thought;
             const toolChoice = responseJson.action;
@@ -132,11 +142,15 @@ export class TaskRunner {
             
             const observation = await tool.execute(toolArgs, context);
             const observationString = String(observation);
-
-            const observationSummary = observationString.length > 500
-                ? `${observationString.substring(0, 500)}... (truncated)`
-                : observationString;
-            this._sendStreamEvent(stream, 'observation', observationSummary);
+            
+            let observationForDisplay;
+            const observationTokens = countTokens(observationString);
+            if (observationTokens > 250) {
+                observationForDisplay = `[Observation received (${observationTokens.toLocaleString()} tokens) and added to context.]`;
+            } else {
+                observationForDisplay = observationString;
+            }
+            this._sendStreamEvent(stream, 'observation', observationForDisplay);
 
             scratchpad += `\nACTION: Called tool '${toolToCall}' with args: ${JSON.stringify(toolArgs)}\nOBSERVATION: ${observationString}\n---`;
         }
@@ -148,14 +162,24 @@ export class TaskRunner {
         }
         
         const synthesisPrompt = this._fillPrompt(synthesizeAnswerPromptTemplate, { goal, context_buffer: scratchpad });
+        const synthesisInputTokens = countTokens(synthesisPrompt);
+        totalInputTokens += synthesisInputTokens;
+        
         const finalAnswerStream = await this.aiService.getCompletion(synthesisPrompt);
         
+        let finalAnswerText = '';
         const reader = finalAnswerStream.getReader();
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+            finalAnswerText += value;
             stream.enqueue(value);
         }
+        
+        const synthesisOutputTokens = countTokens(finalAnswerText);
+        totalOutputTokens += synthesisOutputTokens;
+        
+        stream.enqueue(`\n<!-- Total Tokens: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out -->`);
         stream.close();
     }
 }
