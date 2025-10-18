@@ -1,9 +1,5 @@
 // src/settings/defaults.js
 
-// This file centralizes the list of default files for the 'Settings' garden.
-// It is used by both the initial git repository setup and the 'Reset Default Settings'
-// function in the dev tools to ensure they are always in sync.
-
 import defaultInterfaceYml from './interface.yml?raw';
 import defaultKeymapsYml from './keymaps.yml?raw';
 import defaultNavigateOrPromptJs from './keymaps/navigate-or-prompt.js?raw';
@@ -11,7 +7,7 @@ import defaultToggleSidebarJs from './keymaps/toggle-sidebar.js?raw';
 import defaultToggleDevtoolsJs from './keymaps/toggle-devtools.js?raw';
 import defaultSearchFilesJs from './keymaps/search-files.js?raw';
 import defaultExecuteCommandJs from './keymaps/execute-command.js?raw';
-import defaultGlobalSearchJs from './keymaps/global-search.js?raw'; // Import the new file
+import defaultGlobalSearchJs from './keymaps/global-search.js?raw';
 import defaultBrowserBackJs from './keymaps/browser-back.js?raw';
 import defaultBrowserForwardJs from './keymaps/browser-forward.js?raw';
 import defaultDuplicateFileJs from './keymaps/duplicate-current-file.js?raw';
@@ -28,6 +24,13 @@ import defaultMovePaneDownJs from './keymaps/move-pane-down.js?raw';
 import defaultClosePaneJs from './keymaps/close-pane.js?raw';
 import defaultQueryTestJs from './query/test.js?raw';
 
+// --- AGENT DEFAULTS ---
+import defaultSelectToolMd from './prompts/select-tool.md?raw';
+import defaultCritiqueStepMd from './prompts/critique-step.md?raw';
+import defaultSynthesizeAnswerMd from './prompts/synthesize-answer.md?raw';
+import defaultBuildKnowledgeBaseJs from './tools/buildKnowledgeBase.js?raw';
+
+
 export const defaultFiles = [
   ['/settings/interface.yml', defaultInterfaceYml],
   ['/settings/keymaps.yml', defaultKeymapsYml],
@@ -36,7 +39,7 @@ export const defaultFiles = [
   ['/settings/keymaps/toggle-devtools.js', defaultToggleDevtoolsJs],
   ['/settings/keymaps/search-files.js', defaultSearchFilesJs],
   ['/settings/keymaps/execute-command.js', defaultExecuteCommandJs],
-  ['/settings/keymaps/global-search.js', defaultGlobalSearchJs], // Add the new file to the list
+  ['/settings/keymaps/global-search.js', defaultGlobalSearchJs],
   ['/settings/keymaps/browser-back.js', defaultBrowserBackJs],
   ['/settings/keymaps/browser-forward.js', defaultBrowserForwardJs],
   ['/settings/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],
@@ -51,5 +54,11 @@ export const defaultFiles = [
   ['/settings/hooks/create.js', defaultHookCreateJs],
   ['/settings/hooks/load.js', defaultHookLoadJs],
   ['/settings/hooks/delete.js', defaultHookDeleteJs],
-  ['/settings/query/test.js', defaultQueryTestJs]
+  ['/settings/query/test.js', defaultQueryTestJs],
+
+  // --- AGENT DEFAULTS ---
+  ['/settings/prompts/select-tool.md', defaultSelectToolMd],
+  ['/settings/prompts/critique-step.md', defaultCritiqueStepMd],
+  ['/settings/prompts/synthesize-answer.md', defaultSynthesizeAnswerMd],
+  ['/settings/tools/buildKnowledgeBase.js', defaultBuildKnowledgeBaseJs],
 ];
