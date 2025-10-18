@@ -50,8 +50,8 @@ export class TaskRunner {
         return stream;
     }
 
-    _sendStatus(stream, message) {
-        stream.enqueue(`[STATUS] ${message}`);
+    _sendStreamEvent(stream, type, message) {
+        stream.enqueue(`[${type.toUpperCase()}] ${message}`);
     }
 
     _fillPrompt(template, vars) {
@@ -75,7 +75,7 @@ export class TaskRunner {
 
     async _orchestrate(goal, stream) {
         await this._initialize();
-        this._sendStatus(stream, `Starting with goal: "${goal}"`);
+        this._sendStreamEvent(stream, 'status', `Starting with goal: "${goal}"`);
 
         let scratchpad = `USER GOAL: ${goal}\n---\nINITIAL CONTEXT:\n${this.initialContext}\n---`;
         let loopCount = 0;
@@ -89,13 +89,13 @@ export class TaskRunner {
             const toolList = Array.from(this.tools.values()).map(t => `- ${t.name}: ${t.description}`).join('\n');
             const selectToolPrompt = this._fillPrompt(selectToolPromptTemplate, { scratchpad, tool_list: toolList });
             
-            this._sendStatus(stream, `Loop ${loopCount}/${MAX_LOOPS}: Thinking...`);
+            this._sendStreamEvent(stream, 'status', `Loop ${loopCount}/${MAX_LOOPS}: Planning next step...`);
             
             let responseJson;
             try {
                 responseJson = await this._getJsonCompletion(selectToolPrompt);
             } catch (error) {
-                this._sendStatus(stream, `Error: AI returned an invalid plan. Retrying.`);
+                this._sendStreamEvent(stream, 'status', `Error: AI returned an invalid plan. Retrying.`);
                 scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${error.message}`;
                 continue;
             }
@@ -103,11 +103,11 @@ export class TaskRunner {
             const thought = responseJson.thought;
             const toolChoice = responseJson.action;
 
-            this._sendStatus(stream, `Thought: ${thought}`);
+            this._sendStreamEvent(stream, 'thought', thought);
             scratchpad += `\nTHOUGHT: ${thought}`;
 
             if (!toolChoice || !toolChoice.tool || !this.tools.has(toolChoice.tool)) {
-                this._sendStatus(stream, `Error: AI chose an invalid tool. Retrying.`);
+                this._sendStreamEvent(stream, 'status', `Error: AI chose an invalid tool ('${toolChoice.tool}'). Retrying.`);
                 scratchpad += `\nOBSERVATION: The last tool choice ('${toolChoice.tool}') was invalid. I must choose a tool from the provided list.`;
                 continue;
             }
@@ -117,28 +117,34 @@ export class TaskRunner {
                 scratchpad += `\nASSESSMENT: The goal is met. I will now synthesize the final answer.`;
                 continue;
             }
-
-            this._sendStatus(stream, `Action: ${toolChoice.tool}`);
-            const tool = this.tools.get(toolChoice.tool);
+            
+            const toolToCall = toolChoice.tool;
+            const toolArgs = toolChoice.args || {};
+            this._sendStreamEvent(stream, 'action', `Using tool \`${toolToCall}\` with args: ${JSON.stringify(toolArgs)}`);
+            const tool = this.tools.get(toolToCall);
             
             const context = { 
                 git: this.gitClient, 
                 ai: this.aiService,
-                dependencies: dependencies
+                dependencies: dependencies,
+                onProgress: (message) => this._sendStreamEvent(stream, 'status', message)
             };
             
-            const observation = await tool.execute(toolChoice.args || {}, context);
+            const observation = await tool.execute(toolArgs, context);
+            const observationString = String(observation);
 
-            // --- THIS IS THE FIX ---
-            // The arbitrary .substring(0, 2000) has been removed.
-            scratchpad += `\nACTION: Called tool '${toolChoice.tool}' with args: ${JSON.stringify(toolChoice.args || {})}\nOBSERVATION: ${String(observation)}\n---`;
-            // --- END OF FIX ---
+            const observationSummary = observationString.length > 500
+                ? `${observationString.substring(0, 500)}... (truncated)`
+                : observationString;
+            this._sendStreamEvent(stream, 'observation', observationSummary);
+
+            scratchpad += `\nACTION: Called tool '${toolToCall}' with args: ${JSON.stringify(toolArgs)}\nOBSERVATION: ${observationString}\n---`;
         }
 
         if (shouldFinish) {
-            this._sendStatus(stream, `Information gathering complete. Synthesizing final answer...`);
+            this._sendStreamEvent(stream, 'status', `Information gathering complete. Synthesizing final answer...`);
         } else {
-            this._sendStatus(stream, `Max loops reached. Synthesizing answer with available context...`);
+            this._sendStreamEvent(stream, 'status', `Max loops reached. Synthesizing answer with available context...`);
         }
         
         const synthesisPrompt = this._fillPrompt(synthesizeAnswerPromptTemplate, { goal, context_buffer: scratchpad });

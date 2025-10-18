@@ -9,13 +9,10 @@ if (!args.goal || !args.initialContent) {
 
 const MAX_DEPTH = 2;
 const { goal, initialContent } = args;
-const { git, ai, dependencies } = context;
+const { git, ai, dependencies, onProgress } = context;
 
-// --- THIS IS THE FIX (Part 3) ---
-// Dependencies are now correctly destructured from the context object.
 const { Traversal } = dependencies;
 const traversal = new Traversal(git);
-// --- END OF FIX ---
 
 let finalContext = `--- Initial Content ---\n${initialContent}\n\n`;
 const visited = new Set();
@@ -35,6 +32,8 @@ while (queue.length > 0) {
   const visitedKey = `${sourceGardenName}#${currentLink}`;
   if (visited.has(visitedKey)) continue;
   visited.add(visitedKey);
+
+  if (onProgress) onProgress(`Reading link: ${currentLink}`);
 
   let newContent = null;
   let sourceIdentifier = currentLink;
@@ -59,6 +58,8 @@ while (queue.length > 0) {
     finalContext += `--- Content from ${sourceIdentifier} ---\n${newContent}\n\n`;
     
     const nextLinks = traversal.extractWikilinks(newContent);
+    if (onProgress && nextLinks.length > 0) onProgress(`... found ${nextLinks.length} new links.`);
+
     for (const nextLink of nextLinks) {
       const nextVisitedKey = `${newContentSourceGarden}#${nextLink}`;
       if (!visited.has(nextVisitedKey)) {
@@ -72,6 +73,8 @@ while (queue.length > 0) {
   }
 }
 
+if (onProgress) onProgress('All links read. Filtering for relevance...');
+
 const relevancePrompt = `
   User Goal: "${goal}"
   Based ONLY on the User Goal, review the following knowledge base I have assembled. Remove any "Content from..." sections that are NOT relevant to the goal. Return only the filtered, relevant content.
@@ -81,4 +84,5 @@ const relevancePrompt = `
 `;
 const relevantContext = await ai.getCompletionAsString(relevancePrompt);
 
+if (onProgress) onProgress('Relevance filtering complete.');
 return relevantContext;

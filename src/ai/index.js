@@ -68,65 +68,81 @@ class AiService {
       view.dispatch(placeholderTransaction);
       thinkingMessagePosition = insertPos + '\n'.length;
 
-      // --- NEW AGENT LOGIC ---
       const editor = window.thoughtform.workspace.getActiveEditor();
       if (!editor || !editor.gitClient) {
         throw new Error("Cannot find active editor or gitClient instance for agent.");
       }
       
       const initialContext = view.state.doc.toString();
-      
       const runner = new TaskRunner({
           gitClient: editor.gitClient,
           aiService: this,
           initialContext: initialContext
       });
-
       const stream = runner.run(userPrompt);
-      // --- END NEW AGENT LOGIC ---
       
       const reader = stream.getReader();
       const startTag = '\n<response>\n';
       view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: startTag } });
       
       let finalAnswerStarted = false;
-      let statusLogHTML = '';
-      let responseBodyStart = thinkingMessagePosition + startTag.length;
-      let responseBodyEnd = responseBodyStart;
+      let contentStartPos = thinkingMessagePosition + startTag.length;
+      let contentEndPos = contentStartPos;
+
+      const streamEventRegex = /^\[(STATUS|THOUGHT|ACTION|OBSERVATION)\]\s(.*)/s;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         
         const chunkText = value;
+        const match = chunkText.match(streamEventRegex);
 
-        if (chunkText.startsWith('[STATUS]')) {
-            if (finalAnswerStarted) continue;
-            statusLogHTML += `  <div class="agent-status">${chunkText.substring(8).trim()}</div>\n`;
+        if (match) {
+            if (finalAnswerStarted) continue; 
+
+            const type = match[1];
+            const content = match[2].trim();
+
+            const titles = {
+                STATUS: '> Status:',
+                THOUGHT: '## Thought',
+                ACTION: '## Action',
+                OBSERVATION: '## Observation'
+            };
+            
+            const newLogChunk = `${titles[type]}\n${content}\n\n`;
+
             view.dispatch({
-                changes: { from: responseBodyStart, to: responseBodyEnd, insert: statusLogHTML }
+                changes: { from: contentEndPos, insert: newLogChunk }
             });
-            responseBodyEnd = responseBodyStart + statusLogHTML.length;
+            contentEndPos += newLogChunk.length;
         } else {
             if (!finalAnswerStarted) {
                 finalAnswerStarted = true;
+                // Replace the entire log block with the start of the final answer
                 view.dispatch({
-                    changes: { from: responseBodyStart, to: responseBodyEnd, insert: chunkText }
+                    changes: { 
+                        from: contentStartPos, 
+                        to: contentEndPos, 
+                        insert: chunkText 
+                    }
                 });
-                responseBodyEnd = responseBodyStart + chunkText.length;
+                contentEndPos = contentStartPos + chunkText.length;
             } else {
+                // Continue streaming the final answer by inserting at the end
                 view.dispatch({
-                    changes: { from: responseBodyEnd, insert: chunkText }
+                    changes: { from: contentEndPos, insert: chunkText }
                 });
-                responseBodyEnd += chunkText.length;
+                contentEndPos += chunkText.length;
             }
         }
       }
 
       const finalInsert = `\n</response>\n\n>$ `;
       view.dispatch({
-        changes: { from: responseBodyEnd, insert: finalInsert },
-        selection: { anchor: responseBodyEnd + finalInsert.length }
+        changes: { from: contentEndPos, insert: finalInsert },
+        selection: { anchor: contentEndPos + finalInsert.length }
       });
 
     } catch (error) {
