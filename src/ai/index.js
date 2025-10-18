@@ -1,5 +1,6 @@
 import { streamChatCompletion as streamGemini } from './models/gemini.js';
-import { TaskRunner } from '../agent/runner.js'; // Import the new TaskRunner
+import { TaskRunner } from '../agent/runner.js';
+import { countTokens } from 'gpt-tokenizer';
 
 class AiService {
   constructor() {
@@ -22,22 +23,53 @@ class AiService {
     this.loadConfig();
   }
 
-  async getCompletion(prompt) {
+  async getCompletion(prompt, onTokenCount) {
     this.loadConfig();
     if (!this.config.geminiApiKey) {
       throw new Error('Gemini API key is not set. Please configure it in the AI dev tools panel.');
     }
-    return streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
+    
+    const originalStream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
+
+    if (!onTokenCount) {
+        return originalStream;
+    }
+
+    const inputTokens = countTokens(prompt);
+    let fullResponse = '';
+
+    const countingStream = new TransformStream({
+      transform(chunk, controller) {
+        fullResponse += chunk;
+        controller.enqueue(chunk);
+      },
+      flush(controller) {
+        const outputTokens = countTokens(fullResponse);
+        onTokenCount({ input: inputTokens, output: outputTokens });
+      }
+    });
+
+    return originalStream.pipeThrough(countingStream);
   }
 
-  async getCompletionAsString(prompt) {
-      const stream = await this.getCompletion(prompt);
+  async getCompletionAsString(prompt, onTokenCount) {
+      this.loadConfig();
+      if (!this.config.geminiApiKey) {
+        throw new Error('Gemini API key is not set. Please configure it in the AI dev tools panel.');
+      }
+      const stream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
       const reader = stream.getReader();
       let fullResponse = '';
       while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           fullResponse += value;
+      }
+      
+      if (onTokenCount) {
+          const inputTokens = countTokens(prompt);
+          const outputTokens = countTokens(fullResponse);
+          onTokenCount({ input: inputTokens, output: outputTokens });
       }
       return fullResponse;
   }
@@ -73,7 +105,6 @@ class AiService {
         throw new Error("Cannot find active editor or gitClient instance for agent.");
       }
       
-      // Get the full document content, but remove any previous token count comments.
       const rawContext = view.state.doc.toString();
       const initialContext = rawContext.replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
 
@@ -123,7 +154,6 @@ class AiService {
         } else {
             if (!finalAnswerStarted) {
                 finalAnswerStarted = true;
-                // Replace the entire log block with the start of the final answer
                 view.dispatch({
                     changes: { 
                         from: contentStartPos, 
@@ -133,7 +163,6 @@ class AiService {
                 });
                 contentEndPos = contentStartPos + chunkText.length;
             } else {
-                // Continue streaming the final answer by inserting at the end
                 view.dispatch({
                     changes: { from: contentEndPos, insert: chunkText }
                 });

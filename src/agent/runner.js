@@ -59,8 +59,8 @@ export class TaskRunner {
         return Object.entries(vars).reduce((acc, [key, value]) => acc.replace(new RegExp(`{{${key}}}`, 'g'), String(value)), template);
     }
 
-    async _getJsonCompletion(prompt) {
-        const responseText = await this.aiService.getCompletionAsString(prompt);
+    async _getJsonCompletion(prompt, aiService) {
+        const responseText = await aiService.getCompletionAsString(prompt);
         try {
             const jsonMatch = responseText.match(/{\s*"thought":[\s\S]*}/);
             if (!jsonMatch) {
@@ -84,6 +84,16 @@ export class TaskRunner {
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
         
+        const onTokenCount = ({ input, output }) => {
+            totalInputTokens += input;
+            totalOutputTokens += output;
+        };
+        
+        const trackedAiService = {
+            getCompletion: (prompt) => this.aiService.getCompletion(prompt, onTokenCount),
+            getCompletionAsString: (prompt) => this.aiService.getCompletionAsString(prompt, onTokenCount),
+        };
+        
         const dependencies = { Traversal, Git };
 
         while (loopCount < MAX_LOOPS && !shouldFinish) {
@@ -92,23 +102,21 @@ export class TaskRunner {
             const toolList = Array.from(this.tools.values()).map(t => `- ${t.name}: ${t.description}`).join('\n');
             const selectToolPrompt = this._fillPrompt(selectToolPromptTemplate, { scratchpad, tool_list: toolList });
             
-            const inputTokens = countTokens(selectToolPrompt);
-            totalInputTokens += inputTokens;
+            const tokensBefore = { input: totalInputTokens, output: totalOutputTokens };
 
-            let responseJson, responseText;
+            let responseJson;
             try {
-                const result = await this._getJsonCompletion(selectToolPrompt);
+                const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService);
                 responseJson = result.responseJson;
-                responseText = result.responseText;
             } catch (error) {
                 this._sendStreamEvent(stream, 'status', `Error: AI returned an invalid plan. Retrying.`);
                 scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${error.message}`;
                 continue;
             }
             
-            const outputTokens = countTokens(responseText);
-            totalOutputTokens += outputTokens;
-            this._sendStreamEvent(stream, 'status', `Loop ${loopCount}/${MAX_LOOPS}: Planning next step... [${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out]`);
+            const stepInput = totalInputTokens - tokensBefore.input;
+            const stepOutput = totalOutputTokens - tokensBefore.output;
+            this._sendStreamEvent(stream, 'status', `Loop ${loopCount}/${MAX_LOOPS}: Planning step...\n[Step: ${stepInput.toLocaleString()} in / ${stepOutput.toLocaleString()} out]\n[Total: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out]`);
             
             const thought = responseJson.thought;
             const toolChoice = responseJson.action;
@@ -135,11 +143,13 @@ export class TaskRunner {
             
             const context = { 
                 git: this.gitClient, 
-                ai: this.aiService,
+                ai: trackedAiService,
                 dependencies: dependencies,
                 onProgress: (message) => this._sendStreamEvent(stream, 'status', message)
             };
             
+            const tokensBeforeTool = { input: totalInputTokens, output: totalOutputTokens };
+
             const observation = await tool.execute(toolArgs, context);
             const observationString = String(observation);
             
@@ -151,6 +161,13 @@ export class TaskRunner {
                 observationForDisplay = observationString;
             }
             this._sendStreamEvent(stream, 'observation', observationForDisplay);
+            
+            const toolInput = totalInputTokens - tokensBeforeTool.input;
+            const toolOutput = totalOutputTokens - tokensBeforeTool.output;
+
+            if (toolInput > 0 || toolOutput > 0) {
+                this._sendStreamEvent(stream, 'status', `Tool LLM Usage:\n[Step: ${toolInput.toLocaleString()} in / ${toolOutput.toLocaleString()} out]\n[Total: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out]`);
+            }
 
             scratchpad += `\nACTION: Called tool '${toolToCall}' with args: ${JSON.stringify(toolArgs)}\nOBSERVATION: ${observationString}\n---`;
         }
@@ -162,22 +179,14 @@ export class TaskRunner {
         }
         
         const synthesisPrompt = this._fillPrompt(synthesizeAnswerPromptTemplate, { goal, context_buffer: scratchpad });
-        const synthesisInputTokens = countTokens(synthesisPrompt);
-        totalInputTokens += synthesisInputTokens;
+        const finalAnswerStream = await trackedAiService.getCompletion(synthesisPrompt);
         
-        const finalAnswerStream = await this.aiService.getCompletion(synthesisPrompt);
-        
-        let finalAnswerText = '';
         const reader = finalAnswerStream.getReader();
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            finalAnswerText += value;
             stream.enqueue(value);
         }
-        
-        const synthesisOutputTokens = countTokens(finalAnswerText);
-        totalOutputTokens += synthesisOutputTokens;
         
         stream.enqueue(`\n<!-- Total Tokens: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out -->`);
         stream.close();
