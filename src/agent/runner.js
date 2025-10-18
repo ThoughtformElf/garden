@@ -81,6 +81,8 @@ export class TaskRunner {
         let loopCount = 0;
         let shouldFinish = false;
         
+        const dependencies = { Traversal, Git };
+
         while (loopCount < MAX_LOOPS && !shouldFinish) {
             loopCount++;
             
@@ -119,18 +121,18 @@ export class TaskRunner {
             this._sendStatus(stream, `Action: ${toolChoice.tool}`);
             const tool = this.tools.get(toolChoice.tool);
             
-            // --- THIS IS THE FIX (Part 2) ---
-            // The context object is prepared with all necessary APIs AND dependencies.
             const context = { 
                 git: this.gitClient, 
                 ai: this.aiService,
-                dependencies: { Traversal, Git }
+                dependencies: dependencies
             };
             
-            // The tool is now called with only two arguments.
             const observation = await tool.execute(toolChoice.args || {}, context);
 
-            scratchpad += `\nACTION: Called tool '${toolChoice.tool}' with args: ${JSON.stringify(toolChoice.args || {})}\nOBSERVATION: ${String(observation).substring(0, 2000)}\n---`;
+            // --- THIS IS THE FIX ---
+            // The arbitrary .substring(0, 2000) has been removed.
+            scratchpad += `\nACTION: Called tool '${toolChoice.tool}' with args: ${JSON.stringify(toolChoice.args || {})}\nOBSERVATION: ${String(observation)}\n---`;
+            // --- END OF FIX ---
         }
 
         if (shouldFinish) {
