@@ -30,6 +30,7 @@ import defaultCritiqueStepMd from './prompts/critique-step.md?raw';
 import defaultSynthesizeAnswerMd from './prompts/synthesize-answer.md?raw';
 import defaultBuildKnowledgeBaseJs from './tools/buildKnowledgeBase.js?raw';
 import defaultReadURLJs from './tools/readURL.js?raw';
+import defaultWebSearchJs from './tools/webSearch.js?raw';
 
 
 export const defaultFiles = [
@@ -63,4 +64,5 @@ export const defaultFiles = [
   ['/settings/prompts/synthesize-answer.md', defaultSynthesizeAnswerMd],
   ['/settings/tools/buildKnowledgeBase.js', defaultBuildKnowledgeBaseJs],
   ['/settings/tools/readURL.js', defaultReadURLJs],
+  ['/settings/tools/webSearch.js', defaultWebSearchJs],
 ];

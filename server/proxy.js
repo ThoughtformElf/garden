@@ -64,7 +64,7 @@ function isAllowedDomain(targetUrl) {
   }
 }
 
-async function fetchAndParse(targetUrl) {
+async function fetchAndParse(targetUrl, queryParams) {
   if (cache.has(targetUrl)) {
     const entry = cache.get(targetUrl);
     if (Date.now() - entry.timestamp < CACHE_TTL) {
@@ -74,52 +74,64 @@ async function fetchAndParse(targetUrl) {
     cache.delete(targetUrl);
   }
 
-  try {
-    console.log(`[Proxy] Attempting lightweight fetch: ${targetUrl}`);
-    const response = await axios.get(targetUrl, {
-      headers: {
+  // --- THIS IS THE FIX (Part 2) ---
+  // Check for the 'forceheadless' parameter. If it exists, skip the lightweight fetch.
+  const forceHeadless = queryParams.forceheadless === 'true';
+
+  if (!forceHeadless) {
+    try {
+      console.log(`[Proxy] Attempting lightweight fetch: ${targetUrl}`);
+      const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-      },
-      timeout: 15000
-    });
-    const html = response.data;
+      };
 
-    const dom = new JSDOM(html, { url: targetUrl });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-
-    if (!article || !article.textContent) {
-      throw new Error('Readability could not extract content via lightweight fetch.');
-    }
-    
-    const cleanedText = article.textContent.replace(/\s{2,}/g, ' ').trim();
-    const content = `Title: ${article.title}\nBy: ${article.byline || 'Unknown'}\n\n${cleanedText}`;
-    
-    cache.set(targetUrl, { content, timestamp: Date.now() });
-    console.log(`[Proxy] Lightweight fetch successful for: ${targetUrl}`);
-    return content;
-
-  } catch (error) {
-    if (error.response && (error.response.status === 429 || error.response.status === 403)) {
-      console.warn(`[Proxy] Lightweight fetch failed with status ${error.response.status}. Escalating to headless browser.`);
-    } else {
-      let errorMessage = error.message;
-      if (error.response && error.response.status) {
-          errorMessage = `Request failed with status ${error.response.status}`;
+      // If a Brave API key is passed, add it to the headers.
+      if (queryParams.braveapikey) {
+          headers['X-Subscription-Token'] = queryParams.braveapikey;
       }
-      console.error(`[Proxy] Lightweight fetch failed permanently for "${targetUrl}":`, errorMessage);
-      return `Error: Could not retrieve content from ${targetUrl}. Reason: ${errorMessage}`;
+
+      const response = await axios.get(targetUrl, { headers, timeout: 15000 });
+      const html = response.data;
+
+      const dom = new JSDOM(html, { url: targetUrl });
+      const reader = new Readability(dom.window.document);
+      const article = reader.parse();
+
+      if (!article || !article.textContent) {
+        throw new Error('Readability could not extract content via lightweight fetch.');
+      }
+      
+      const cleanedText = article.textContent.replace(/\s{2,}/g, ' ').trim();
+      const content = `Title: ${article.title}\nBy: ${article.byline || 'Unknown'}\n\n${cleanedText}`;
+      
+      cache.set(targetUrl, { content, timestamp: Date.now() });
+      console.log(`[Proxy] Lightweight fetch successful for: ${targetUrl}`);
+      return content;
+
+    } catch (error) {
+      if (error.response && (error.response.status === 429 || error.response.status === 403)) {
+        console.warn(`[Proxy] Lightweight fetch failed with status ${error.response.status}. Escalating to headless browser.`);
+      } else {
+        let errorMessage = error.message;
+        if (error.response && error.response.status) {
+            errorMessage = `Request failed with status ${error.response.status}`;
+        }
+        console.warn(`[Proxy] Lightweight fetch failed for "${targetUrl}", escalating to headless. Reason:`, errorMessage);
+      }
     }
+  } else {
+      console.log(`[Proxy] Bypassing lightweight fetch due to 'forceheadless=true'.`);
   }
+
 
   console.log(`[Proxy] Fetching with headless browser: ${targetUrl}`);
   let browser = null;
   try {
     browser = await puppeteer.launch({
         headless: "new",
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // Use environment variable
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
@@ -128,7 +140,7 @@ async function fetchAndParse(targetUrl) {
             '--disable-software-rasterizer',
             '--disable-extensions',
             '--no-zygote',
-            '--single-process'  // This is the key one for Docker
+            '--single-process'
         ]
     });
     const page = await browser.newPage();
@@ -136,7 +148,6 @@ async function fetchAndParse(targetUrl) {
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36');
     
-    // Block unnecessary resources to speed up loading
     await page.setRequestInterception(true);
     page.on('request', (req) => {
         if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
@@ -146,7 +157,6 @@ async function fetchAndParse(targetUrl) {
         }
     });
     
-    // Try networkidle2 first, fall back to domcontentloaded if timeout
     try {
         await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
     } catch (timeoutError) {
@@ -155,6 +165,13 @@ async function fetchAndParse(targetUrl) {
     }
 
     const html = await page.content();
+
+    // With DuckDuckGo, we don't need Readability, we want the raw search results HTML.
+    if (targetUrl.includes('duckduckgo.com')) {
+        cache.set(targetUrl, { content: html, timestamp: Date.now() });
+        console.log(`[Proxy] Headless browser fetch successful for DDG: ${targetUrl}`);
+        return html;
+    }
 
     const dom = new JSDOM(html, { url: targetUrl });
     const reader = new Readability(dom.window.document);
@@ -265,8 +282,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const content = await fetchAndParse(targetUrl);
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      // Pass the query parameters to the fetch function
+      const content = await fetchAndParse(targetUrl, parsedUrl.query);
+      
+      // Determine content type based on what was fetched
+      const contentType = targetUrl.includes('duckduckgo.com') ? 'text/html' : 'text/plain';
+      res.writeHead(200, { 'Content-Type': contentType });
       res.end(content);
     } catch (e) {
       res.writeHead(500, { 'Content-Type': 'application/json' });

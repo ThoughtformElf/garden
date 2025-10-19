@@ -68,11 +68,17 @@ async function loadTool(toolPath, contextGarden) {
     const name = toolPath.split('/').pop().replace('.js', '');
     const description = parseToolMetadata(code);
     
+    // --- THIS IS THE FIX ---
+    // The tool's code is now wrapped in a try...catch block.
+    // This logs the full error for debugging but returns a simple
+    // message to the agent so it can reason about the failure.
     const execute = new Function('args', 'context', `
       return (async () => {
-        try { ${code} } catch (e) {
+        try { 
+          ${code} 
+        } catch (e) {
           console.error('TOOL EXECUTION FAILED in script: "${toolPath}" from ${sourceGarden}', e);
-          return 'Error: ' + e.message;
+          return 'Error: An exception occurred while trying to run the tool: ' + e.message;
         }
       })();
     `);

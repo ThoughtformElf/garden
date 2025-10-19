@@ -18,7 +18,9 @@ You must now decide the next step.
 
 If, and only if, the `OBSERVATION` in the `CURRENT STATE` contains enough information to fully answer the `USER GOAL`, you should use the `finish` tool.
 
-Respond with a single, valid JSON object following this exact format:
+# CRITICAL REMINDER
+You MUST respond with a single, valid JSON object following this exact format. Do NOT output any other text, reasoning, or explanation before or after the JSON object.
+
 {
   "thought": "...",
   "action": {
