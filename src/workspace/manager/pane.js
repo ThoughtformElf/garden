@@ -2,10 +2,11 @@ export class PaneManager {
   constructor(workspace) {
     this.workspace = workspace;
     this.isMaximized = false;
-    // No longer need preMaximizeTree, as we will modify percentages in place.
   }
 
   splitPane(paneIdToSplit, direction) {
+    if (this.isMaximized) this.toggleMaximizePane();
+
     let newPaneId = null; 
 
     const generateScratchpadPath = () => {
@@ -53,6 +54,7 @@ export class PaneManager {
   }
 
   closeActivePane() {
+    if (this.isMaximized) this.toggleMaximizePane();
     const panes = this._getPaneList();
     if (panes.length <= 1) {
         return;
@@ -109,7 +111,8 @@ export class PaneManager {
       this._applyMaximize(this.workspace.paneTree, this.workspace.activePaneId);
     }
     this.isMaximized = !this.isMaximized;
-    this.workspace.render();
+    this.workspace.updateLayout(); // Use the fast layout update
+    this.workspace._stateManager.saveState();
   }
   
   _isDescendant(node, paneId) {
@@ -126,12 +129,13 @@ export class PaneManager {
     if (!node || node.type === 'leaf') return;
 
     if (node.type.startsWith('split-')) {
+      // Store the current percentage so we can restore it later.
       node.originalSplitPercentage = node.splitPercentage;
 
       if (this._isDescendant(node.children[0], activePaneId)) {
-        node.splitPercentage = 99.5;
+        node.splitPercentage = 99.5; // Give almost all space to the first child
       } else if (this._isDescendant(node.children[1], activePaneId)) {
-        node.splitPercentage = 0.5;
+        node.splitPercentage = 0.5; // Give almost no space to the first child
       }
       
       this._applyMaximize(node.children[0], activePaneId);

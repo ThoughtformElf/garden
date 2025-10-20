@@ -5,6 +5,10 @@ export class WorkspaceRenderer {
     this.workspace = workspace;
   }
 
+  /**
+   * Performs a full, destructive render. Only use for initial load or
+   * when the pane structure (splits, closes) changes.
+   */
   async render() {
     this.workspace.mainContainer.style.display = 'flex';
     this.workspace.mainContainer.style.gridTemplateColumns = '';
@@ -20,6 +24,33 @@ export class WorkspaceRenderer {
     this.workspace.mainContainer.innerHTML = '';
     await this._renderNode(this.workspace.paneTree, this.workspace.mainContainer);
     this.workspace.setActivePane(this.workspace.activePaneId);
+  }
+
+  /**
+   * A lightweight, non-destructive layout update. Use for resizing operations
+   * like maximizing, which only change percentages.
+   */
+  updateLayout() {
+    this._syncNodeStyles(this.workspace.paneTree, this.workspace.mainContainer);
+  }
+
+  _syncNodeStyles(node, element) {
+    if (!element || !node) return;
+
+    if (node.type.startsWith('split-')) {
+      const direction = node.type.split('-')[1];
+      if (direction === 'vertical') {
+        element.style.gridTemplateColumns = `${node.splitPercentage}% auto 1fr`;
+      } else {
+        element.style.gridTemplateRows = `${node.splitPercentage}% auto 1fr`;
+      }
+      
+      // Recursively sync styles for children, assuming a consistent DOM structure
+      if (element.children.length === 3) {
+        this._syncNodeStyles(node.children[0], element.children[0]);
+        this._syncNodeStyles(node.children[1], element.children[2]);
+      }
+    }
   }
 
   async _renderNode(node, parentElement) {

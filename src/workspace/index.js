@@ -61,14 +61,9 @@ export class WorkspaceManager {
   }
 
   setActivePane(paneId) {
-    // --- THIS IS THE FIX ---
-    // Only un-maximize if the layout IS maximized AND the user is trying
-    // to switch to a DIFFERENT pane. This prevents the "snap back" effect.
     if (this._paneManager.isMaximized && this.activePaneId !== paneId) {
-      this.toggleMaximizePane();
+      this.toggleMaximizePane(); // This will restore the view
     }
-    // --- END OF FIX ---
-
     if (!this.panes.has(paneId)) return;
     this.activePaneId = paneId;
 
@@ -143,8 +138,8 @@ export class WorkspaceManager {
     }
 
     await editor.loadFile(path);
-    this.setActivePane(this.activePaneId);
-    this._stateManager.saveState();
+    this.setActivePane(this.activePaneId); // Call setActivePane to handle focus and state saving
+    // No need to save state here, setActivePane does it.
   }
 
   _updateURL() {
@@ -252,6 +247,7 @@ export class WorkspaceManager {
   
   // Delegated Public API
   render() { return this._renderer.render(); }
+  updateLayout() { return this._renderer.updateLayout(); }
   splitPane(paneId, direction) { return this._paneManager.splitPane(paneId, direction); }
   closeActivePane() { return this._paneManager.closeActivePane(); }
   selectNextPane() { return this._paneManager.selectNextPane(); }
