@@ -29,7 +29,8 @@ export class WorkspaceStateManager {
     const stateToSave = {
       paneTree: this.workspace.paneTree,
       activePaneId: this.workspace.activePaneId,
-      editorStates: editorStates
+      editorStates: editorStates,
+      isMaximized: this.workspace._paneManager.isMaximized,
     };
 
     try {

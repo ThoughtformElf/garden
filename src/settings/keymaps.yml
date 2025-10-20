@@ -41,15 +41,26 @@
 
 - key: "Alt-Shift-ArrowRight"
   run: "settings/keymaps/select-next-pane.js"
+- key: "Alt-l"
+  run: "settings/keymaps/select-next-pane.js"
 
 - key: "Alt-Shift-ArrowLeft"
+  run: "settings/keymaps/select-prev-pane.js"
+- key: "Alt-h"
   run: "settings/keymaps/select-prev-pane.js"
 
 - key: "Alt-Shift-ArrowDown"
   run: "settings/keymaps/move-pane-down.js"
+- key: "Alt-j"
+  run: "settings/keymaps/move-pane-down.js"
 
 - key: "Alt-Shift-ArrowUp"
+  run: "settings/keymaps/move-pane-up.js"
+- key: "Alt-k"
   run: "settings/keymaps/move-pane-up.js"
 
 - key: "Alt-Shift-x"
   run: "settings/keymaps/close-pane.js"
+
+- key: "Alt-z"
+  run: "settings/keymaps/toggle-maximize-pane.js"

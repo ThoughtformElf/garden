@@ -22,6 +22,7 @@ import defaultSelectPrevPaneJs from './keymaps/select-prev-pane.js?raw';
 import defaultMovePaneUpJs from './keymaps/move-pane-up.js?raw';
 import defaultMovePaneDownJs from './keymaps/move-pane-down.js?raw';
 import defaultClosePaneJs from './keymaps/close-pane.js?raw';
+import defaultMaximizePaneJS from './keymaps/toggle-maximize-pane.js?raw';
 import defaultQueryTestJs from './query/test.js?raw';
 
 // --- AGENT DEFAULTS ---
@@ -31,6 +32,7 @@ import defaultSynthesizeAnswerMd from './prompts/synthesize-answer.md?raw';
 import defaultBuildKnowledgeBaseJs from './tools/buildKnowledgeBase.js?raw';
 import defaultReadURLJs from './tools/readURL.js?raw';
 import defaultWebSearchJs from './tools/webSearch.js?raw';
+import defaultListFilesJs from './tools/listFiles.js?raw';
 
 
 export const defaultFiles = [
@@ -53,6 +55,7 @@ export const defaultFiles = [
   ['/settings/keymaps/move-pane-up.js', defaultMovePaneUpJs],
   ['/settings/keymaps/move-pane-down.js', defaultMovePaneDownJs],
   ['/settings/keymaps/close-pane.js', defaultClosePaneJs],
+  ['/settings/keymaps/toggle-maximize-pane.js', defaultMaximizePaneJS ],
   ['/settings/hooks/create.js', defaultHookCreateJs],
   ['/settings/hooks/load.js', defaultHookLoadJs],
   ['/settings/hooks/delete.js', defaultHookDeleteJs],
@@ -65,4 +68,5 @@ export const defaultFiles = [
   ['/settings/tools/buildKnowledgeBase.js', defaultBuildKnowledgeBaseJs],
   ['/settings/tools/readURL.js', defaultReadURLJs],
   ['/settings/tools/webSearch.js', defaultWebSearchJs],
+  ['/settings/tools/listFiles.js', defaultListFilesJs],
 ];

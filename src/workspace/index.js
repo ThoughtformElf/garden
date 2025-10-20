@@ -32,10 +32,12 @@ export class WorkspaceManager {
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
         this.initialEditorStates = savedState.editorStates || {};
+        this._paneManager.isMaximized = savedState.isMaximized || false;
     } else {
         this.paneTree = this._createInitialPaneTree();
         this.activePaneId = 'pane-1';
         this.initialEditorStates = {};
+        this._paneManager.isMaximized = false;
     }
   }
 
@@ -59,6 +61,14 @@ export class WorkspaceManager {
   }
 
   setActivePane(paneId) {
+    // --- THIS IS THE FIX ---
+    // Only un-maximize if the layout IS maximized AND the user is trying
+    // to switch to a DIFFERENT pane. This prevents the "snap back" effect.
+    if (this._paneManager.isMaximized && this.activePaneId !== paneId) {
+      this.toggleMaximizePane();
+    }
+    // --- END OF FIX ---
+
     if (!this.panes.has(paneId)) return;
     this.activePaneId = paneId;
 
@@ -248,6 +258,7 @@ export class WorkspaceManager {
   selectPrevPane() { return this._paneManager.selectPrevPane(); }
   movePaneUp() { return this._paneManager.movePaneUp(); }
   movePaneDown() { return this._paneManager.movePaneDown(); }
+  toggleMaximizePane() { return this._paneManager.toggleMaximizePane(); }
   _saveStateToSession() { return this._stateManager.saveState(); }
 }
 

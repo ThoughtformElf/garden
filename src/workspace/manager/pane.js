@@ -1,6 +1,8 @@
 export class PaneManager {
   constructor(workspace) {
     this.workspace = workspace;
+    this.isMaximized = false;
+    // No longer need preMaximizeTree, as we will modify percentages in place.
   }
 
   splitPane(paneIdToSplit, direction) {
@@ -99,6 +101,56 @@ export class PaneManager {
   
   movePaneUp() { this._findAndSwap('up'); }
   movePaneDown() { this._findAndSwap('down'); }
+
+  toggleMaximizePane() {
+    if (this.isMaximized) {
+      this._applyRestore(this.workspace.paneTree);
+    } else {
+      this._applyMaximize(this.workspace.paneTree, this.workspace.activePaneId);
+    }
+    this.isMaximized = !this.isMaximized;
+    this.workspace.render();
+  }
+  
+  _isDescendant(node, paneId) {
+    if (node.type === 'leaf') {
+      return node.id === paneId;
+    }
+    if (node.type.startsWith('split-')) {
+      return this._isDescendant(node.children[0], paneId) || this._isDescendant(node.children[1], paneId);
+    }
+    return false;
+  }
+
+  _applyMaximize(node, activePaneId) {
+    if (!node || node.type === 'leaf') return;
+
+    if (node.type.startsWith('split-')) {
+      node.originalSplitPercentage = node.splitPercentage;
+
+      if (this._isDescendant(node.children[0], activePaneId)) {
+        node.splitPercentage = 99.5;
+      } else if (this._isDescendant(node.children[1], activePaneId)) {
+        node.splitPercentage = 0.5;
+      }
+      
+      this._applyMaximize(node.children[0], activePaneId);
+      this._applyMaximize(node.children[1], activePaneId);
+    }
+  }
+
+  _applyRestore(node) {
+    if (!node || node.type === 'leaf') return;
+    
+    if (node.type.startsWith('split-')) {
+      if (typeof node.originalSplitPercentage === 'number') {
+        node.splitPercentage = node.originalSplitPercentage;
+        delete node.originalSplitPercentage;
+      }
+      this._applyRestore(node.children[0]);
+      this._applyRestore(node.children[1]);
+    }
+  }
 
   getActivePaneInfo() {
     if (!this.workspace.activePaneId) return null;
