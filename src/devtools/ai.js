@@ -29,7 +29,7 @@ class AiTool {
           </div>
           <div class="sync-row">
             <label for="gemini-model-name" class="sync-label">Model Name:</label>
-            <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-1.5-flash">
+            <input type="text" id="gemini-model-name" class="eruda-input flex-grow" placeholder="e.g., gemini-2.5-flash">
           </div>
         </div>
         <div class="sync-panel" style="margin-top: 15px;">
@@ -53,7 +53,7 @@ class AiTool {
     const saveBtn = $el.find('#ai-save-config')[0];
 
     apiKeyInput.value = localStorage.getItem('thoughtform_gemini_api_key') || '';
-    modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-1.5-flash';
+    modelNameInput.value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
     proxyUrlInput.value = localStorage.getItem('thoughtform_proxy_url') || '';
 
     const saveConfig = () => this._handleSaveConfig();
@@ -67,7 +67,7 @@ class AiTool {
   _handleSaveConfig() {
     const $el = this._$el;
     const apiKey = $el.find('#gemini-api-key')[0].value.trim();
-    const modelName = $el.find('#gemini-model-name')[0].value.trim() || 'gemini-1.5-flash';
+    const modelName = $el.find('#gemini-model-name')[0].value.trim() || 'gemini-2.5-flash';
     const proxyUrl = $el.find('#proxy-url')[0].value.trim();
     
     localStorage.setItem('thoughtform_gemini_api_key', apiKey);

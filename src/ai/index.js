@@ -6,7 +6,7 @@ class AiService {
   constructor() {
     this.config = {
       geminiApiKey: '',
-      geminiModelName: 'gemini-1.5-flash'
+      geminiModelName: 'gemini-2.5-flash'
     };
     this.loadConfig();
   }
@@ -14,7 +14,7 @@ class AiService {
   loadConfig() {
     this.config.geminiApiKey = localStorage.getItem('thoughtform_gemini_api_key') || '';
     const savedModel = localStorage.getItem('thoughtform_gemini_model_name');
-    this.config.geminiModelName = savedModel || 'gemini-1.5-flash';
+    this.config.geminiModelName = savedModel || 'gemini-2.5-flash';
   }
 
   saveConfig(apiKey, modelName) {

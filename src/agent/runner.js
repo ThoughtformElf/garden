@@ -6,8 +6,6 @@ import selectToolPromptTemplate from '../settings/prompts/select-tool.md?raw';
 import critiqueStepPromptTemplate from '../settings/prompts/critique-step.md?raw';
 import synthesizeAnswerPromptTemplate from '../settings/prompts/synthesize-answer.md?raw';
 
-const MAX_LOOPS = 8;
-
 export class TaskRunner {
     constructor({ gitClient, aiService, initialContext }) {
         if (!gitClient || !aiService || initialContext === undefined) {
@@ -23,7 +21,7 @@ export class TaskRunner {
         this.tools = await getAllTools(this.gitClient.gardenName);
         this.tools.set('finish', {
             name: 'finish',
-            description: 'Call this tool with no arguments when you have gathered all necessary information and are ready to synthesize the final answer.',
+            description: 'Call this tool when you have completed all research, verified your findings from multiple sources, and are ready to synthesize the final, comprehensive answer.',
             execute: async () => "Signal to finish task received.",
         });
     }
@@ -84,19 +82,19 @@ export class TaskRunner {
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
         
-        const onTokenCount = ({ input, output }) => {
+        const onTokenCountholder = ({ input, output }) => {
             totalInputTokens += input;
             totalOutputTokens += output;
         };
         
         const trackedAiService = {
-            getCompletion: (prompt) => this.aiService.getCompletion(prompt, onTokenCount),
-            getCompletionAsString: (prompt) => this.aiService.getCompletionAsString(prompt, onTokenCount),
+            getCompletion: (prompt) => this.aiService.getCompletion(prompt, onTokenCountholder),
+            getCompletionAsString: (prompt) => this.aiService.getCompletionAsString(prompt, onTokenCountholder),
         };
         
         const dependencies = { Traversal, Git };
 
-        while (loopCount < MAX_LOOPS && !shouldFinish) {
+        while (!shouldFinish) {
             loopCount++;
             
             const toolList = Array.from(this.tools.values()).map(t => `- ${t.name}: ${t.description}`).join('\n');
@@ -116,7 +114,7 @@ export class TaskRunner {
             
             const stepInput = totalInputTokens - tokensBefore.input;
             const stepOutput = totalOutputTokens - tokensBefore.output;
-            this._sendStreamEvent(stream, 'status', `Loop ${loopCount}/${MAX_LOOPS}: Planning step...\n[Step: ${stepInput.toLocaleString()} in / ${stepOutput.toLocaleString()} out]\n[Total: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out]`);
+            this._sendStreamEvent(stream, 'status', `Step ${loopCount}: Planning...\n[Step: ${stepInput.toLocaleString()} in / ${stepOutput.toLocaleString()} out]\n[Total: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out]`);
             
             const thought = responseJson.thought;
             const toolChoice = responseJson.action;
@@ -138,6 +136,7 @@ export class TaskRunner {
             
             const toolToCall = toolChoice.tool;
             const toolArgs = toolChoice.args || {};
+            
             this._sendStreamEvent(stream, 'action', `Using tool \`${toolToCall}\` with args: ${JSON.stringify(toolArgs)}`);
             const tool = this.tools.get(toolToCall);
             
@@ -171,12 +170,8 @@ export class TaskRunner {
 
             scratchpad += `\nACTION: Called tool '${toolToCall}' with args: ${JSON.stringify(toolArgs)}\nOBSERVATION: ${observationString}\n---`;
         }
-
-        if (shouldFinish) {
-            this._sendStreamEvent(stream, 'status', `Information gathering complete. Synthesizing final answer...`);
-        } else {
-            this._sendStreamEvent(stream, 'status', `Max loops reached. Synthesizing answer with available context...`);
-        }
+        
+        this._sendStreamEvent(stream, 'status', `Agent has finished its work. Synthesizing final answer...`);
         
         const synthesisPrompt = this._fillPrompt(synthesizeAnswerPromptTemplate, { goal, context_buffer: scratchpad });
         const finalAnswerStream = await trackedAiService.getCompletion(synthesisPrompt);
