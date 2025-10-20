@@ -129,15 +129,12 @@ export class PaneManager {
     if (!node || node.type === 'leaf') return;
 
     if (node.type.startsWith('split-')) {
-      // Store the current percentage so we can restore it later.
       node.originalSplitPercentage = node.splitPercentage;
-
       if (this._isDescendant(node.children[0], activePaneId)) {
-        node.splitPercentage = 99.5; // Give almost all space to the first child
+        node.splitPercentage = 99.5;
       } else if (this._isDescendant(node.children[1], activePaneId)) {
-        node.splitPercentage = 0.5; // Give almost no space to the first child
+        node.splitPercentage = 0.5;
       }
-      
       this._applyMaximize(node.children[0], activePaneId);
       this._applyMaximize(node.children[1], activePaneId);
     }
@@ -184,32 +181,58 @@ export class PaneManager {
     traverse(this.workspace.paneTree);
     return paneList;
   }
+  
+  /**
+   * Rebuilds the pane tree structure using a new, ordered list of leaf panes.
+   * This is the core of the robust swapping logic. It preserves the split
+   * structure while re-populating it with panes in the desired order.
+   * @param {object} skeleton - A deep copy of the original tree structure.
+   * @param {Array<object>} orderedPanes - The array of leaf panes in their new visual order.
+   * @returns {object} The newly constructed pane tree.
+   */
+  _rebuildTreeWithNewOrder(skeleton, orderedPanes) {
+    if (!skeleton) return null;
+    if (skeleton.type === 'leaf') {
+      // Pluck the next pane from the front of the ordered list.
+      return orderedPanes.shift();
+    }
+    if (skeleton.type.startsWith('split-')) {
+      skeleton.children = skeleton.children.map(child => this._rebuildTreeWithNewOrder(child, orderedPanes));
+    }
+    return skeleton;
+  }
 
   _findAndSwap(direction) {
-    let parentNode = null;
-    let nodeIndex = -1;
+    if (this.isMaximized) this.toggleMaximizePane();
 
-    const findParent = (node) => {
-        if (node.type.startsWith('split-')) {
-            const index = node.children.findIndex(child => child.id === this.workspace.activePaneId);
-            if (index !== -1) {
-                parentNode = node;
-                nodeIndex = index;
-                return;
-            }
-            node.children.forEach(findParent);
-        }
-    };
-    findParent(this.workspace.paneTree);
+    const panes = this._getPaneList();
+    if (panes.length < 2) return;
 
-    if (parentNode) {
-      if (direction === 'up' && nodeIndex > 0) {
-        [parentNode.children[nodeIndex], parentNode.children[nodeIndex - 1]] = [parentNode.children[nodeIndex - 1], parentNode.children[nodeIndex]];
-        this.workspace.render();
-      } else if (direction === 'down' && nodeIndex < parentNode.children.length - 1) {
-        [parentNode.children[nodeIndex], parentNode.children[nodeIndex + 1]] = [parentNode.children[nodeIndex + 1], parentNode.children[nodeIndex]];
-        this.workspace.render();
-      }
+    const currentIndex = panes.findIndex(p => p.id === this.workspace.activePaneId);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    // Prevent moving past the beginning or end of the list.
+    if (targetIndex < 0 || targetIndex >= panes.length) {
+      return; 
     }
+
+    // 1. Create the new, desired visual order by swapping in the flat list.
+    [panes[currentIndex], panes[targetIndex]] = [panes[targetIndex], panes[currentIndex]];
+    
+    // 2. Rebuild the master paneTree data model to match this new order.
+    // We use a deep copy of the current tree as a "skeleton" to fill in.
+    const skeleton = JSON.parse(JSON.stringify(this.workspace.paneTree));
+    this.workspace.paneTree = this._rebuildTreeWithNewOrder(skeleton, panes);
+
+    // 3. Trigger the fast, non-destructive render.
+    this.workspace.render().then(() => {
+        // 4. Ensure focus is maintained.
+        const activeEditor = this.workspace.getActiveEditor();
+        if (activeEditor) {
+            activeEditor.editorView.focus();
+        }
+    });
   }
 }

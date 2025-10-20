@@ -6,23 +6,25 @@ export class WorkspaceRenderer {
   }
 
   /**
-   * Performs a full, destructive render. Only use for initial load or
-   * when the pane structure (splits, closes) changes.
+   * Performs a smart, full render. It reuses existing editor instances
+   * to avoid performance bottlenecks, detaching them and re-attaching
+   * them to a newly created pane structure.
    */
   async render() {
-    this.workspace.mainContainer.style.display = 'flex';
-    this.workspace.mainContainer.style.gridTemplateColumns = '';
-    this.workspace.mainContainer.style.gridTemplateRows = '';
-
+    // 1. Detach existing editor DOM elements without destroying them
     this.workspace.panes.forEach(({ editor }) => {
-        if (editor && editor.editorView) {
-            editor.editorView.destroy();
-        }
+      if (editor && editor.editorView && editor.editorView.dom.parentElement) {
+        editor.editorView.dom.remove();
+      }
     });
-    this.workspace.panes.clear();
 
+    // 2. Clear the old grid structure
     this.workspace.mainContainer.innerHTML = '';
+    
+    // 3. Rebuild the grid structure from the paneTree and re-attach editors
     await this._renderNode(this.workspace.paneTree, this.workspace.mainContainer);
+    
+    // 4. Finalize the state
     this.workspace.setActivePane(this.workspace.activePaneId);
   }
 
@@ -45,7 +47,6 @@ export class WorkspaceRenderer {
         element.style.gridTemplateRows = `${node.splitPercentage}% auto 1fr`;
       }
       
-      // Recursively sync styles for children, assuming a consistent DOM structure
       if (element.children.length === 3) {
         this._syncNodeStyles(node.children[0], element.children[0]);
         this._syncNodeStyles(node.children[1], element.children[2]);
@@ -60,30 +61,34 @@ export class WorkspaceRenderer {
       paneElement.dataset.paneId = node.id;
       parentElement.appendChild(paneElement);
 
-      const activeBuffer = node.buffers[node.activeBufferIndex];
-      const gitClient = await this.workspace.getGitClient(activeBuffer.garden);
-      
-      const editor = new Editor({
-        target: paneElement,
-        gitClient: gitClient,
-        commandPalette: window.thoughtform.commandPalette,
-        initialFile: activeBuffer.path,
-        paneId: node.id
-      });
-      
-      await new Promise(resolve => {
-        const check = setInterval(() => {
-          if (editor.isReady) {
-            clearInterval(check);
-            resolve();
-          }
-        }, 50);
-      });
+      let editor = this.workspace.panes.get(node.id)?.editor;
 
-      this.workspace.panes.set(node.id, { element: paneElement, editor: editor });
-      
-      if (this.workspace.initialEditorStates[node.id]) {
-          editor.restoreState(this.workspace.initialEditorStates[node.id]);
+      if (editor) {
+        // Re-attach the existing editor's DOM
+        paneElement.appendChild(editor.editorView.dom);
+        this.workspace.panes.set(node.id, { element: paneElement, editor: editor });
+      } else {
+        // Create a new editor if it doesn't exist
+        const activeBuffer = node.buffers[node.activeBufferIndex];
+        const gitClient = await this.workspace.getGitClient(activeBuffer.garden);
+        
+        editor = new Editor({
+          target: paneElement,
+          gitClient: gitClient,
+          commandPalette: window.thoughtform.commandPalette,
+          initialFile: activeBuffer.path,
+          paneId: node.id
+        });
+        
+        await new Promise(resolve => {
+          const check = setInterval(() => { if (editor.isReady) { clearInterval(check); resolve(); } }, 50);
+        });
+
+        this.workspace.panes.set(node.id, { element: paneElement, editor: editor });
+        
+        if (this.workspace.initialEditorStates[node.id]) {
+            editor.restoreState(this.workspace.initialEditorStates[node.id]);
+        }
       }
 
       paneElement.addEventListener('click', () => {
