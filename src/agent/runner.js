@@ -107,6 +107,11 @@ export class TaskRunner {
                 const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService);
                 responseJson = result.responseJson;
             } catch (error) {
+                // If the error is fatal (like a missing API key), re-throw it to break the loop.
+                // Otherwise, let the agent attempt to recover from a transient error (like malformed JSON).
+                if (error.message.includes('API key')) {
+                    throw error; // This will be caught by the orchestrator's main catch block.
+                }
                 this._sendStreamEvent(stream, 'status', `Error: AI returned an invalid plan. Retrying.`);
                 scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${error.message}`;
                 continue;

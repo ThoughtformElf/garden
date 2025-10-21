@@ -26,7 +26,7 @@ class AiService {
   async getCompletion(prompt, onTokenCount) {
     this.loadConfig();
     if (!this.config.geminiApiKey) {
-      throw new Error('Gemini API key is not set. Please configure it in the AI dev tools panel.');
+      throw new Error('Gemini API key is not set. Get a key from https://aistudio.google.com/app/api-keys and add it in the DevTools > AI panel.');
     }
     
     const originalStream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
@@ -55,7 +55,7 @@ class AiService {
   async getCompletionAsString(prompt, onTokenCount) {
       this.loadConfig();
       if (!this.config.geminiApiKey) {
-        throw new Error('Gemini API key is not set. Please configure it in the AI dev tools panel.');
+        throw new Error('Gemini API key is not set. Get a key from https://aistudio.google.com/app/api-keys and add it in the DevTools > AI panel.');
       }
       const stream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
       const reader = stream.getReader();
