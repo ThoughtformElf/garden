@@ -9,6 +9,9 @@
 - key: "Mod-Enter"
   run: "settings/keymaps/navigate-or-prompt.js"
 
+- key: "Mod-Shift-Enter"
+  run: "settings/keymaps/navigate-in-new-pane.js"
+
 - key: "Mod-`"
   run: "settings/keymaps/toggle-devtools.js"
 

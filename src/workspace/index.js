@@ -1,5 +1,5 @@
 import { Git } from '../util/git-integration.js';
-import { appContextField } from '../editor/navigation.js';
+import { appContextField, findFileCaseInsensitive } from '../editor/navigation.js';
 import { WorkspaceRenderer } from './renderer.js';
 import { PaneManager } from './manager/pane.js';
 import { WorkspaceStateManager } from './manager/state.js';
@@ -142,6 +142,47 @@ export class WorkspaceManager {
     // No need to save state here, setActivePane does it.
   }
 
+  async openInNewPane(linkContent, sourcePaneId) {
+    if (!linkContent || !sourcePaneId) return;
+
+    // 1. Get the context of the pane where the action was triggered.
+    const sourceEditor = this.panes.get(sourcePaneId)?.editor;
+    if (!sourceEditor) {
+        console.error(`[Workspace] Could not find source editor for pane ID: ${sourcePaneId}`);
+        return;
+    }
+
+    // 2. Resolve the wikilink content into a garden and path.
+    let path = linkContent.split('|')[0].trim();
+    let garden = null;
+  
+    if (path.includes('#')) {
+      [garden, path] = path.split('#');
+    }
+
+    let finalPath, finalGarden;
+
+    if (garden && garden !== sourceEditor.gitClient.gardenName) {
+        finalGarden = garden;
+        const targetGitClient = await this.getGitClient(finalGarden);
+        const foundPath = await findFileCaseInsensitive(path, { gitClient: targetGitClient, sidebar: window.thoughtform.sidebar });
+        finalPath = foundPath || (path.startsWith('/') ? path : `/${path}`);
+    } else {
+        finalGarden = sourceEditor.gitClient.gardenName;
+        const foundPath = await findFileCaseInsensitive(path, { gitClient: sourceEditor.gitClient, sidebar: window.thoughtform.sidebar });
+        finalPath = foundPath || (path.startsWith('/') ? path : `/${path}`);
+    }
+    
+    // 3. Determine the split direction based on the source pane's dimensions.
+    const sourcePane = this.panes.get(sourcePaneId);
+    if (!sourcePane || !sourcePane.element) return;
+    const paneElement = sourcePane.element;
+    const direction = paneElement.offsetWidth > paneElement.offsetHeight ? 'vertical' : 'horizontal';
+
+    // 4. Call the enhanced splitPane method with the file info.
+    await this.splitPane(sourcePaneId, direction, { garden: finalGarden, path: finalPath });
+  }
+
   _updateURL() {
       const info = this._paneManager.getActivePaneInfo();
       if (!info) return;
@@ -248,7 +289,7 @@ export class WorkspaceManager {
   // Delegated Public API
   render() { return this._renderer.render(); }
   updateLayout() { return this._renderer.updateLayout(); }
-  splitPane(paneId, direction) { return this._paneManager.splitPane(paneId, direction); }
+  splitPane(paneId, direction, fileToOpen = null) { return this._paneManager.splitPane(paneId, direction, fileToOpen); }
   closeActivePane() { return this._paneManager.closeActivePane(); }
   selectNextPane() { return this._paneManager.selectNextPane(); }
   selectPrevPane() { return this._paneManager.selectPrevPane(); }

@@ -3,6 +3,7 @@
 import defaultInterfaceYml from './interface.yml?raw';
 import defaultKeymapsYml from './keymaps.yml?raw';
 import defaultNavigateOrPromptJs from './keymaps/navigate-or-prompt.js?raw';
+import defaultNavigateInNewPaneJs from './keymaps/navigate-in-new-pane.js?raw';
 import defaultToggleSidebarJs from './keymaps/toggle-sidebar.js?raw';
 import defaultToggleDevtoolsJs from './keymaps/toggle-devtools.js?raw';
 import defaultSearchFilesJs from './keymaps/search-files.js?raw';
@@ -41,6 +42,7 @@ export const defaultFiles = [
   ['/settings/interface.yml', defaultInterfaceYml],
   ['/settings/keymaps.yml', defaultKeymapsYml],
   ['/settings/keymaps/navigate-or-prompt.js', defaultNavigateOrPromptJs],
+  ['/settings/keymaps/navigate-in-new-pane.js', defaultNavigateInNewPaneJs],
   ['/settings/keymaps/toggle-sidebar.js', defaultToggleSidebarJs],
   ['/settings/keymaps/toggle-devtools.js', defaultToggleDevtoolsJs],
   ['/settings/keymaps/search-files.js', defaultSearchFilesJs],

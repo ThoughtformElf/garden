@@ -46,7 +46,17 @@ class WikilinkPlugin {
     const linkEl = event.target.closest('.cm-wikilink');
     if (linkEl && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      this.handleNavigation(linkEl);
+      const linkContent = linkEl.textContent.slice(2, -2);
+      
+      if (event.shiftKey) {
+        const appContext = this.view.state.field(appContextField);
+        // It's crucial to pass the paneId of the editor that was clicked on.
+        if (appContext && appContext.editor && appContext.editor.paneId) {
+            window.thoughtform.workspace.openInNewPane(linkContent, appContext.editor.paneId);
+        }
+      } else {
+        this.handleNavigation(linkEl);
+      }
     }
   }
 

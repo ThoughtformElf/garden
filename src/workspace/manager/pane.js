@@ -6,7 +6,7 @@ export class PaneManager {
     this.isMaximized = false;
   }
 
-  async splitPane(paneIdToSplit, direction) {
+  async splitPane(paneIdToSplit, direction, fileToOpen = null) {
     if (this.isMaximized) this.toggleMaximizePane();
 
     let newPaneId = null; 
@@ -14,15 +14,22 @@ export class PaneManager {
     const findAndSplit = (node) => {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
             newPaneId = `pane-${Date.now()}`;
-            const currentGarden = node.buffers[node.activeBufferIndex].garden;
-            
-            // The new leaf is created with a placeholder path for now.
-            // The actual unique path will be generated asynchronously right before rendering.
+            let buffer;
+            if (fileToOpen) {
+                // Use the provided file info for the new pane's buffer
+                buffer = { garden: fileToOpen.garden, path: fileToOpen.path };
+            } else {
+                // Fallback to the original scratchpad logic
+                const currentGarden = node.buffers[node.activeBufferIndex].garden;
+                // Path is a placeholder, will be generated async later
+                buffer = { garden: currentGarden, path: '/scratchpad/placeholder' };
+            }
+
             const newLeaf = {
                 type: 'leaf',
                 id: newPaneId,
                 activeBufferIndex: 0,
-                buffers: [{ garden: currentGarden, path: '/scratchpad/placeholder' }]
+                buffers: [buffer]
             };
             
             return {
@@ -48,8 +55,8 @@ export class PaneManager {
     
     this.workspace.paneTree = findAndSplit(this.workspace.paneTree);
     
-    // Asynchronously generate the unique path *before* rendering.
-    if (newPaneId) {
+    // Only generate a unique scratchpad path if no file was provided
+    if (newPaneId && !fileToOpen) {
         const newLeafNode = findNodeById(this.workspace.paneTree, newPaneId);
         if (newLeafNode) {
             const gitClient = await this.workspace.getGitClient(newLeafNode.buffers[0].garden);
