@@ -46,8 +46,14 @@ class ExternalLinkPlugin {
     const linkEl = event.target.closest('.cm-naked-link, .cm-url');
     if (!linkEl) return false;
     
-    const url = sanitizeUrl(linkEl.textContent);
+    let url = sanitizeUrl(linkEl.textContent);
     if (url) {
+      // --- THIS IS THE FIX ---
+      // This regex removes one or more common punctuation characters
+      // (.,;)) from the very end of the URL string.
+      url = url.replace(/[.,;)]+$/, '');
+      // --- END OF FIX ---
+      
       window.open(url, '_blank', 'noopener,noreferrer');
     }
     return true;
