@@ -15,7 +15,7 @@ if (!args.url || !args.url.startsWith('http')) {
   return "Error: A valid 'url' argument starting with http is required.";
 }
 
-const { onProgress } = context;
+const { onProgress, addSource } = context;
 const { url } = args;
 
 if (onProgress) onProgress(`Reading URL: ${url}`);
@@ -31,6 +31,11 @@ try {
     }
     
     const content = await response.text();
+
+    if (addSource) {
+        addSource(url);
+    }
+
     if (onProgress) onProgress('Successfully read URL content.');
     return content;
 

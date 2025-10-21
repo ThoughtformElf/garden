@@ -26,7 +26,7 @@ if (!args.goal || !args.initialContent) {
 
 const MAX_DEPTH = 2;
 const { goal, initialContent } = args;
-const { git, ai, dependencies, onProgress } = context;
+const { git, ai, dependencies, onProgress, addSource } = context;
 
 const { Traversal } = dependencies;
 const traversal = new Traversal(git);
@@ -61,7 +61,12 @@ while (queue.length > 0) {
           const baseUrl = localStorage.getItem('thoughtform_proxy_url')?.trim() || 'https://proxy.thoughtform.garden';
           const proxyUrl = `${baseUrl}?thoughtformgardenproxy=${encodeURIComponent(currentLink)}`;
           const response = await fetch(proxyUrl);
-          if(response.ok) newContent = await response.text();
+          if(response.ok) {
+              newContent = await response.text();
+              if (addSource) {
+                  addSource(currentLink);
+              }
+          }
       } catch {}
   } else {
       const result = await traversal.readLinkContent(currentLink, sourceGardenName);

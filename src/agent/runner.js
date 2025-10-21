@@ -60,6 +60,7 @@ export class TaskRunner {
     }
 
     async _getJsonCompletion(prompt, aiService, signal) {
+        // THIS IS THE FIX (Part 1): No signature change needed, as the tracked service will handle counting.
         const responseText = await aiService.getCompletionAsString(prompt, null, signal);
         try {
             const jsonMatch = responseText.match(/{\s*"thought":[\s\S]*}/);
@@ -83,15 +84,28 @@ export class TaskRunner {
         let shouldFinish = false;
         let totalInputTokens = 0;
         let totalOutputTokens = 0;
+        const readSources = new Set();
         
-        const onTokenCountholder = ({ input, output }) => {
+        const onTokenCounter = ({ input, output }) => {
             totalInputTokens += input;
             totalOutputTokens += output;
         };
         
+        // --- THIS IS THE FIX (Part 2) ---
+        // This wrapped service transparently intercepts every LLM call to add token counting.
         const trackedAiService = {
-            getCompletion: (prompt, onTokenCount) => this.aiService.getCompletion(prompt, onTokenCount, signal),
-            getCompletionAsString: (prompt, onTokenCount) => this.aiService.getCompletionAsString(prompt, onTokenCount, signal),
+            getCompletion: (prompt, onTokenCount, passedSignal) => {
+                return this.aiService.getCompletion(prompt, (tokenData) => {
+                    onTokenCounter(tokenData); // Update the orchestrator's totals
+                    if (onTokenCount) onTokenCount(tokenData); // Call the original callback if it exists
+                }, passedSignal || signal);
+            },
+            getCompletionAsString: (prompt, onTokenCount, passedSignal) => {
+                return this.aiService.getCompletionAsString(prompt, (tokenData) => {
+                    onTokenCounter(tokenData);
+                    if (onTokenCount) onTokenCount(tokenData);
+                }, passedSignal || signal);
+            },
         };
         
         const dependencies = { Traversal, Git };
@@ -107,6 +121,7 @@ export class TaskRunner {
 
             let responseJson;
             try {
+                // This call now correctly uses the tracked service, which will count the tokens.
                 const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService, signal);
                 responseJson = result.responseJson;
             } catch (error) {
@@ -148,10 +163,15 @@ export class TaskRunner {
             
             const context = { 
                 git: this.gitClient, 
-                ai: trackedAiService,
+                ai: trackedAiService, // Tools also get the tracked service
                 dependencies: dependencies,
                 onProgress: (message) => this._sendStreamEvent(stream, 'status', message),
-                signal: signal
+                signal: signal,
+                addSource: (url) => {
+                    if (url && typeof url === 'string') {
+                        readSources.add(url);
+                    }
+                }
             };
             
             const tokensBeforeTool = { input: totalInputTokens, output: totalOutputTokens };
@@ -188,6 +208,11 @@ export class TaskRunner {
             const { done, value } = await reader.read();
             if (done) break;
             stream.enqueue(value);
+        }
+        
+        if (readSources.size > 0) {
+            const sourcesList = Array.from(readSources).join(', ');
+            stream.enqueue(`\n<!-- Sources: ${sourcesList} -->`);
         }
         
         stream.enqueue(`\n<!-- Total Tokens: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out -->`);
