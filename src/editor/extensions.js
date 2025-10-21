@@ -72,5 +72,25 @@ export function createEditorExtensions({
     ...allHighlightPlugins,
     diffCompartment.of([]),
     statusBarCompartment.of(createStatusBarExtension()),
+    
+    // THIS IS THE FIX:
+    // This extension intercepts drop events directly at the CodeMirror level.
+    // It specifically checks for file drops and prevents CodeMirror's default
+    // behavior (inserting text), allowing our global drop handler to manage the file import.
+    EditorView.domEventHandlers({
+      drop(event, view) {
+        // Check if the drop event contains files from the operating system.
+        if (event.dataTransfer && event.dataTransfer.files.length > 0) {
+          // If it's a file drop, we absolutely must prevent the editor's default action.
+          event.preventDefault();
+          // The global drop handler in `src/util/drag-drop.js` will now be the only
+          // thing that processes the files, correctly adding them to the active garden.
+          return true; // Indicate that we have handled this event.
+        }
+        // For any other type of drop (e.g., dragging selected text), we let the editor
+        // perform its default action.
+        return false;
+      },
+    }),
   ];
 }

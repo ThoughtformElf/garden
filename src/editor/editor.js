@@ -70,7 +70,13 @@ export class Editor {
         editor: this
       });
       await this.sidebar.init();
-      initializeDragAndDrop(this.gitClient, this.sidebar);
+
+      // Use a global flag to ensure this only runs once for the whole app.
+      if (!window.thoughtform._dragDropInitialized) {
+        initializeDragAndDrop(this.sidebar);
+        window.thoughtform._dragDropInitialized = true;
+      }
+      
       const loadingIndicator = document.getElementById('loading-indicator');
       if(loadingIndicator) loadingIndicator.remove();
       document.querySelector('.main-content').style.display = 'flex';
