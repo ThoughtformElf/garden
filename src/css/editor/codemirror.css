@@ -158,3 +158,18 @@ html body .cm-activeLineGutter {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;  
 }
+
+
+/* Vim */
+.cm-panels.cm-panels-bottom {
+  background: var(--base-interactive);
+  padding: 0.5rem;
+}
+
+.cm-vim-panel.cm-panel {
+  padding: 0 !important;
+}
+.cm-vim-panel.cm-panel input {
+  padding-top: 0;
+  padding-bottom: 0;
+}

@@ -5,6 +5,9 @@ A powerful research tool that recursively explores a topic by following internal
 This tool is best for broad research questions where you need to gather context from multiple connected notes within the user's garden.
 
 **IMPORTANT**: If you just need to read a single, specific external webpage (like a reddit link or a news article), use the `readURL` tool instead. This tool is for exploring the internal knowledge base.
+- IF THE USER MENTIONS "me", "I", "this", "our" - "this garden" "my notes" "yesterdays notes" "that chat" use this tool
+- DO NOT USE `webSearch` to search [[wikilinks]] use this tool instead
+- USE THIS TOOL TO LEARN ABOUT THE USER, YOURSELF, AND THIS INTERFACE
 
 Arguments:
 - goal: The user's original goal or research question. This helps the tool filter for relevant information later.

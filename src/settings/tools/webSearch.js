@@ -3,6 +3,7 @@ Description:
 Performs a web search using the key-less HTML version of DuckDuckGo to find up-to-date information or answer general knowledge questions. This tool is ideal for discovering URLs and getting summaries of information on the internet. It returns ALL available search results from the page.
 
 **IMPORTANT**: Use this tool to *discover* information and URLs. After you have identified a promising URL from the search results, you MUST use the `readURL` tool in a subsequent step to read the full content of that specific page.
+- DO NOT USE THIS TOOL TO to search [[wikilinks]] use `buildKnowledgeBase` tool instead
 
 Arguments:
 - query: The search query string. Be specific and concise.
