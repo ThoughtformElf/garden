@@ -1,6 +1,6 @@
 /*
 Description:
-Performs a web search using the key-less HTML version of DuckDuckGo to find up-to-date information or answer general knowledge questions. This tool is ideal for discovering URLs and getting summaries of information on the internet.
+Performs a web search using the key-less HTML version of DuckDuckGo to find up-to-date information or answer general knowledge questions. This tool is ideal for discovering URLs and getting summaries of information on the internet. It returns ALL available search results from the page.
 
 **IMPORTANT**: Use this tool to *discover* information and URLs. After you have identified a promising URL from the search results, you MUST use the `readURL` tool in a subsequent step to read the full content of that specific page.
 
@@ -46,14 +46,11 @@ try {
   // --- End Throttling ---
 
   const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-  // --- THIS IS THE FIX (Part 1) ---
-  // Add `forceheadless=true` to ensure the proxy uses Puppeteer, which is less likely to be blocked.
   const proxyUrl = `${proxyBaseUrl}?thoughtformgardenproxy=${encodeURIComponent(searchUrl)}&forceheadless=true`;
 
   const response = await fetch(proxyUrl);
   const htmlText = await response.text();
   
-  // --- THIS IS THE DEBUGGING IMPROVEMENT ---
   console.log('[webSearch Tool] Raw HTML received from proxy:', htmlText);
 
   if (!response.ok) {
@@ -65,18 +62,16 @@ try {
   const results = doc.querySelectorAll('.result');
   
   if (results.length === 0) {
-    // Check if the page is a "no results" page explicitly
     if (htmlText.includes("No results found")) {
         return "No search results found for that query.";
     }
-    // If there are no results but it's not an explicit "no results" page, it's likely a block/error.
     return "Error: Failed to parse search results. The page structure may have changed or the request was blocked.";
   }
 
-  let formattedResults = "Here are the top search results:\n\n";
+  let formattedResults = "Here are the search results:\n\n";
   let count = 0;
+  // --- FIX: The loop now processes ALL results with NO limit ---
   results.forEach((result) => {
-    if (count >= 5) return; // Limit to top 5 results
     const titleEl = result.querySelector('.result__a');
     const snippetEl = result.querySelector('.result__snippet');
     
@@ -105,7 +100,6 @@ try {
 
 } catch (e) {
   if (onProgress) onProgress(`An error occurred while searching the web.`);
-  // Also log the full error to the console for easier debugging
   console.error('[webSearch Tool] Exception caught:', e);
   return `Error: An exception occurred while trying to perform the web search: ${e.message}`;
 }
