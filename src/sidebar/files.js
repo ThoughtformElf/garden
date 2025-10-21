@@ -231,7 +231,11 @@ export const fileActions = {
       title: 'New Folder',
       label: 'Enter new folder name (e.g., "projects/new-topic"):'
     });
-    if (!newName || !newName.trim()) return;
+    if (newName === null) {
+      window.thoughtform.workspace.getActiveEditor()?.editorView?.focus();
+      return;
+    }
+    if (!newName.trim()) return;
 
     const newPath = `/${newName.trim().replace(/\/$/, '')}`;
 
@@ -267,9 +271,14 @@ export const fileActions = {
         label: `Enter new name for ${oldPath.substring(1)}:`,
         defaultValue: oldPath.substring(1)
     });
-    if (!newName || newName === oldPath.substring(1)) return;
 
-    const newPath = `/${newName}`;
+    if (newName === null) {
+      window.thoughtform.workspace.getActiveEditor()?.editorView?.focus();
+      return;
+    }
+    if (!newName.trim() || newName.trim() === oldPath.substring(1)) return;
+
+    const newPath = `/${newName.trim()}`;
     
     try {
       const existingStat = await gitClient.pfs.stat(newPath);

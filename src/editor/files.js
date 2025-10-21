@@ -241,9 +241,9 @@ export class EditorFiles {
           return;
       }
       
-      if (!newFilename) return; // Do nothing if name is empty after confirmation.
+      if (!newFilename.trim()) return; // Do nothing if name is empty after confirmation.
     
-      const newPath = `${directory}/${newFilename}`;
+      const newPath = `${directory}/${newFilename.trim()}`;
       try {
         const rawContent = await this.editor.gitClient.readFile(path);
         await this.editor.gitClient.writeFile(newPath, rawContent);

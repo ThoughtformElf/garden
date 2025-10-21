@@ -318,13 +318,13 @@ export class CommandPalette {
     this.resultsList.appendChild(fragment);
   }
 
-  selectItem(index) {
+  async selectItem(index) {
     if (index < 0 || index >= this.results.length) return;
     const file = this.results[index].doc;
     
     if (this.mode === 'executeCommand') {
         const editor = window.thoughtform.workspace.getActiveEditor();
-        const git = window.thoughtform.workspace.getActiveGitClient(); // This will be the active garden's client
+        const git = await window.thoughtform.workspace.getActiveGitClient();
         if (editor && git) {
             const fullPath = `${file.garden}#${file.path}`;
             executeFile(fullPath, editor, git);
@@ -339,14 +339,14 @@ export class CommandPalette {
     this.search(e.target.value);
   }
   
-  handleResultClick(e) {
+  async handleResultClick(e) {
     const item = e.target.closest('.command-result-item');
     if (item) {
-      this.selectItem(parseInt(item.dataset.index, 10));
+      await this.selectItem(parseInt(item.dataset.index, 10));
     }
   }
 
-  handleKeyDown(e) {
+  async handleKeyDown(e) {
     if (!this.isOpen) return;
     switch (e.key) {
       case 'ArrowDown':
@@ -362,7 +362,7 @@ export class CommandPalette {
       case 'Enter':
         e.preventDefault();
         if (this.results.length > 0) {
-            this.selectItem(this.selectedIndex);
+            await this.selectItem(this.selectedIndex);
         }
         break;
       case 'Escape':

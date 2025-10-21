@@ -11,6 +11,7 @@ import defaultGlobalSearchJs from './keymaps/global-search.js?raw';
 import defaultBrowserBackJs from './keymaps/browser-back.js?raw';
 import defaultBrowserForwardJs from './keymaps/browser-forward.js?raw';
 import defaultDuplicateFileJs from './keymaps/duplicate-current-file.js?raw';
+import defaultDuplicateGardenJs from './keymaps/duplicate-current-garden.js?raw';
 import defaultNewFileJs from './keymaps/new-file.js?raw';
 import defaultHookCreateJs from './hooks/create.js?raw';
 import defaultHookLoadJs from './hooks/load.js?raw';
@@ -47,6 +48,7 @@ export const defaultFiles = [
   ['/settings/keymaps/browser-back.js', defaultBrowserBackJs],
   ['/settings/keymaps/browser-forward.js', defaultBrowserForwardJs],
   ['/settings/keymaps/duplicate-current-file.js', defaultDuplicateFileJs],
+  ['/settings/keymaps/duplicate-current-garden.js', defaultDuplicateGardenJs],
   ['/settings/keymaps/new-file.js', defaultNewFileJs],
   ['/settings/keymaps/split-pane-vertical.js', defaultSplitVerticalJs],
   ['/settings/keymaps/split-pane-horizontal.js', defaultSplitHorizontalJs],
