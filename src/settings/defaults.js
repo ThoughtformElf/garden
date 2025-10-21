@@ -15,6 +15,7 @@ import defaultDuplicateFileJs from './keymaps/duplicate-current-file.js?raw';
 import defaultDuplicateGardenJs from './keymaps/duplicate-current-garden.js?raw';
 import defaultRenameFileJs from './keymaps/rename-current-file.js?raw';
 import defaultNewFileJs from './keymaps/new-file.js?raw';
+import defaultNewGardenJs from './keymaps/new-garden.js?raw';
 import defaultHookCreateJs from './hooks/create.js?raw';
 import defaultHookLoadJs from './hooks/load.js?raw';
 import defaultHookDeleteJs from './hooks/delete.js?raw';
@@ -54,6 +55,7 @@ export const defaultFiles = [
   ['/settings/keymaps/duplicate-current-garden.js', defaultDuplicateGardenJs],
   ['/settings/keymaps/rename-current-file.js', defaultRenameFileJs],
   ['/settings/keymaps/new-file.js', defaultNewFileJs],
+  ['/settings/keymaps/new-garden.js', defaultNewGardenJs],
   ['/settings/keymaps/split-pane-vertical.js', defaultSplitVerticalJs],
   ['/settings/keymaps/split-pane-horizontal.js', defaultSplitHorizontalJs],
   ['/settings/keymaps/select-next-pane.js', defaultSelectNextPaneJs],

@@ -7,15 +7,12 @@
 // 'event': Null for keymap-triggered events.
 
 const sidebar = window.thoughtform.sidebar;
-// git.gardenName is the decoded name of the current garden
 const currentGardenName = git?.gardenName;
 
 if (sidebar && currentGardenName) {
-  // The handleDuplicateGarden function expects the name as it's stored,
-  // which might be URI encoded if it contains special characters.
-  // We encode the current garden's name to match this expectation.
-  const encodedGardenName = encodeURIComponent(currentGardenName);
-  sidebar.handleDuplicateGarden(encodedGardenName);
+  // The handleDuplicateGarden function on the sidebar handles all the logic,
+  // including prompting the user.
+  sidebar.handleDuplicateGarden(currentGardenName);
 } else {
-  console.error('[Duplicate Garden Command] Could not find sidebar or current garden name.');
+  console.error('[Duplicate Garden Keymap] Could not find sidebar or current garden name.');
 }

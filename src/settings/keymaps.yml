@@ -27,8 +27,14 @@
 - key: "Mod-Shift-d"
   run: "settings/keymaps/duplicate-current-file.js"
 
+- key: "Mod-Alt-d"
+  run: "settings/keymaps/duplicate-current-garden.js"
+
 - key: "Mod-Alt-n"
   run: "settings/keymaps/new-file.js"
+
+- key: "Mod-Shift-g"
+  run: "settings/keymaps/new-garden.js"
 
 - key: "Mod-r"
   run: "settings/keymaps/rename-current-file.js"
