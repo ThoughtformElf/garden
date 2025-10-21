@@ -87,13 +87,14 @@ export const gardenActions = {
         const destGit = new Git(newName);
         await destGit.initRepo();
 
-        const filesToCopy = await this.listFiles(sourceGit, '/');
+        const allPaths = await this.listAllPaths(sourceGit, '/');
+        const filesToCopy = allPaths.filter(p => !p.isDirectory).map(p => p.path);
         
         let count = 0;
         for (const file of filesToCopy) {
           count++;
           this.contentContainer.innerHTML = `<p class="sidebar-info">Copying file ${count} of ${filesToCopy.length}:<br>${file.substring(1)}</p>`;
-          const content = await sourceGit.readFile(file);
+          const content = await sourceGit.pfs.readFile(file);
           await destGit.writeFile(file, content);
         }
         
