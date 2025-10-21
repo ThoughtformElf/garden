@@ -26,7 +26,7 @@ export class TaskRunner {
         });
     }
 
-    run(goal) {
+    run(goal, signal) {
         const streamController = {
             controller: null,
             enqueue(chunk) { this.controller?.enqueue(chunk); },
@@ -40,10 +40,12 @@ export class TaskRunner {
             }
         });
 
-        this._orchestrate(goal, streamController).catch(e => {
-            console.error("[TaskRunner] Orchestration failed:", e);
-            streamController.enqueue(`**Agent Error:**\n> ${e.message}`);
-            streamController.close();
+        this._orchestrate(goal, streamController, signal).catch(e => {
+            if (e.name !== 'AbortError') {
+                console.error("[TaskRunner] Orchestration failed:", e);
+            }
+            // Propagate the error to the stream so the UI handler can catch it.
+            streamController.error(e);
         });
 
         return stream;
@@ -57,8 +59,8 @@ export class TaskRunner {
         return Object.entries(vars).reduce((acc, [key, value]) => acc.replace(new RegExp(`{{${key}}}`, 'g'), String(value)), template);
     }
 
-    async _getJsonCompletion(prompt, aiService) {
-        const responseText = await aiService.getCompletionAsString(prompt);
+    async _getJsonCompletion(prompt, aiService, signal) {
+        const responseText = await aiService.getCompletionAsString(prompt, null, signal);
         try {
             const jsonMatch = responseText.match(/{\s*"thought":[\s\S]*}/);
             if (!jsonMatch) {
@@ -72,7 +74,7 @@ export class TaskRunner {
         }
     }
 
-    async _orchestrate(goal, stream) {
+    async _orchestrate(goal, stream, signal) {
         await this._initialize();
         this._sendStreamEvent(stream, 'status', `Starting with goal: "${goal}"`);
 
@@ -88,14 +90,15 @@ export class TaskRunner {
         };
         
         const trackedAiService = {
-            getCompletion: (prompt) => this.aiService.getCompletion(prompt, onTokenCountholder),
-            getCompletionAsString: (prompt) => this.aiService.getCompletionAsString(prompt, onTokenCountholder),
+            getCompletion: (prompt, onTokenCount) => this.aiService.getCompletion(prompt, onTokenCount, signal),
+            getCompletionAsString: (prompt, onTokenCount) => this.aiService.getCompletionAsString(prompt, onTokenCount, signal),
         };
         
         const dependencies = { Traversal, Git };
 
         while (!shouldFinish) {
             loopCount++;
+            if (signal.aborted) throw new DOMException('Agent run was cancelled by the user.', 'AbortError');
             
             const toolList = Array.from(this.tools.values()).map(t => `- ${t.name}: ${t.description}`).join('\n');
             const selectToolPrompt = this._fillPrompt(selectToolPromptTemplate, { scratchpad, tool_list: toolList });
@@ -104,14 +107,12 @@ export class TaskRunner {
 
             let responseJson;
             try {
-                const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService);
+                const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService, signal);
                 responseJson = result.responseJson;
             } catch (error) {
-                // If the error is fatal (like a missing API key), re-throw it to break the loop.
-                // Otherwise, let the agent attempt to recover from a transient error (like malformed JSON).
-                if (error.message.includes('API key')) {
-                    throw error; // This will be caught by the orchestrator's main catch block.
-                }
+                if (error.name === 'AbortError') throw error;
+                if (error.message.includes('API key')) throw error;
+                
                 this._sendStreamEvent(stream, 'status', `Error: AI returned an invalid plan. Retrying.`);
                 scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${error.message}`;
                 continue;
@@ -149,7 +150,8 @@ export class TaskRunner {
                 git: this.gitClient, 
                 ai: trackedAiService,
                 dependencies: dependencies,
-                onProgress: (message) => this._sendStreamEvent(stream, 'status', message)
+                onProgress: (message) => this._sendStreamEvent(stream, 'status', message),
+                signal: signal
             };
             
             const tokensBeforeTool = { input: totalInputTokens, output: totalOutputTokens };

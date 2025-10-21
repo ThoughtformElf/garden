@@ -3,9 +3,10 @@
  * @param {string} apiKey - The Google Gemini API key.
  * @param {string} modelName - The name of the model to use.
  * @param {string} prompt - The user's prompt.
+ * @param {AbortSignal} signal - An AbortSignal to allow cancelling the request.
  * @returns {ReadableStream} A stream of text chunks from the AI.
  */
-export async function streamChatCompletion(apiKey, modelName, prompt) {
+export async function streamChatCompletion(apiKey, modelName, prompt, signal) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
   const requestBody = {
@@ -21,6 +22,7 @@ export async function streamChatCompletion(apiKey, modelName, prompt) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+      signal: signal, // Pass the signal to the fetch request
     });
 
     if (!response.ok) {
@@ -63,7 +65,11 @@ export async function streamChatCompletion(apiKey, modelName, prompt) {
       },
     });
   } catch (error) {
-    console.error('Failed to fetch from Gemini API:', error);
+    if (error.name === 'AbortError') {
+      console.log('Gemini API request was cancelled by the user.');
+    } else {
+      console.error('Failed to fetch from Gemini API:', error);
+    }
     throw error;
   }
 }

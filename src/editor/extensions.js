@@ -1,6 +1,6 @@
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, highlightActiveLine } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
-import { history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { history, historyKeymap, indentWithTab, defaultKeymap } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
@@ -10,7 +10,7 @@ import { lineNumbersRelative } from '@uiw/codemirror-extensions-line-numbers-rel
 import { basicDark } from '../util/theme.js';
 import { allHighlightPlugins } from './plugins/index.js';
 import { diffCompartment } from './diff.js';
-import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'; // Import the new status bar
+import { statusBarCompartment, createStatusBarExtension } from './status-bar.js';
 
 /**
  * Creates the complete array of CodeMirror extensions for the editor.
@@ -18,6 +18,7 @@ import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'
  * @param {object} options.appContext - The application context.
  * @param {object} options.dynamicKeymapExtension - The keymap compartment.
  * @param {object} options.vimCompartment - The vim compartment.
+ * @param {object} options.defaultKeymapCompartment - The compartment for the default keymap.
  * @param {object} options.languageCompartment - The language compartment.
  * @param {object} options.appContextCompartment - The app context compartment.
  * @param {Function} options.updateListener - The update listener.
@@ -29,6 +30,7 @@ export function createEditorExtensions({
   appContext,
   dynamicKeymapExtension,
   vimCompartment,
+  defaultKeymapCompartment,
   languageCompartment,
   appContextCompartment,
   updateListener,
@@ -37,8 +39,9 @@ export function createEditorExtensions({
 }) {
   return [
     appContextCompartment.of(appContext),
-    dynamicKeymapExtension,
-    vimCompartment.of([]),
+    dynamicKeymapExtension, // Highest priority for user-configurable keys
+    vimCompartment.of([]), // For VIM mode, managed in editor.js
+    defaultKeymapCompartment.of(keymap.of(defaultKeymap)), // For default mode, managed in editor.js
     keymap.of([indentWithTab]),
     lineNumbers(),
     highlightActiveLineGutter(),
@@ -57,12 +60,13 @@ export function createEditorExtensions({
     highlightActiveLine(),
     highlightSelectionMatches(),
     keymap.of([
+      // The defaultKeymap is now in its own compartment and is no longer here.
       ...closeBracketsKeymap,
       ...searchKeymap,
       ...historyKeymap,
       ...foldKeymap,
       ...completionKeymap,
-      ...lintKeymap
+      ...lintKeymap,
     ]),
     EditorView.lineWrapping,
     lineNumbersRelative,
@@ -73,22 +77,12 @@ export function createEditorExtensions({
     diffCompartment.of([]),
     statusBarCompartment.of(createStatusBarExtension()),
     
-    // THIS IS THE FIX:
-    // This extension intercepts drop events directly at the CodeMirror level.
-    // It specifically checks for file drops and prevents CodeMirror's default
-    // behavior (inserting text), allowing our global drop handler to manage the file import.
     EditorView.domEventHandlers({
       drop(event, view) {
-        // Check if the drop event contains files from the operating system.
         if (event.dataTransfer && event.dataTransfer.files.length > 0) {
-          // If it's a file drop, we absolutely must prevent the editor's default action.
           event.preventDefault();
-          // The global drop handler in `src/util/drag-drop.js` will now be the only
-          // thing that processes the files, correctly adding them to the active garden.
-          return true; // Indicate that we have handled this event.
+          return true;
         }
-        // For any other type of drop (e.g., dragging selected text), we let the editor
-        // perform its default action.
         return false;
       },
     }),

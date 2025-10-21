@@ -10,6 +10,39 @@ const view = editor.editorView;
 const pos = view.state.selection.main.head;
 const line = view.state.doc.lineAt(pos);
 
+/**
+ * Robustly checks if the cursor position is within or immediately after a response block.
+ * This prevents new prompts from being added when interacting with agent output.
+ * @param {EditorState} state - The current editor state.
+ * @param {number} pos - The cursor position.
+ * @returns {boolean} - True if the cursor is in a relevant context.
+ */
+function isCursorInAgentContext(state, pos) {
+  const doc = state.doc;
+  const textBefore = doc.sliceString(0, pos);
+  
+  const lastOpenTag = textBefore.lastIndexOf('<response>');
+  const lastCloseTag = textBefore.lastIndexOf('</response>');
+
+  // If the last thing we saw was an open tag, we are definitely inside.
+  if (lastOpenTag > lastCloseTag) {
+    return true;
+  }
+  
+  // If the last thing we saw was a close tag, check if the cursor is still
+  // on the same line or the line immediately following it. This prevents
+  // adding a new prompt right after the agent finishes.
+  if (lastCloseTag > lastOpenTag) {
+    const closeTagLine = doc.lineAt(lastCloseTag).number;
+    const cursorLine = doc.lineAt(pos).number;
+    if (cursorLine <= closeTagLine + 1) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // --- 1. AI Prompt Execution ---
 // If the cursor is on a line that is an AI prompt, execute the AI request.
 if (line.text.trim().startsWith('>$')) {
@@ -47,7 +80,26 @@ for (const { type, regex } of linkRegexes) {
   }
 }
 
-// --- 3. Fallback: Insert New Prompt ---
+// --- 3. Inside Agent Response ---
+// If the cursor is inside an agent's response block...
+if (isCursorInAgentContext(view.state, pos)) {
+  // ...check if an agent is actually running for this pane.
+  const editorPaneId = editor.paneId;
+  if (editorPaneId) {
+    const controller = window.thoughtform.ai.activeAgentControllers.get(editorPaneId);
+    if (controller) {
+      // If an agent is running, cancel it.
+      console.log('[navigate-or-prompt] Agent is running. Cancelling via Mod-Enter.');
+      controller.abort();
+      return; // Stop execution.
+    }
+  }
+  // If no agent is running, just do nothing.
+  console.log('[navigate-or-prompt] Cursor is inside a finished agent context. Doing nothing.');
+  return; // Stop execution
+}
+
+// --- 4. Fallback: Insert New Prompt ---
 // If no other context was matched, insert a new prompt at the end of the document.
 console.log('[navigate-or-prompt] No other context found. Inserting new prompt.');
 const doc = view.state.doc;

@@ -2,6 +2,8 @@ import { EditorView } from '@codemirror/view';
 import { EditorState as CodeMirrorEditorState, Compartment, Annotation } from '@codemirror/state';
 import { vim, Vim } from '@replit/codemirror-vim';
 import debounce from 'lodash/debounce';
+import { keymap } from '@codemirror/view';
+import { defaultKeymap } from '@codemirror/commands';
 
 import { Sidebar } from '../sidebar/sidebar.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
@@ -37,6 +39,7 @@ export class Editor {
 
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();
+    this.defaultKeymapCompartment = new Compartment();
     this.appContextCompartment = new Compartment();
     this.mediaViewerElement = null;
     this.currentMediaObjectUrl = null;
@@ -114,6 +117,7 @@ export class Editor {
       })),
       dynamicKeymapExtension,
       vimCompartment: this.vimCompartment,
+      defaultKeymapCompartment: this.defaultKeymapCompartment,
       languageCompartment: this.languageCompartment,
       appContextCompartment: this.appContextCompartment,
       updateListener,
@@ -142,11 +146,17 @@ export class Editor {
     if (editingMode === 'vim') {
       Vim.map('jj', '<Esc>', 'insert');
       this.editorView.dispatch({
-        effects: this.vimCompartment.reconfigure(vim())
+        effects: [
+          this.vimCompartment.reconfigure(vim()),
+          this.defaultKeymapCompartment.reconfigure([]) // Disable default keymap in VIM mode
+        ]
       });
     } else {
        this.editorView.dispatch({
-        effects: this.vimCompartment.reconfigure([])
+        effects: [
+          this.vimCompartment.reconfigure([]),
+          this.defaultKeymapCompartment.reconfigure(keymap.of(defaultKeymap)) // Enable default keymap
+        ]
       });
     }
     
@@ -179,7 +189,6 @@ export class Editor {
     if (!this.isReady) return;
     await this.gitClient.writeFile(this.filePath, newContent);
     
-    // THIS IS THE FIX: Publish an event for the global search index to consume
     window.thoughtform.events.publish('file:update', {
         gardenName: this.gitClient.gardenName,
         path: this.filePath,

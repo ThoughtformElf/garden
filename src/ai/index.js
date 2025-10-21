@@ -8,6 +8,7 @@ class AiService {
       geminiApiKey: '',
       geminiModelName: 'gemini-2.5-flash'
     };
+    this.activeAgentControllers = new Map(); // Track running agents per pane
     this.loadConfig();
   }
 
@@ -23,13 +24,13 @@ class AiService {
     this.loadConfig();
   }
 
-  async getCompletion(prompt, onTokenCount) {
+  async getCompletion(prompt, onTokenCount, signal) {
     this.loadConfig();
     if (!this.config.geminiApiKey) {
       throw new Error('Gemini API key is not set. Get a key from https://aistudio.google.com/app/api-keys and add it in the DevTools > AI panel.');
     }
     
-    const originalStream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
+    const originalStream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
 
     if (!onTokenCount) {
         return originalStream;
@@ -52,12 +53,12 @@ class AiService {
     return originalStream.pipeThrough(countingStream);
   }
 
-  async getCompletionAsString(prompt, onTokenCount) {
+  async getCompletionAsString(prompt, onTokenCount, signal) {
       this.loadConfig();
       if (!this.config.geminiApiKey) {
         throw new Error('Gemini API key is not set. Get a key from https://aistudio.google.com/app/api-keys and add it in the DevTools > AI panel.');
       }
-      const stream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt);
+      const stream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
       const reader = stream.getReader();
       let fullResponse = '';
       while (true) {
@@ -77,8 +78,25 @@ class AiService {
   async handleAiChatRequest(view) {
     let thinkingMessagePosition = -1;
     const thinkingText = '🤖 Thinking...';
+    let editorPaneId = null;
+    let contentStartPos = -1;
+    let contentEndPos = -1;
 
     try {
+      const editor = window.thoughtform.workspace.getActiveEditor();
+      if (!editor || !editor.gitClient || !editor.paneId) {
+        throw new Error("Cannot find active editor, gitClient, or paneId for agent.");
+      }
+      editorPaneId = editor.paneId;
+
+      if (this.activeAgentControllers.has(editorPaneId)) {
+        console.warn(`Agent already running in pane ${editorPaneId}. Ignoring request.`);
+        return;
+      }
+      
+      const controller = new AbortController();
+      this.activeAgentControllers.set(editorPaneId, controller);
+
       const pos = view.state.selection.main.head;
       const currentLine = view.state.doc.lineAt(pos);
       
@@ -100,11 +118,6 @@ class AiService {
       view.dispatch(placeholderTransaction);
       thinkingMessagePosition = insertPos + '\n'.length;
 
-      const editor = window.thoughtform.workspace.getActiveEditor();
-      if (!editor || !editor.gitClient) {
-        throw new Error("Cannot find active editor or gitClient instance for agent.");
-      }
-      
       const rawContext = view.state.doc.toString();
       const initialContext = rawContext.replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
 
@@ -113,15 +126,15 @@ class AiService {
           aiService: this,
           initialContext: initialContext
       });
-      const stream = runner.run(userPrompt);
+      const stream = runner.run(userPrompt, controller.signal);
       
       const reader = stream.getReader();
       const startTag = '\n<response>\n';
       view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: startTag } });
       
       let finalAnswerStarted = false;
-      let contentStartPos = thinkingMessagePosition + startTag.length;
-      let contentEndPos = contentStartPos;
+      contentStartPos = thinkingMessagePosition + startTag.length;
+      contentEndPos = contentStartPos;
 
       const streamEventRegex = /^\[(STATUS|THOUGHT|ACTION|OBSERVATION)\]\s(.*)/s;
 
@@ -178,9 +191,30 @@ class AiService {
       });
 
     } catch (error) {
-      console.error("AI Chat Error:", error);
-      if (thinkingMessagePosition !== -1) {
-        view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: `🚨 Error: ${error.message}` } });
+      if (error.name === 'AbortError') {
+        console.log('AI chat request was intentionally cancelled by the user.');
+        if (contentStartPos !== -1) {
+          // Replace everything from the start of the response tag to the end of the agent's output
+          // with a clean cancellation message.
+          const startReplacePos = contentStartPos - '\n<response>\n'.length;
+          const cancelledText = '🛑 Agent cancelled by user.';
+          view.dispatch({ 
+            changes: { 
+              from: startReplacePos, 
+              to: contentEndPos, 
+              insert: `\n<response>\n${cancelledText}\n</response>`
+            } 
+          });
+        }
+      } else {
+        console.error("AI Chat Error:", error);
+        if (thinkingMessagePosition !== -1) {
+          view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: `🚨 Error: ${error.message}` } });
+        }
+      }
+    } finally {
+      if (editorPaneId) {
+        this.activeAgentControllers.delete(editorPaneId);
       }
     }
   }

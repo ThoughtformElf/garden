@@ -4,6 +4,7 @@ import { executeFile } from './executor.js';
 import { Git } from '../util/git-integration.js';
 import { parse } from 'yaml';
 import { appContextField } from '../editor/navigation.js';
+import { internalCommands } from '../editor/keymaps/internal-commands.js';
 
 import defaultKeymapsYml from '../settings/keymaps.yml?raw';
 
@@ -50,9 +51,6 @@ export class KeymapService {
     const processConfig = (config, sourceGarden) => {
       if (!Array.isArray(config)) return;
       for (const binding of config) {
-        // THIS IS THE FIX (Part 1):
-        // We now check that the `run` property *exists* (`hasOwnProperty`), even if its value is null or "".
-        // This allows `run: null` to be a valid override instruction.
         if (binding && binding.key && binding.hasOwnProperty('run')) {
           mergedKeymap.set(binding.key, { ...binding, sourceGarden });
         }
@@ -76,17 +74,26 @@ export class KeymapService {
 
   _buildKeymapExtension(config) {
     const keyBindings = config.map(binding => {
-      const { key, run, sourceGarden } = binding;
+      let { key, run, sourceGarden } = binding;
       
-      // THIS IS THE FIX (Part 2):
-      // If `run` is null, "", or otherwise falsy, we explicitly treat it as a disabled
-      // keybinding and return `null` so it can be filtered out.
       if (!run) {
-        return null;
+        return null; // A null 'run' value disables the keybinding.
       }
       
-      const fullPath = `${sourceGarden}#${run}`;
+      // Check for the "internal:" prefix to handle special, hardcoded commands.
+      if (typeof run === 'string' && run.startsWith('internal:')) {
+        const commandName = run.substring(9);
+        const commandFn = internalCommands.get(commandName);
+        if (commandFn) {
+          return { key, run: commandFn };
+        } else {
+          console.warn(`[KeymapService] Unknown internal command: "${commandName}"`);
+          return null;
+        }
+      }
 
+      // Default behavior: treat 'run' as a path to a user script.
+      const fullPath = `${sourceGarden}#${run}`;
       return {
         key: key,
         run: (view) => {
@@ -94,10 +101,10 @@ export class KeymapService {
           if (appContext.editor && appContext.gitClient) {
             executeFile(fullPath, appContext.editor, appContext.gitClient);
           }
-          return true;
+          return true; // Assume handled.
         },
       };
-    }).filter(Boolean); // This `filter(Boolean)` now correctly removes the disabled keymaps.
+    }).filter(Boolean);
 
     return keymap.of(keyBindings);
   }

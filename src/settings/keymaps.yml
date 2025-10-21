@@ -30,6 +30,9 @@
 - key: "Mod-r"
   run: "settings/keymaps/rename-current-file.js"
 
+- key: "Mod-c"
+  run: "internal:cancel-agent"
+
 - key: "Alt-ArrowLeft"
   run: "settings/keymaps/browser-back.js"
 
