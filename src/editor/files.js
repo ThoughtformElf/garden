@@ -1,5 +1,6 @@
 import { Modal } from '../util/modal.js';
 import { getLanguageExtension } from './languages.js';
+import { generateUniqueScratchpadPath } from '../workspace/scratchpad.js';
 
 /**
  * Manages file operations within the editor, such as loading, creating, and duplicating.
@@ -165,36 +166,43 @@ export class EditorFiles {
     try {
       const newName = await Modal.prompt({
         title: 'New File',
-        label: 'Enter new file name (including folders, e.g., "projects/new-idea"):',
+        label: 'Enter file name (or leave blank for a scratchpad):',
       });
-      if (!newName || !newName.trim()) {
-        return;
-      }
-      const newPath = `/${newName.trim()}`;
       
-      try {
-        const stat = await this.editor.gitClient.pfs.stat(newPath);
-        const itemType = stat.isDirectory() ? 'folder' : 'file';
-        await this.editor.sidebar.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${newName}" already exists.` });
-        return;
-      } catch (e) {
-        if (e.code !== 'ENOENT') {
-          console.error('Error checking for file:', e);
-          await this.editor.sidebar.showAlert({ title: 'Error', message: 'An unexpected error occurred.' });
-          return;
+      let newPath;
+
+      // Step 1: Determine the path.
+      if (!newName || !newName.trim()) {
+        // If the name is blank, generate a unique scratchpad path.
+        newPath = await generateUniqueScratchpadPath(this.editor.gitClient);
+      } else {
+        // Otherwise, use the user-provided name.
+        const finalName = newName.trim();
+        newPath = `/${finalName}`;
+        
+        // For named files, we must check if it already exists to prevent conflicts.
+        try {
+          const stat = await this.editor.gitClient.pfs.stat(newPath);
+          const itemType = stat.isDirectory() ? 'folder' : 'file';
+          await this.editor.sidebar.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${finalName}" already exists.` });
+          return; // Stop if there's a conflict.
+        } catch (e) {
+          // A "file not found" error is expected and good. Any other error is a problem.
+          if (e.code !== 'ENOENT') {
+            console.error('Error checking for file:', e);
+            await this.editor.sidebar.showAlert({ title: 'Error', message: 'An unexpected error occurred.' });
+            return;
+          }
         }
       }
 
-      try {
-        await this.editor.gitClient.writeFile(newPath, '');
-        window.thoughtform.events.publish('file:create', { path: newPath, gardenName: this.editor.gitClient.gardenName });
-        window.thoughtform.workspace.openFile(this.editor.gitClient.gardenName, newPath);
-      } catch (writeError) {
-        console.error('Error creating file:', writeError);
-        await this.editor.sidebar.showAlert({ title: 'Error', message: `Could not create file: ${writeError.message}` });
-      }
+      // Step 2: Open the determined path as a "virtual" file.
+      // This is now the single, unified workflow. The file is NOT created on disk here.
+      // It only becomes real when the user edits the content.
+      window.thoughtform.workspace.openFile(this.editor.gitClient.gardenName, newPath);
+
     } finally {
-      // Focus is handled by the workspace manager.
+      // Focus is automatically handled by the workspace manager.
     }
   }
 

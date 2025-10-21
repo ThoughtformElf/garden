@@ -1,36 +1,28 @@
+import { generateUniqueScratchpadPath } from '../scratchpad.js';
+
 export class PaneManager {
   constructor(workspace) {
     this.workspace = workspace;
     this.isMaximized = false;
   }
 
-  splitPane(paneIdToSplit, direction) {
+  async splitPane(paneIdToSplit, direction) {
     if (this.isMaximized) this.toggleMaximizePane();
 
     let newPaneId = null; 
-
-    const generateScratchpadPath = () => {
-        const now = new Date();
-        const year = String(now.getFullYear()).slice(-2);
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const randomKey = Math.random().toString(36).substring(2, 6);
-        const timestamp = `${year}${month}${day}-${hours}${minutes}`;
-        return `/scratchpad/${timestamp}`;
-    };
 
     const findAndSplit = (node) => {
         if (node.type === 'leaf' && node.id === paneIdToSplit) {
             newPaneId = `pane-${Date.now()}`;
             const currentGarden = node.buffers[node.activeBufferIndex].garden;
             
+            // The new leaf is created with a placeholder path for now.
+            // The actual unique path will be generated asynchronously right before rendering.
             const newLeaf = {
                 type: 'leaf',
                 id: newPaneId,
                 activeBufferIndex: 0,
-                buffers: [{ garden: currentGarden, path: generateScratchpadPath() }]
+                buffers: [{ garden: currentGarden, path: '/scratchpad/placeholder' }]
             };
             
             return {
@@ -45,7 +37,28 @@ export class PaneManager {
         return node;
     };
     
+    // Find the new leaf node in the updated tree to set its path
+    const findNodeById = (node, id) => {
+        if (node.type === 'leaf' && node.id === id) return node;
+        if (node.type.startsWith('split-')) {
+            return findNodeById(node.children[0], id) || findNodeById(node.children[1], id);
+        }
+        return null;
+    };
+    
     this.workspace.paneTree = findAndSplit(this.workspace.paneTree);
+    
+    // Asynchronously generate the unique path *before* rendering.
+    if (newPaneId) {
+        const newLeafNode = findNodeById(this.workspace.paneTree, newPaneId);
+        if (newLeafNode) {
+            const gitClient = await this.workspace.getGitClient(newLeafNode.buffers[0].garden);
+            const scratchpadPath = await generateUniqueScratchpadPath(gitClient);
+            newLeafNode.buffers[0].path = scratchpadPath;
+            // The file is NOT created here. The editor will load it as a placeholder.
+        }
+    }
+
     this.workspace.render().then(() => {
         if (newPaneId) {
             this.workspace.setActivePane(newPaneId); 
