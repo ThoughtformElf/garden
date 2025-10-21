@@ -169,10 +169,16 @@ export class EditorFiles {
         label: 'Enter file name (or leave blank for a scratchpad):',
       });
       
+      // If the user cancels the prompt, newName will be null.
+      if (newName === null) {
+        this.editor.editorView?.focus(); // Return focus to the editor.
+        return;
+      }
+      
       let newPath;
 
       // Step 1: Determine the path.
-      if (!newName || !newName.trim()) {
+      if (!newName.trim()) {
         // If the name is blank, generate a unique scratchpad path.
         newPath = await generateUniqueScratchpadPath(this.editor.gitClient);
       } else {
@@ -202,7 +208,7 @@ export class EditorFiles {
       window.thoughtform.workspace.openFile(this.editor.gitClient.gardenName, newPath);
 
     } finally {
-      // Focus is automatically handled by the workspace manager.
+      // Focus is automatically handled by the workspace manager on success.
     }
   }
 
@@ -229,7 +235,13 @@ export class EditorFiles {
         label: 'Enter name for duplicated file:',
         defaultValue: defaultName
       });
-      if (!newFilename) return;
+      
+      if (newFilename === null) {
+          this.editor.editorView?.focus(); // Return focus to the editor on cancel.
+          return;
+      }
+      
+      if (!newFilename) return; // Do nothing if name is empty after confirmation.
     
       const newPath = `${directory}/${newFilename}`;
       try {
