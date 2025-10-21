@@ -27,6 +27,9 @@
 - key: "Mod-Alt-n"
   run: "settings/keymaps/new-file.js"
 
+- key: "Mod-r"
+  run: "settings/keymaps/rename-current-file.js"
+
 - key: "Alt-ArrowLeft"
   run: "settings/keymaps/browser-back.js"
 
