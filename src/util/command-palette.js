@@ -355,21 +355,46 @@ export class CommandPalette {
     if (!editor || !editor.editorView || editor.editorView.isDestroyed) return;
 
     const file = this.results[index].doc;
-    const targetGarden = file.garden;
-    const targetPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
     const activeGarden = editor.gitClient.gardenName;
     
-    let linkText;
-    if (targetGarden === activeGarden) {
-        linkText = `[[${targetPath}]]`;
+    const targetPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
+    let linkContent;
+    if (file.garden === activeGarden) {
+        linkContent = targetPath;
     } else {
-        linkText = `[[${targetGarden}#${targetPath}]]`;
+        linkContent = `${file.garden}#${targetPath}`;
     }
+    const linkText = `[[${linkContent}]]`;
 
     editor.editorView.dispatch({
         changes: { from: selection.from, to: selection.to, insert: linkText },
         selection: { anchor: selection.from + linkText.length }
     });
+    
+    this.close();
+  }
+  
+  async openInNewPane(index) {
+    if (index < 0 || index >= this.results.length || !this.lastEditorState) return;
+
+    const { editor } = this.lastEditorState;
+    if (!editor || !editor.paneId) {
+        console.error('[CommandPalette] Cannot open in new pane, source editor or paneId not found.');
+        return;
+    }
+
+    const file = this.results[index].doc;
+    const sourceGarden = editor.gitClient.gardenName;
+    
+    const targetPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
+    let linkContent;
+    if (file.garden === sourceGarden) {
+        linkContent = targetPath;
+    } else {
+        linkContent = `${file.garden}#${targetPath}`;
+    }
+
+    window.thoughtform.workspace.openInNewPane(linkContent, editor.paneId);
     
     this.close();
   }
@@ -401,7 +426,9 @@ export class CommandPalette {
       case 'Enter':
         e.preventDefault();
         if (this.results.length > 0) {
-            if ((e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
+            if (e.shiftKey && (e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
+                await this.openInNewPane(this.selectedIndex);
+            } else if ((e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
                 await this.insertLink(this.selectedIndex);
             } else {
                 await this.selectItem(this.selectedIndex);

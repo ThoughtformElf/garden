@@ -108,7 +108,7 @@ export class WorkspaceManager {
     }
     await window.thoughtform.sidebar.refresh();
   }
-  
+
   async openFile(garden, path) {
     const activePaneInfo = this._paneManager.getActivePaneInfo();
     if (!activePaneInfo) return;
