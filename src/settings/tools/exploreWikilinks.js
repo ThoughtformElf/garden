@@ -1,22 +1,19 @@
 /*
 Description:
-A powerful research tool that recursively explores a topic by following internal [[wikilinks]]. It starts from an initial piece of content, finds all wikilinks, reads their content, and repeats this process to build a comprehensive knowledge base.
+A specialized exploration tool that recursively follows [[wikilinks]] to discover and assemble related information. Start with a piece of text that already contains wikilinks, and this tool will automatically read the content of those links, find more links within them, and repeat the process up to a certain depth.
 
-This tool is best for broad research questions where you need to gather context from multiple connected notes within the user's garden.
+This tool is best used *after* you have already used `readFile` to get initial content. It allows you to go deeper into the connections between notes.
 
-**IMPORTANT**: If you just need to read a single, specific external webpage (like a reddit link or a news article), use the `readURL` tool instead. This tool is for exploring the internal knowledge base.
-- IF THE USER MENTIONS "me", "I", "this", "our" - "this garden" "my notes" "yesterdays notes" "that chat" use this tool
-- DO NOT USE `webSearch` to search [[wikilinks]] use this tool instead
-- USE THIS TOOL TO LEARN ABOUT THE USER, YOURSELF, AND THIS INTERFACE
+**IMPORTANT**: The `initialContent` you provide MUST contain one or more `[[wikilinks]]` for the tool to have a starting point for its exploration.
 
 Arguments:
-- goal: The user's original goal or research question. This helps the tool filter for relevant information later.
-- initialContent: The starting text, which MUST contain one or more [[wikilinks]] for the tool to begin its exploration.
+- goal: The user's original goal or research question. This helps the tool filter for relevant information during its exploration.
+- initialContent: The starting text, which MUST contain one or more [[wikilinks]] for the tool to begin.
 
 Example Call (in JSON format):
 {
   "goal": "understand the project's agentic computing features",
-  "initialContent": "The main features are described in the [[README]]."
+  "initialContent": "The main features are described in the [[README]]. It talks about [[P2P]] sync and [[Agentic Loop]]."
 }
 */
 
@@ -50,7 +47,7 @@ while (queue.length > 0) {
   if (visited.has(visitedKey)) continue;
   visited.add(visitedKey);
 
-  if (onProgress) onProgress(`Reading link: ${currentLink}`);
+  if (onProgress) onProgress(`Exploring link: ${currentLink}`);
 
   let newContent = null;
   let sourceIdentifier = currentLink;
@@ -96,7 +93,7 @@ while (queue.length > 0) {
   }
 }
 
-if (onProgress) onProgress('All links read. Filtering for relevance...');
+if (onProgress) onProgress('All links explored. Filtering for relevance...');
 
 const relevancePrompt = `
   User Goal: "${goal}"

@@ -1,6 +1,6 @@
 /*
 Description:
-Generates a list of all available files (pages). It can operate in two scopes: listing files only within the current garden or listing files across all gardens. This is useful for getting an overview of available documents before deciding which ones to read.
+Generates a list of all available files (pages). It can operate in two scopes: listing files only within the current garden or listing files across all gardens. This is useful for getting an overview of available documents before deciding which ones to read. After using this tool, you can use the `readFile` tool on the most relevant-looking file paths.
 
 Arguments:
 - scope: The scope of the file search. Can be either "current" (default) or "all".

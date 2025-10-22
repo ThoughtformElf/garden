@@ -33,7 +33,8 @@ import defaultQueryTestJs from './query/test.js?raw';
 import defaultSelectToolMd from './prompts/select-tool.md?raw';
 import defaultCritiqueStepMd from './prompts/critique-step.md?raw';
 import defaultSynthesizeAnswerMd from './prompts/synthesize-answer.md?raw';
-import defaultBuildKnowledgeBaseJs from './tools/buildKnowledgeBase.js?raw';
+import defaultExploreWikilinksJs from './tools/exploreWikilinks.js?raw'; // Renamed
+import defaultReadFileJs from './tools/readFile.js?raw'; // New
 import defaultReadURLJs from './tools/readURL.js?raw';
 import defaultWebSearchJs from './tools/webSearch.js?raw';
 import defaultListFilesJs from './tools/listFiles.js?raw';
@@ -73,7 +74,8 @@ export const defaultFiles = [
   ['/settings/prompts/select-tool.md', defaultSelectToolMd],
   ['/settings/prompts/critique-step.md', defaultCritiqueStepMd],
   ['/settings/prompts/synthesize-answer.md', defaultSynthesizeAnswerMd],
-  ['/settings/tools/buildKnowledgeBase.js', defaultBuildKnowledgeBaseJs],
+  ['/settings/tools/exploreWikilinks.js', defaultExploreWikilinksJs], // Renamed
+  ['/settings/tools/readFile.js', defaultReadFileJs], // New
   ['/settings/tools/readURL.js', defaultReadURLJs],
   ['/settings/tools/webSearch.js', defaultWebSearchJs],
   ['/settings/tools/listFiles.js', defaultListFilesJs],
