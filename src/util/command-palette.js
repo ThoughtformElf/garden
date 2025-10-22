@@ -33,6 +33,7 @@ export class CommandPalette {
     this.results = [];
     this.selectedIndex = 0;
     this.mode = 'searchFiles'; // Default mode
+    this.lastEditorState = null; // To store editor and selection for link insertion
     
     this.isIndexing = false;
     this.indexPromise = null;
@@ -170,6 +171,17 @@ export class CommandPalette {
     this.isOpen = true;
     this.mode = mode;
 
+    // Capture the editor state at the moment the palette is opened
+    const activeEditor = window.thoughtform.workspace.getActiveEditor();
+    if (activeEditor && activeEditor.editorView) {
+        this.lastEditorState = {
+            editor: activeEditor,
+            selection: activeEditor.editorView.state.selection.main
+        };
+    } else {
+        this.lastEditorState = null;
+    }
+
     // Configure UI based on mode
     switch(this.mode) {
         case 'executeCommand':
@@ -211,6 +223,7 @@ export class CommandPalette {
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
+    this.lastEditorState = null; // Clear the saved editor state
     document.removeEventListener('keydown', this.handleKeyDown);
     const activeEditor = window.thoughtform.workspace.getActiveEditor();
     if (activeEditor && activeEditor.editorView) {
@@ -335,6 +348,32 @@ export class CommandPalette {
     this.close();
   }
 
+  async insertLink(index) {
+    if (index < 0 || index >= this.results.length || !this.lastEditorState) return;
+
+    const { editor, selection } = this.lastEditorState;
+    if (!editor || !editor.editorView || editor.editorView.isDestroyed) return;
+
+    const file = this.results[index].doc;
+    const targetGarden = file.garden;
+    const targetPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
+    const activeGarden = editor.gitClient.gardenName;
+    
+    let linkText;
+    if (targetGarden === activeGarden) {
+        linkText = `[[${targetPath}]]`;
+    } else {
+        linkText = `[[${targetGarden}#${targetPath}]]`;
+    }
+
+    editor.editorView.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: linkText },
+        selection: { anchor: selection.from + linkText.length }
+    });
+    
+    this.close();
+  }
+
   handleInput(e) {
     this.search(e.target.value);
   }
@@ -362,7 +401,11 @@ export class CommandPalette {
       case 'Enter':
         e.preventDefault();
         if (this.results.length > 0) {
-            await this.selectItem(this.selectedIndex);
+            if ((e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
+                await this.insertLink(this.selectedIndex);
+            } else {
+                await this.selectItem(this.selectedIndex);
+            }
         }
         break;
       case 'Escape':

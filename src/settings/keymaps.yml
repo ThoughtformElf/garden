@@ -74,7 +74,7 @@
 - key: "Alt-k"
   run: "settings/keymaps/move-pane-up.js"
 
-- key: "Alt-Shift-x"
+- key: "Alt-x"
   run: "settings/keymaps/close-pane.js"
 
 - key: "Alt-z"
