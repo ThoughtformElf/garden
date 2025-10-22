@@ -6,11 +6,13 @@ const axios = require('axios');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+// --- THIS IS THE FIX (Part 1) ---
+// Import the PDFParse class directly, as shown in the documentation.
+const { PDFParse } = require('pdf-parse');
 
 const cache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
-// Change this to something obscure
 const SECRET_PARAM = 'thoughtformgardenproxy';
 
 const args = process.argv.slice(2);
@@ -74,8 +76,6 @@ async function fetchAndParse(targetUrl, queryParams) {
     cache.delete(targetUrl);
   }
 
-  // --- THIS IS THE FIX (Part 2) ---
-  // Check for the 'forceheadless' parameter. If it exists, skip the lightweight fetch.
   const forceHeadless = queryParams.forceheadless === 'true';
 
   if (!forceHeadless) {
@@ -87,13 +87,40 @@ async function fetchAndParse(targetUrl, queryParams) {
         'Accept-Language': 'en-US,en;q=0.5',
       };
 
-      // If a Brave API key is passed, add it to the headers.
       if (queryParams.braveapikey) {
           headers['X-Subscription-Token'] = queryParams.braveapikey;
       }
 
-      const response = await axios.get(targetUrl, { headers, timeout: 15000 });
-      const html = response.data;
+      const response = await axios.get(targetUrl, { 
+          headers, 
+          timeout: 15000,
+          responseType: 'arraybuffer' 
+      });
+
+      const contentType = response.headers['content-type'] || '';
+
+      if (contentType.includes('application/pdf')) {
+        console.log(`[Proxy] PDF detected. Parsing: ${targetUrl}`);
+        
+        // --- THIS IS THE FIX (Part 2) ---
+        // Use the correct, class-based v2 syntax from the documentation.
+        const parser = new PDFParse({ data: response.data });
+        try {
+            const data = await parser.getText();
+            const content = `Title: ${data.info?.Title || path.basename(targetUrl)}\n\n${data.text.trim()}`;
+            
+            cache.set(targetUrl, { content, timestamp: Date.now() });
+            console.log(`[Proxy] PDF parsing successful for: ${targetUrl}`);
+            await parser.destroy();
+            return content;
+        } catch (pdfError) {
+            // Ensure destroy is called even on error.
+            await parser.destroy();
+            throw pdfError; // Re-throw to be caught by the outer catch block.
+        }
+      }
+      
+      const html = Buffer.from(response.data).toString('utf-8');
 
       const dom = new JSDOM(html, { url: targetUrl });
       const reader = new Readability(dom.window.document);
@@ -111,6 +138,8 @@ async function fetchAndParse(targetUrl, queryParams) {
       return content;
 
     } catch (error) {
+      // This outer catch block will now correctly handle PDF parsing errors
+      // and prevent them from escalating to the headless browser.
       if (error.response && (error.response.status === 429 || error.response.status === 403)) {
         console.warn(`[Proxy] Lightweight fetch failed with status ${error.response.status}. Escalating to headless browser.`);
       } else {
@@ -131,7 +160,7 @@ async function fetchAndParse(targetUrl, queryParams) {
   try {
     browser = await puppeteer.launch({
         headless: "new",
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH, // Use environment variable
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
@@ -166,7 +195,6 @@ async function fetchAndParse(targetUrl, queryParams) {
 
     const html = await page.content();
 
-    // With DuckDuckGo, we don't need Readability, we want the raw search results HTML.
     if (targetUrl.includes('duckduckgo.com')) {
         cache.set(targetUrl, { content: html, timestamp: Date.now() });
         console.log(`[Proxy] Headless browser fetch successful for DDG: ${targetUrl}`);
@@ -282,10 +310,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      // Pass the query parameters to the fetch function
       const content = await fetchAndParse(targetUrl, parsedUrl.query);
       
-      // Determine content type based on what was fetched
       const contentType = targetUrl.includes('duckduckgo.com') ? 'text/html' : 'text/plain';
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(content);

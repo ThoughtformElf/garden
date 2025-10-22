@@ -21,7 +21,7 @@ export class TaskRunner {
         this.tools = await getAllTools(this.gitClient.gardenName);
         this.tools.set('finish', {
             name: 'finish',
-            description: 'Call this tool when you have completed all research, verified your findings from multiple sources, and are ready to synthesize the final, comprehensive answer.',
+            description: 'Call this tool with NO ARGUMENTS when you have completed all research and are ready to synthesize the final answer.',
             execute: async () => "Signal to finish task received.",
         });
     }
@@ -44,7 +44,6 @@ export class TaskRunner {
             if (e.name !== 'AbortError') {
                 console.error("[TaskRunner] Orchestration failed:", e);
             }
-            // Propagate the error to the stream so the UI handler can catch it.
             streamController.error(e);
         });
 
@@ -60,7 +59,6 @@ export class TaskRunner {
     }
 
     async _getJsonCompletion(prompt, aiService, signal) {
-        // THIS IS THE FIX (Part 1): No signature change needed, as the tracked service will handle counting.
         const responseText = await aiService.getCompletionAsString(prompt, null, signal);
         try {
             const jsonMatch = responseText.match(/{\s*"thought":[\s\S]*}/);
@@ -91,13 +89,11 @@ export class TaskRunner {
             totalOutputTokens += output;
         };
         
-        // --- THIS IS THE FIX (Part 2) ---
-        // This wrapped service transparently intercepts every LLM call to add token counting.
         const trackedAiService = {
             getCompletion: (prompt, onTokenCount, passedSignal) => {
                 return this.aiService.getCompletion(prompt, (tokenData) => {
-                    onTokenCounter(tokenData); // Update the orchestrator's totals
-                    if (onTokenCount) onTokenCount(tokenData); // Call the original callback if it exists
+                    onTokenCounter(tokenData);
+                    if (onTokenCount) onTokenCount(tokenData);
                 }, passedSignal || signal);
             },
             getCompletionAsString: (prompt, onTokenCount, passedSignal) => {
@@ -121,7 +117,6 @@ export class TaskRunner {
 
             let responseJson;
             try {
-                // This call now correctly uses the tracked service, which will count the tokens.
                 const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService, signal);
                 responseJson = result.responseJson;
             } catch (error) {
@@ -163,7 +158,7 @@ export class TaskRunner {
             
             const context = { 
                 git: this.gitClient, 
-                ai: trackedAiService, // Tools also get the tracked service
+                ai: trackedAiService,
                 dependencies: dependencies,
                 onProgress: (message) => this._sendStreamEvent(stream, 'status', message),
                 signal: signal,
