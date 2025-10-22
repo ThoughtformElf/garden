@@ -44,7 +44,9 @@ export class TaskRunner {
             if (e.name !== 'AbortError') {
                 console.error("[TaskRunner] Orchestration failed:", e);
             }
-            streamController.error(e);
+            if (!streamController.controller.desiredSize === null) {
+                streamController.error(e);
+            }
         });
 
         return stream;
@@ -73,6 +75,87 @@ export class TaskRunner {
         }
     }
 
+    // --- NEW: AI-Powered Error Classification ---
+    async _classifyError(errorMessage, ai, signal) {
+        const classificationPrompt = `
+You are an error analysis bot. Analyze the following error message from an API call.
+Respond with ONLY ONE of the following classifications: CONTEXT_OVERFLOW, RATE_LIMIT, INVALID_JSON, API_KEY_ERROR, UNKNOWN_FAILURE.
+
+- If the error indicates the input was too large, context window was exceeded, or a token quota was hit, classify as CONTEXT_OVERFLOW.
+- If the error indicates too many requests are being sent too quickly, classify as RATE_LIMIT.
+- If the error indicates a problem with the AI's own JSON output, classify as INVALID_JSON.
+- If the error mentions an invalid or missing API key, classify as API_KEY_ERROR.
+- For all other errors, classify as UNKNOWN_FAILURE.
+
+Error Message: "${errorMessage}"
+
+Classification:`;
+
+        const classification = await ai.getCompletionAsString(classificationPrompt, null, signal);
+        return classification.trim();
+    }
+    
+    async _compressScratchpad(scratchpad, errorMessage, ai, signal, onProgress) {
+        onProgress('Cognitive compression initiated...');
+        
+        const limitDetectionPrompt = `From the following error message, extract only the integer value for the token limit. If you cannot find one, respond with '8000'. Error: "${errorMessage}"`;
+        onProgress('Analyzing context limit...');
+        const limitStr = await ai.getCompletionAsString(limitDetectionPrompt, null, signal);
+        const detectedLimit = parseInt(limitStr, 10) || 8000;
+        onProgress(`Context limit detected: ~${detectedLimit.toLocaleString()} tokens.`);
+
+        const safeBudget = detectedLimit * 0.5;
+
+        const headerEndMarker = '---';
+        const initialContextEnd = scratchpad.indexOf(headerEndMarker, scratchpad.indexOf('INITIAL CONTEXT'));
+        if (initialContextEnd === -1) throw new Error("Compression failed: Could not find end of initial context.");
+        
+        const header = scratchpad.substring(0, initialContextEnd + headerEndMarker.length);
+        let history = scratchpad.substring(initialContextEnd + headerEndMarker.length);
+
+        const summaryMarker = '[COMPRESSED MEMORY]:';
+        let existingSummary = '';
+        const summaryIndex = history.indexOf(summaryMarker);
+        if (summaryIndex !== -1) {
+            const summaryEndIndex = history.indexOf('\n---', summaryIndex);
+            existingSummary = history.substring(summaryIndex, summaryEndIndex);
+            history = history.substring(summaryEndIndex);
+        }
+        
+        if (history.trim().length === 0) throw new Error("Compression failed: No uncompressed history to process.");
+
+        let chunkToSummarize = '';
+        let remainingHistory = '';
+        const allCycles = history.split('---').filter(c => c.trim());
+        let tokensForChunk = 0;
+        let cyclesInChunk = 0;
+
+        for (const cycle of allCycles) {
+            const cycleTokens = countTokens(cycle);
+            if (tokensForChunk + cycleTokens < safeBudget) {
+                chunkToSummarize += cycle + '---';
+                tokensForChunk += cycleTokens;
+                cyclesInChunk++;
+            } else {
+                remainingHistory += cycle + '---';
+            }
+        }
+        
+        if (cyclesInChunk === 0 && allCycles.length > 0) {
+            onProgress('Warning: A single memory item is larger than the safe summarization budget. Truncating.');
+            chunkToSummarize = allCycles[0].substring(0, safeBudget * 4); 
+            remainingHistory = allCycles.slice(1).join('---');
+        }
+
+        const summarizationPrompt = `# Persona: You are a Memory Compression Module.\n# Your task is to read a sequence of an AI agent's memories and distill them into a concise, factual summary, preserving all key findings, decisions, and data points.\n\n# Memories to Summarize:\n---\n${chunkToSummarize}\n---\n\n# Concise Summary:`;
+        onProgress(`Generating summary of oldest ${cyclesInChunk} steps...`);
+        const newSummary = await ai.getCompletionAsString(summarizationPrompt, null, signal);
+        onProgress('Memory compression complete.');
+        
+        const combinedSummary = `${existingSummary}\n- ${newSummary.trim()}`.replace(summaryMarker, '').trim();
+        return `${header}\n\n${summaryMarker} ${combinedSummary}\n---${remainingHistory}`;
+    }
+
     async _orchestrate(goal, stream, signal) {
         await this._initialize();
         this._sendStreamEvent(stream, 'status', `Starting with goal: "${goal}"`);
@@ -90,18 +173,8 @@ export class TaskRunner {
         };
         
         const trackedAiService = {
-            getCompletion: (prompt, onTokenCount, passedSignal) => {
-                return this.aiService.getCompletion(prompt, (tokenData) => {
-                    onTokenCounter(tokenData);
-                    if (onTokenCount) onTokenCount(tokenData);
-                }, passedSignal || signal);
-            },
-            getCompletionAsString: (prompt, onTokenCount, passedSignal) => {
-                return this.aiService.getCompletionAsString(prompt, (tokenData) => {
-                    onTokenCounter(tokenData);
-                    if (onTokenCount) onTokenCount(tokenData);
-                }, passedSignal || signal);
-            },
+            getCompletion: (prompt, onTokenCount, passedSignal) => this.aiService.getCompletion(prompt, (d) => { onTokenCounter(d); if(onTokenCount) onTokenCount(d); }, passedSignal || signal),
+            getCompletionAsString: (prompt, onTokenCount, passedSignal) => this.aiService.getCompletionAsString(prompt, (d) => { onTokenCounter(d); if(onTokenCount) onTokenCount(d); }, passedSignal || signal),
         };
         
         const dependencies = { Traversal, Git };
@@ -120,12 +193,37 @@ export class TaskRunner {
                 const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService, signal);
                 responseJson = result.responseJson;
             } catch (error) {
+                // --- THIS IS THE INTELLIGENT ERROR HANDLING FIX ---
                 if (error.name === 'AbortError') throw error;
-                if (error.message.includes('API key')) throw error;
-                
-                this._sendStreamEvent(stream, 'status', `Error: AI returned an invalid plan. Retrying.`);
-                scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${error.message}`;
-                continue;
+                const errorMessage = error.message;
+
+                this._sendStreamEvent(stream, 'status', 'An error occurred during planning. Analyzing...');
+                const errorType = await this._classifyError(errorMessage, trackedAiService, signal);
+                this._sendStreamEvent(stream, 'status', `Error classified as: ${errorType}`);
+
+                switch (errorType) {
+                    case 'CONTEXT_OVERFLOW':
+                        scratchpad += `\nOBSERVATION: CRITICAL API FAILURE. The context window is full. You must compress your memory to continue. Error Details: "${errorMessage}"\n---`;
+                        continue; // Re-run the loop to let the agent see the error.
+
+                    case 'RATE_LIMIT':
+                        this._sendStreamEvent(stream, 'status', 'API rate limit reached. Waiting 5 seconds before retry...');
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                        continue; // Retry the original planning step.
+
+                    case 'INVALID_JSON':
+                        scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${errorMessage}\n---`;
+                        continue;
+
+                    case 'API_KEY_ERROR':
+                        throw error; // This is a fatal error, stop the orchestration.
+
+                    case 'UNKNOWN_FAILURE':
+                    default:
+                        scratchpad += `\nOBSERVATION: An unknown API error occurred. I will retry the step. Error: ${errorMessage}\n---`;
+                        continue;
+                }
+                // --- END OF FIX ---
             }
             
             const stepInput = totalInputTokens - tokensBefore.input;
@@ -162,25 +260,26 @@ export class TaskRunner {
                 dependencies: dependencies,
                 onProgress: (message) => this._sendStreamEvent(stream, 'status', message),
                 signal: signal,
-                addSource: (url) => {
-                    if (url && typeof url === 'string') {
-                        readSources.add(url);
-                    }
-                }
+                addSource: (url) => { if (url && typeof url === 'string') readSources.add(url); }
             };
             
             const tokensBeforeTool = { input: totalInputTokens, output: totalOutputTokens };
 
-            const observation = await tool.execute(toolArgs, context);
-            const observationString = String(observation);
-            
-            let observationForDisplay;
-            const observationTokens = countTokens(observationString);
-            if (observationTokens > 250) {
-                observationForDisplay = `[Observation received (${observationTokens.toLocaleString()} tokens) and added to context.]`;
-            } else {
-                observationForDisplay = observationString;
+            let observation = await tool.execute(toolArgs, context);
+
+            if (toolToCall === 'requestMemoryCompression') {
+                try {
+                    const signalData = JSON.parse(observation);
+                    if (signalData.action === 'request_memory_compression') {
+                        scratchpad = await this._compressScratchpad(scratchpad, signalData.details.errorMessage, trackedAiService, signal, (msg) => this._sendStreamEvent(stream, 'status', msg));
+                        continue;
+                    }
+                } catch(e) { /* Not a valid signal */ }
             }
+
+            const observationString = String(observation);
+            const observationTokens = countTokens(observationString);
+            const observationForDisplay = observationTokens > 250 ? `[Observation received (${observationTokens.toLocaleString()} tokens) and added to context.]` : observationString;
             this._sendStreamEvent(stream, 'observation', observationForDisplay);
             
             const toolInput = totalInputTokens - tokensBeforeTool.input;
@@ -206,8 +305,7 @@ export class TaskRunner {
         }
         
         if (readSources.size > 0) {
-            const sourcesList = Array.from(readSources).join(', ');
-            stream.enqueue(`\n<!-- Sources: ${sourcesList} -->`);
+            stream.enqueue(`\n<!-- Sources: ${Array.from(readSources).join(', ')} -->`);
         }
         
         stream.enqueue(`\n<!-- Total Tokens: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out -->`);

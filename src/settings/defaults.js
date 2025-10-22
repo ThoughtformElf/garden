@@ -33,11 +33,12 @@ import defaultQueryTestJs from './query/test.js?raw';
 import defaultSelectToolMd from './prompts/select-tool.md?raw';
 import defaultCritiqueStepMd from './prompts/critique-step.md?raw';
 import defaultSynthesizeAnswerMd from './prompts/synthesize-answer.md?raw';
-import defaultExploreWikilinksJs from './tools/exploreWikilinks.js?raw'; // Renamed
-import defaultReadFileJs from './tools/readFile.js?raw'; // New
+import defaultExploreWikilinksJs from './tools/exploreWikilinks.js?raw';
+import defaultReadFileJs from './tools/readFile.js?raw';
 import defaultReadURLJs from './tools/readURL.js?raw';
 import defaultWebSearchJs from './tools/webSearch.js?raw';
 import defaultListFilesJs from './tools/listFiles.js?raw';
+import defaultRequestMemoryCompressionJs from './tools/requestMemoryCompression.js?raw'; // New
 
 
 export const defaultFiles = [
@@ -74,9 +75,10 @@ export const defaultFiles = [
   ['/settings/prompts/select-tool.md', defaultSelectToolMd],
   ['/settings/prompts/critique-step.md', defaultCritiqueStepMd],
   ['/settings/prompts/synthesize-answer.md', defaultSynthesizeAnswerMd],
-  ['/settings/tools/exploreWikilinks.js', defaultExploreWikilinksJs], // Renamed
-  ['/settings/tools/readFile.js', defaultReadFileJs], // New
+  ['/settings/tools/exploreWikilinks.js', defaultExploreWikilinksJs],
+  ['/settings/tools/readFile.js', defaultReadFileJs],
   ['/settings/tools/readURL.js', defaultReadURLJs],
   ['/settings/tools/webSearch.js', defaultWebSearchJs],
   ['/settings/tools/listFiles.js', defaultListFilesJs],
+  ['/settings/tools/requestMemoryCompression.js', defaultRequestMemoryCompressionJs], // New
 ];
