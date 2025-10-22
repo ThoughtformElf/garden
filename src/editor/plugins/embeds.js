@@ -1,8 +1,41 @@
 import { WidgetType, Decoration, ViewPlugin } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
+import { RangeSetBuilder, EditorState } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { Git } from '../../util/git-integration.js';
 import { appContextField } from '../navigation.js';
+import { EditorView } from '@codemirror/view';
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { basicDark } from '../../util/theme.js';
+import { getLanguageExtension } from '../languages.js';
+
+// --- Import all custom highlight plugins EXCEPT for the embed plugin itself ---
+// This is to prevent an infinite loop of embeds rendering inside other embeds.
+import { hashtagPlugin } from './hashtags.js';
+import { wikilinkPlugin } from './wikilinks.js';
+import { checkboxPlugin } from './checkboxes.js';
+import { timestampPlugin } from './timestamps.js';
+import { externalLinkPlugin } from './external-links.js';
+import { blockquotePlugin } from './blockquotes.js';
+import { rulerPlugin } from './ruler.js';
+import { responseWrapperPlugin } from './response-wrapper.js';
+import { promptWrapperPlugin } from './prompt-wrapper.js';
+import { titleHeadingPlugin } from './title-headings.js';
+import { mermaidPlugin } from './mermaid.js';
+
+// --- Create an array of plugins specifically for the embedded editor ---
+const embeddedHighlightPlugins = [
+  hashtagPlugin,
+  wikilinkPlugin,
+  checkboxPlugin,
+  timestampPlugin,
+  externalLinkPlugin,
+  blockquotePlugin,
+  rulerPlugin,
+  responseWrapperPlugin,
+  promptWrapperPlugin,
+  titleHeadingPlugin,
+  mermaidPlugin,
+];
 
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
 const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
@@ -91,12 +124,7 @@ class EmbedWidget extends WidgetType {
     }
     
     const extension = path.split('.').pop()?.toLowerCase();
-    if (!mediaExtensions.includes(extension)) {
-        container.textContent = ``;
-        container.style.display = 'none';
-        return;
-    }
-
+    
     const appContext = this.view.state.field(appContextField);
     let gitClient;
 
@@ -107,41 +135,72 @@ class EmbedWidget extends WidgetType {
     }
     
     const fullPath = path.startsWith('/') ? path : `/${path}`;
-    const buffer = await gitClient.readFileAsBuffer(fullPath);
 
-    if (!buffer) {
-      throw new Error('File could not be read as a buffer.');
-    }
-    
-    const mimeType = getMimeType(extension);
-    const blob = new Blob([buffer], { type: mimeType });
-    this.objectURL = URL.createObjectURL(blob);
+    if (mediaExtensions.includes(extension)) {
+      const buffer = await gitClient.readFileAsBuffer(fullPath);
 
-    let element;
-    if (imageExtensions.includes(extension)) {
-        element = document.createElement('img');
-        element.className = 'cm-embedded-image';
-        element.alt = this.linkTarget;
-    } else if (videoExtensions.includes(extension)) {
-        element = document.createElement('video');
-        element.className = 'cm-embedded-video';
-        element.controls = true;
-    } else if (audioExtensions.includes(extension)) {
-        element = document.createElement('audio');
-        element.className = 'cm-embedded-audio';
-        element.controls = true;
-    }
+      if (!buffer) {
+        throw new Error('File could not be read as a buffer.');
+      }
+      
+      const mimeType = getMimeType(extension);
+      const blob = new Blob([buffer], { type: mimeType });
+      this.objectURL = URL.createObjectURL(blob);
 
-    element.src = this.objectURL;
-    container.innerHTML = ''; // Clear placeholder
-    container.appendChild(element);
+      let element;
+      if (imageExtensions.includes(extension)) {
+          element = document.createElement('img');
+          element.className = 'cm-embedded-image';
+          element.alt = this.linkTarget;
+      } else if (videoExtensions.includes(extension)) {
+          element = document.createElement('video');
+          element.className = 'cm-embedded-video';
+          element.controls = true;
+      } else if (audioExtensions.includes(extension)) {
+          element = document.createElement('audio');
+          element.className = 'cm-embedded-audio';
+          element.controls = true;
+      }
 
-    if (element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
-        element.onerror = (e) => {
-            console.error("Embedded media playback error:", e);
-            container.innerHTML = `<span class="cm-embed-error">Error playing: ${this.linkTarget}</span>`;
-        };
-        element.load();
+      element.src = this.objectURL;
+      container.innerHTML = ''; // Clear placeholder
+      container.appendChild(element);
+
+      if (element.tagName === 'VIDEO' || element.tagName === 'AUDIO') {
+          element.onerror = (e) => {
+              console.error("Embedded media playback error:", e);
+              container.innerHTML = `<span class="cm-embed-error">Error playing: ${this.linkTarget}</span>`;
+          };
+          element.load();
+      }
+    } else {
+      // Handle text/code content
+      const content = await gitClient.readFile(fullPath);
+      
+      if (content === null || content === undefined) {
+           throw new Error('File content could not be read.');
+      }
+
+      container.innerHTML = ''; // Clear the "Loading..." placeholder
+      container.classList.add('cm-embedded-content'); // Add class for styling
+
+      // Create a minimal, read-only CodeMirror instance for the embed
+      const embeddedEditorState = EditorState.create({
+          doc: content,
+          extensions: [
+              basicDark,
+              syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+              getLanguageExtension(path),
+              EditorView.lineWrapping,
+              EditorView.editable.of(false), // Make it read-only
+              ...embeddedHighlightPlugins // <-- THIS IS THE FIX
+          ]
+      });
+      
+      new EditorView({
+          state: embeddedEditorState,
+          parent: container
+      });
     }
   }
 
@@ -186,17 +245,15 @@ function buildDecorations(view) {
 
       const end = start + match[0].length;
       const linkTarget = match[1];
-      const extension = linkTarget.split('.').pop()?.toLowerCase();
       
-      if (mediaExtensions.includes(extension)) {
-        builder.add(
-          start,
-          end,
-          Decoration.replace({
-            widget: new EmbedWidget(linkTarget, linkTarget, 'internal', view),
-          })
-        );
-      }
+      // Always create the widget; it will handle whether to render as media or text.
+      builder.add(
+        start,
+        end,
+        Decoration.replace({
+          widget: new EmbedWidget(linkTarget, linkTarget, 'internal', view),
+        })
+      );
     }
 
     const externalEmbedRegex = /!\[(.*?)\]\((.*?)\)/g;
