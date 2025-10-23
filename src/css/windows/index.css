@@ -1,0 +1,99 @@
+/* --- Preview Window Container & Iframe --- */
+#preview-windows-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Allows clicks to pass through the container */
+    z-index: 999;
+}
+
+.preview-iframe {
+    position: absolute;
+    width: 60rem; /* Use rem for scalability */
+    height: 40rem;
+    background-color: var(--color-background-primary);
+    border: 1px solid var(--color-border-primary);
+    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
+    border-radius: 0.4rem;
+    overflow: hidden;
+    resize: both;
+    min-width: 25rem;
+    min-height: 15rem;
+    pointer-events: auto; /* The iframe itself is interactive */
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.preview-iframe.visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+
+/* --- Styles for the app when running INSIDE an iframe --- */
+/* This is controlled by the .is-preview-mode class on the body */
+.is-preview-mode #sidebar,
+.is-preview-mode #resizer,
+.is-preview-mode #eruda-container,
+.is-preview-mode #eruda-resizer {
+    display: none !important;
+}
+
+.is-preview-mode .app-container {
+    height: 100vh;
+    width: 100vw;
+}
+
+.is-preview-mode .main-content {
+    grid-template-columns: 1fr; /* Remove sidebar column */
+}
+
+
+/* --- Draggable Header for Preview Windows --- */
+.preview-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2.5rem;
+    background-color: var(--color-background-secondary);
+    border-bottom: 1px solid var(--color-border-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.8rem;
+    cursor: grab;
+    z-index: 1000;
+    user-select: none;
+    color: var(--color-text-secondary);
+}
+
+.preview-header:active {
+    cursor: grabbing;
+}
+
+.preview-header-filename {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-header-controls button {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    line-height: 1;
+    border-radius: 0.3rem;
+}
+
+.preview-header-controls button:hover {
+    background-color: var(--color-background-hover);
+    color: var(--color-text-primary);
+}

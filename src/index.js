@@ -41,11 +41,69 @@ function initializeNavigationListener() {
     });
 }
 
+// --- Logic for when running inside a preview iframe ---
+function initializePreviewMode() {
+    document.body.classList.add('is-preview-mode');
+
+    const header = document.createElement('div');
+    header.className = 'preview-header';
+    
+    const filenameEl = document.createElement('div');
+    filenameEl.className = 'preview-header-filename';
+    
+    const controlsEl = document.createElement('div');
+    controlsEl.className = 'preview-header-controls';
+    
+    const maximizeBtn = document.createElement('button');
+    maximizeBtn.innerHTML = '&#x26F6;'; // Square Four Corners
+    maximizeBtn.title = 'Maximize';
+    maximizeBtn.onclick = () => window.parent.postMessage({ type: 'preview-maximize' }, '*');
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = 'Close';
+    closeBtn.onclick = () => window.parent.postMessage({ type: 'preview-close' }, '*');
+    
+    controlsEl.appendChild(maximizeBtn);
+    controlsEl.appendChild(closeBtn);
+    header.appendChild(filenameEl);
+    header.appendChild(controlsEl);
+    
+    document.body.prepend(header);
+
+    // Any interaction with the preview should mark it as persistent
+    const markInteracted = () => {
+        window.parent.postMessage({ type: 'preview-interacted' }, '*');
+        document.body.removeEventListener('mousedown', markInteracted, true);
+        document.body.removeEventListener('wheel', markInteracted, true);
+    };
+    document.body.addEventListener('mousedown', markInteracted, true);
+    document.body.addEventListener('wheel', markInteracted, true);
+
+    // Make the header draggable
+    header.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({ type: 'preview-drag-start', payload: { x: e.clientX, y: e.clientY }}, '*');
+    });
+
+    // Update the filename in the header when the file changes
+    window.thoughtform.events.subscribe('file:update', (data) => {
+        const displayPath = `[${data.gardenName}] ${data.path}`;
+        if (filenameEl.textContent !== displayPath) {
+            filenameEl.textContent = displayPath;
+        }
+    });
+}
+
+
 // --- Main Application Logic ---
 async function main() {
   const fullPath = new URL(import.meta.url).pathname;
   const srcIndex = fullPath.lastIndexOf('/src/');
   const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPreview = urlParams.has('preview');
 
   // --- Ensure the Settings garden exists on every load ---
   const settingsGit = new Git('Settings');
@@ -72,6 +130,10 @@ async function main() {
     events: initializeEventBus(),
     // workspace will be assigned below
   };
+  
+  if (isPreview) {
+    initializePreviewMode();
+  }
 
   // Now that window.thoughtform.events exists, we can initialize the workspace.
   window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
@@ -104,13 +166,13 @@ async function main() {
   // --- Global Error Handling ---
   window.onerror = function(message, source, lineno, colno, error) {
     console.error("Caught global error:", message, error);
-    window.thoughtform.ui.toggleDevtools?.(true, 'console');
+    if (!isPreview) window.thoughtform.ui.toggleDevtools?.(true, 'console');
     return false;
   };
 
   window.onunhandledrejection = function(event) {
     console.error("Caught unhandled promise rejection:", event.reason);
-    window.thoughtform.ui.toggleDevtools?.(true, 'console');
+    if (!isPreview) window.thoughtform.ui.toggleDevtools?.(true, 'console');
   };
 
   const editorShim = { gitClient }; 

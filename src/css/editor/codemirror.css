@@ -17,7 +17,10 @@
   text-decoration: none;
   font-weight: bold;
 }
-.cm-heading  { font-weight: bold; color: var(--base-accent-destructive); }
+.cm-heading  { 
+  font-weight: bold;
+  color: var(--base-accent-destructive); 
+}
 .cm-atom     { color: var(--base-accent-action); }
 .cm-invalid  { color: var(--base-accent-destructive); }
 
