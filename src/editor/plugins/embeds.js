@@ -7,35 +7,8 @@ import { EditorView } from '@codemirror/view';
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { basicDark } from '../../util/theme.js';
 import { getLanguageExtension } from '../languages.js';
+import { highlightPluginsForEmbeds } from './index.js';
 
-// --- Import all custom highlight plugins EXCEPT for the embed plugin itself ---
-// This is to prevent an infinite loop of embeds rendering inside other embeds.
-import { hashtagPlugin } from './hashtags.js';
-import { wikilinkPlugin } from './wikilinks.js';
-import { checkboxPlugin } from './checkboxes.js';
-import { timestampPlugin } from './timestamps.js';
-import { externalLinkPlugin } from './external-links.js';
-import { blockquotePlugin } from './blockquotes.js';
-import { rulerPlugin } from './ruler.js';
-import { responseWrapperPlugin } from './response-wrapper.js';
-import { promptWrapperPlugin } from './prompt-wrapper.js';
-import { titleHeadingPlugin } from './title-headings.js';
-import { mermaidPlugin } from './mermaid.js';
-
-// --- Create an array of plugins specifically for the embedded editor ---
-const embeddedHighlightPlugins = [
-  hashtagPlugin,
-  wikilinkPlugin,
-  checkboxPlugin,
-  timestampPlugin,
-  externalLinkPlugin,
-  blockquotePlugin,
-  rulerPlugin,
-  responseWrapperPlugin,
-  promptWrapperPlugin,
-  titleHeadingPlugin,
-  mermaidPlugin,
-];
 
 const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
 const videoExtensions = ['mp4', 'webm', 'mov', 'ogg'];
@@ -193,7 +166,7 @@ class EmbedWidget extends WidgetType {
               getLanguageExtension(path),
               EditorView.lineWrapping,
               EditorView.editable.of(false), // Make it read-only
-              ...embeddedHighlightPlugins // <-- THIS IS THE FIX
+              ...highlightPluginsForEmbeds // <-- THIS IS THE REFACTORED FIX
           ]
       });
       

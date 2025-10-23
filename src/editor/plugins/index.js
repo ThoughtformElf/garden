@@ -11,8 +11,12 @@ import { promptWrapperPlugin } from './prompt-wrapper.js';
 import { titleHeadingPlugin } from './title-headings.js';
 import { mermaidPlugin } from './mermaid.js';
 
-// Combine all custom plugins into a single array for export.
-export const allHighlightPlugins = [
+/**
+ * A list of all syntax highlighting plugins that are safe to use inside
+ * an embedded editor. This list explicitly EXCLUDES the embedPlugin itself
+ * to prevent infinite recursion (embeds within embeds).
+ */
+export const highlightPluginsForEmbeds = [
   hashtagPlugin,
   wikilinkPlugin,
   checkboxPlugin,
@@ -20,9 +24,17 @@ export const allHighlightPlugins = [
   externalLinkPlugin,
   blockquotePlugin,
   rulerPlugin,
-  embedPlugin,
   responseWrapperPlugin,
   promptWrapperPlugin,
   titleHeadingPlugin,
   mermaidPlugin,
+];
+
+/**
+ * The complete list of all custom plugins for the main editor.
+ * It includes the embed plugin.
+ */
+export const allHighlightPlugins = [
+  ...highlightPluginsForEmbeds,
+  embedPlugin,
 ];
