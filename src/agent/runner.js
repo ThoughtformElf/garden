@@ -69,13 +69,14 @@ export class TaskRunner {
             }
             return { responseText, responseJson: JSON.parse(jsonMatch[0]) };
         } catch (e) {
-            console.error("[TaskRunner] Failed to parse JSON from LLM response:", e);
-            console.error("[TaskRunner] Raw response was:", responseText);
+            // --- DEBUG LOGGING ADDED ---
+            console.error("[DEBUG] Failed to parse JSON from LLM response:", e);
+            console.error("[DEBUG] Raw LLM response that caused the error was:", `"${responseText}"`);
+            // --- END OF DEBUG LOGGING ---
             throw new Error(`The AI assistant did not return a valid JSON plan. Raw response: ${responseText}`);
         }
     }
 
-    // --- NEW: AI-Powered Error Classification ---
     async _classifyError(errorMessage, ai, signal) {
         const classificationPrompt = `
 You are an error analysis bot. Analyze the following error message from an API call.
@@ -193,7 +194,6 @@ Classification:`;
                 const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService, signal);
                 responseJson = result.responseJson;
             } catch (error) {
-                // --- THIS IS THE INTELLIGENT ERROR HANDLING FIX ---
                 if (error.name === 'AbortError') throw error;
                 const errorMessage = error.message;
 
@@ -201,29 +201,38 @@ Classification:`;
                 const errorType = await this._classifyError(errorMessage, trackedAiService, signal);
                 this._sendStreamEvent(stream, 'status', `Error classified as: ${errorType}`);
 
+                // --- DEBUG LOGGING ADDED ---
+                console.log(`[DEBUG] Agent planning failed. Error: "${errorMessage}"`);
+                console.log(`[DEBUG] Classified error as: "${errorType}"`);
+                // --- END OF DEBUG LOGGING ---
+
                 switch (errorType) {
                     case 'CONTEXT_OVERFLOW':
+                        console.log('[DEBUG] Handling CONTEXT_OVERFLOW...');
                         scratchpad += `\nOBSERVATION: CRITICAL API FAILURE. The context window is full. You must compress your memory to continue. Error Details: "${errorMessage}"\n---`;
-                        continue; // Re-run the loop to let the agent see the error.
+                        continue;
 
                     case 'RATE_LIMIT':
+                        console.log('[DEBUG] Handling RATE_LIMIT...');
                         this._sendStreamEvent(stream, 'status', 'API rate limit reached. Waiting 5 seconds before retry...');
                         await new Promise(resolve => setTimeout(resolve, 5000));
-                        continue; // Retry the original planning step.
+                        continue;
 
                     case 'INVALID_JSON':
+                        console.log('[DEBUG] Handling INVALID_JSON...');
                         scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${errorMessage}\n---`;
                         continue;
 
                     case 'API_KEY_ERROR':
-                        throw error; // This is a fatal error, stop the orchestration.
+                        console.log('[DEBUG] Handling API_KEY_ERROR (fatal)...');
+                        throw error;
 
                     case 'UNKNOWN_FAILURE':
                     default:
+                        console.log('[DEBUG] Handling UNKNOWN_FAILURE...');
                         scratchpad += `\nOBSERVATION: An unknown API error occurred. I will retry the step. Error: ${errorMessage}\n---`;
                         continue;
                 }
-                // --- END OF FIX ---
             }
             
             const stepInput = totalInputTokens - tokensBefore.input;

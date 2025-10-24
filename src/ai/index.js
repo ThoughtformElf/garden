@@ -1,5 +1,6 @@
 import { streamChatCompletion as streamGemini } from './models/gemini.js';
 import { streamChatCompletion as streamOpenAICompatible } from './models/openai-compatible.js';
+import { streamChatCompletion as streamWebLlm, initializeEngine as initializeWebLlm } from './models/web-llm.js';
 import { TaskRunner } from '../agent/runner.js';
 import { countTokens } from 'gpt-tokenizer';
 
@@ -9,6 +10,7 @@ class AiService {
       activeProvider: 'gemini',
       geminiApiKey: '',
       geminiModelName: 'gemini-2.5-flash',
+      webllmModelId: 'Llama-3-8B-Instruct-q4f16_1-MLC',
       providers: [],
     };
     this.activeAgentControllers = new Map();
@@ -17,34 +19,49 @@ class AiService {
 
   loadConfig() {
     this.config.activeProvider = localStorage.getItem('thoughtform_ai_provider') || 'gemini';
+    this.config.webllmModelId = localStorage.getItem('thoughtform_webllm_model_id') || 'Llama-3-8B-Instruct-q4f16_1-MLC';
     this.config.geminiApiKey = localStorage.getItem('thoughtform_gemini_api_key') || '';
     this.config.geminiModelName = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
     this.config.providers = JSON.parse(localStorage.getItem('thoughtform_ai_providers_list') || '[]');
   }
   
+  async initializeWebLlmEngine(modelId, progressCallback) {
+    try {
+      await initializeWebLlm(modelId, progressCallback);
+    } catch (err) {
+      console.error("[AI Service] Failed to initialize WebLLM engine:", err);
+      progressCallback({ progress: -1, text: `Error: ${err.message}. Check console for details.` });
+    }
+  }
+
   async getCompletion(prompt, onTokenCount, signal) {
     let streamPromise;
     let providerId = this.config.activeProvider;
 
-    // --- THIS IS THE NEW DISPATCHER LOGIC ---
-    // A URL override can change the provider for this run only.
     if (this.config.override_activeProvider) {
         providerId = this.config.override_activeProvider;
     }
 
-    if (providerId === 'gemini') {
+    if (providerId === 'webllm') {
+      const statusEl = document.getElementById('webllm-status');
+      const progressCallback = (report) => {
+        if (statusEl) {
+          const percentage = (report.progress * 100).toFixed(1);
+          statusEl.textContent = `${report.text} (${percentage}%)`;
+        }
+      };
+      streamPromise = streamWebLlm(this.config.webllmModelId, prompt, signal, progressCallback);
+    } else if (providerId === 'gemini') {
       if (!this.config.geminiApiKey) {
         throw new Error('Active provider is Gemini, but the API key is not set. Add it in DevTools > AI.');
       }
       streamPromise = streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
     } else {
-      // Find the selected custom provider from the list
       const providerConfig = this.config.providers.find(p => p.id === providerId);
       if (!providerConfig) {
         throw new Error(`AI provider "${providerId}" not found. Please configure it in DevTools > AI.`);
       }
 
-      // Allow URL params to override specific fields of the found provider
       const modelToUse = this.config.override_customModelName || providerConfig.model;
       const endpointToUse = this.config.override_customEndpointUrl || providerConfig.endpoint || 'http://localhost:11434/v1';
       const apiKeyToUse = this.config.override_customApiKey || providerConfig.apiKey;
@@ -55,7 +72,6 @@ class AiService {
       
       streamPromise = streamOpenAICompatible(endpointToUse, apiKeyToUse, modelToUse, prompt, signal);
     }
-    // --- END OF NEW LOGIC ---
 
     const originalStream = await streamPromise;
 
@@ -134,7 +150,6 @@ class AiService {
       if (editor.aiOverrides && Object.keys(editor.aiOverrides).length > 0) {
         console.log('[AI Service] Applying session-specific AI overrides:', editor.aiOverrides);
         
-        // Create a temporary, flat config for the scoped service
         const overrideConfig = {
             ...this.config,
             override_activeProvider: editor.aiOverrides.activeProvider,

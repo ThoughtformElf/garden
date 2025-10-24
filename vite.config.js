@@ -28,18 +28,12 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,md}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        // Add a runtime caching rule to always try the network first for the main page.
-        // This ensures the browser gets the newest version of the app shell,
-        // which will in turn trigger the service worker `autoUpdate`.
         runtimeCaching: [
           {
-            // Apply this rule to navigation requests (loading the page itself).
             urlPattern: ({ request }) => request.mode === 'navigate',
-            // Try the network first. If it fails, serve the cached version.
             handler: 'NetworkFirst',
             options: {
               cacheName: 'pages-cache',
-              // Give the network 3 seconds to respond before falling back to cache.
               networkTimeoutSeconds: 3,
               expiration: {
                 maxEntries: 10,

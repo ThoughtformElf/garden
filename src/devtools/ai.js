@@ -1,3 +1,5 @@
+import { prebuiltAppConfig } from "@mlc-ai/web-llm";
+
 // Helper function to prevent excessive calls while typing.
 function debounce(func, wait) {
   let timeout;
@@ -44,6 +46,22 @@ class AiTool {
             <div class="sync-row">
                 <select id="ai-active-provider" class="eruda-select" style="width: 100%;"></select>
             </div>
+        </div>
+
+        <div class="sync-panel" style="margin-bottom: 15px;">
+          <h3>WebLLM (In-Browser)</h3>
+          <div class="sync-row" style="margin-bottom: 10px;">
+            <label for="webllm-model-select" class="sync-label">Model:</label>
+            <select id="webllm-model-select" class="eruda-select flex-grow">
+              <!-- This will be populated dynamically -->
+            </select>
+          </div>
+          <div class="sync-row">
+            <button id="load-webllm-btn" class="eruda-button" style="width: 100%;">Load Model</button>
+          </div>
+          <div id="webllm-status" style="margin-top: 10px; color: var(--base-accent-info); font-size: 0.9em;">
+            Status: Not loaded.
+          </div>
         </div>
 
         <div class="sync-panel">
@@ -93,7 +111,10 @@ class AiTool {
       const activeProviderSelect = this._$el.find('#ai-active-provider')[0];
 
       providerListContainer.innerHTML = '';
-      activeProviderSelect.innerHTML = '<option value="gemini">Google Gemini</option>';
+      activeProviderSelect.innerHTML = `
+        <option value="webllm">WebLLM (In-Browser)</option>
+        <option value="gemini">Google Gemini</option>
+      `;
 
       providers.forEach(provider => {
           const providerEl = this._createProviderElement(provider);
@@ -137,13 +158,40 @@ class AiTool {
   _bindEvents() {
     const $el = this._$el;
 
+    // --- NEW: DYNAMICALLY POPULATE WEBLMM MODELS ---
+    const modelSelect = $el.find('#webllm-model-select')[0];
+    const categorizedModels = {
+      Llama: [], Phi: [], Gemma: [], Mistral: [], Qwen: [], Other: []
+    };
+
+    prebuiltAppConfig.model_list.forEach(model => {
+      const id = model.model_id.toLowerCase();
+      if (id.startsWith('llama')) categorizedModels.Llama.push(model);
+      else if (id.startsWith('phi')) categorizedModels.Phi.push(model);
+      else if (id.startsWith('gemma')) categorizedModels.Gemma.push(model);
+      else if (id.startsWith('mistral') || id.includes('hermes')) categorizedModels.Mistral.push(model);
+      else if (id.startsWith('qwen')) categorizedModels.Qwen.push(model);
+      else categorizedModels.Other.push(model);
+    });
+
+    let selectHTML = '';
+    for (const category in categorizedModels) {
+      if (categorizedModels[category].length > 0) {
+        selectHTML += `<optgroup label="${category}">`;
+        categorizedModels[category].forEach(model => {
+          selectHTML += `<option value="${model.model_id}">${model.model_id}</option>`;
+        });
+        selectHTML += `</optgroup>`;
+      }
+    }
+    modelSelect.innerHTML = selectHTML;
+    // --- END OF NEW LOGIC ---
+
     $el.find('#gemini-api-key')[0].value = localStorage.getItem('thoughtform_gemini_api_key') || '';
     $el.find('#gemini-model-name')[0].value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
     $el.find('#proxy-url')[0].value = localStorage.getItem('thoughtform_proxy_url') || '';
 
     $el[0].addEventListener('input', (e) => {
-        // --- THIS IS THE FIX ---
-        // If the user is editing a provider's ID, update the dropdown in real-time.
         if (e.target.classList.contains('provider-id')) {
             const providerInstance = e.target.closest('.provider-instance');
             const newId = e.target.value.trim();
@@ -156,24 +204,20 @@ class AiTool {
                 const wasSelected = activeProviderSelect.value === oldId;
                 optionToUpdate.value = newId;
                 optionToUpdate.textContent = newId;
-                // If the provider being renamed was the active one, keep it active.
                 if (wasSelected) {
                     activeProviderSelect.value = newId;
                 }
             }
-            // Update the instance's data attribute for the next keystroke.
             providerInstance.dataset.providerId = newId;
         }
-        // --- END OF FIX ---
 
-        // Debounce the save for all text inputs to prevent lag.
         if (e.target.tagName === 'INPUT') {
             this.debouncedSave();
         }
     });
 
     $el[0].addEventListener('change', (e) => {
-        if (e.target.id === 'ai-active-provider') {
+        if (e.target.id === 'ai-active-provider' || e.target.id === 'webllm-model-select') {
             this._handleSaveConfig({ render: false });
         }
     });
@@ -190,12 +234,34 @@ class AiTool {
             this._handleSaveConfig({ render: true });
         }
     });
+
+    const loadBtn = $el.find('#load-webllm-btn')[0];
+    const statusEl = $el.find('#webllm-status')[0];
+    
+    modelSelect.value = localStorage.getItem('thoughtform_webllm_model_id') || 'Llama-3-8B-Instruct-q4f16_1-MLC';
+
+    loadBtn.addEventListener('click', () => {
+        const selectedModel = modelSelect.value;
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading...';
+        
+        const progressCallback = (report) => {
+            const percentage = (report.progress * 100).toFixed(1);
+            statusEl.textContent = `${report.text} (${percentage}%)`;
+            if (report.progress >= 1) {
+                loadBtn.disabled = false;
+                loadBtn.textContent = 'Reload Model';
+            }
+        };
+        window.thoughtform.ai.initializeWebLlmEngine(selectedModel, progressCallback);
+    });
   }
 
   _handleSaveConfig({ render = false } = {}) {
     const $el = this._$el;
 
     localStorage.setItem('thoughtform_ai_provider', $el.find('#ai-active-provider')[0].value);
+    localStorage.setItem('thoughtform_webllm_model_id', $el.find('#webllm-model-select')[0].value);
     localStorage.setItem('thoughtform_gemini_api_key', $el.find('#gemini-api-key')[0].value.trim());
     localStorage.setItem('thoughtform_gemini_model_name', $el.find('#gemini-model-name')[0].value.trim() || 'gemini-2.5-flash');
     localStorage.setItem('thoughtform_proxy_url', $el.find('#proxy-url')[0].value.trim());
