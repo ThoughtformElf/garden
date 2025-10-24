@@ -4,6 +4,9 @@ const eventToHookFileMap = {
   'app:load': 'load.js',
   'file:create': 'create.js',
   'file:delete': 'delete.js',
+  'window:create': 'on-create-window.js',
+  'window:close': 'on-close-window.js',
+  'window:resize': 'on-resize-window.js',
 };
 
 export class HookRunner {
@@ -24,23 +27,21 @@ export class HookRunner {
     const hookFileName = eventToHookFileMap[eventName];
     if (!hookFileName) return;
 
-    // The context for finding the hook comes from the event payload itself.
+    // For window events, the garden context is always the active main window's garden.
+    // For file events, it comes from the event payload.
     const contextGarden = eventData?.gardenName || window.thoughtform.workspace.getActiveEditor()?.gitClient.gardenName;
     if (!contextGarden) {
       console.warn(`[HookRunner] Could not determine garden context for event: ${eventName}`);
       return;
     }
 
-    // The context for executing the hook is the active editor.
     const editor = window.thoughtform.workspace.getActiveEditor();
     const git = window.thoughtform.workspace.getActiveGitClient();
     if (!editor || !git) return;
 
-    // Ask the ConfigService for the correct hook script path using the event's garden context.
     const hookPath = await this.config.getHook(hookFileName, contextGarden);
     
     if (hookPath) {
-      // Execute the found hook with the active editor's context.
       executeFile(hookPath, editor, git, eventData);
     }
   }

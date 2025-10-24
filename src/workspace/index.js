@@ -26,17 +26,26 @@ export class WorkspaceManager {
     this._paneManager = new PaneManager(this);
     this._stateManager = new WorkspaceStateManager(this);
 
-    // THIS IS THE FIX: Correctly detect the preview flag from the URL hash.
+    // THIS IS THE DEFINITIVE FIX: Explicitly prioritize windowed mode to force a fresh state.
     const hash = window.location.hash || '';
-    const isPreview = hash.includes('?preview=true');
+    const isWindowed = hash.includes('?windowed=true');
     const savedState = this._stateManager.loadState();
 
-    if (savedState && !isPreview) {
+    if (isWindowed) {
+        // If in a window, ALWAYS start with a fresh, single-pane layout.
+        // Ignore any saved state from the parent window's session.
+        this.paneTree = this._createInitialPaneTree();
+        this.activePaneId = 'pane-1';
+        this.initialEditorStates = {};
+        this._paneManager.isMaximized = false;
+    } else if (savedState) {
+        // If not in a window and a saved state exists, load it.
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
         this.initialEditorStates = savedState.editorStates || {};
         this._paneManager.isMaximized = savedState.isMaximized || false;
     } else {
+        // Otherwise (first visit, or cleared session), create a fresh default layout.
         this.paneTree = this._createInitialPaneTree();
         this.activePaneId = 'pane-1';
         this.initialEditorStates = {};
@@ -45,7 +54,6 @@ export class WorkspaceManager {
   }
 
   _createInitialPaneTree() {
-    // THIS IS THE FIX: Strip the query params from the path.
     let initialPath = (window.location.hash || '#/home').substring(1);
     initialPath = initialPath.split('?')[0]; 
     return {
@@ -66,9 +74,7 @@ export class WorkspaceManager {
   }
 
   setActivePane(paneId) {
-    if (this._paneManager.isMaximized && this.activePaneId !== paneId) {
-      this.toggleMaximizePane();
-    }
+    if (this._paneManager.isMaximized && this.activePaneId !== paneId) this.toggleMaximizePane();
     if (!this.panes.has(paneId)) return;
     this.activePaneId = paneId;
 
@@ -78,9 +84,7 @@ export class WorkspaceManager {
     
     const activePane = this.panes.get(paneId);
 
-    setTimeout(() => {
-      activePane?.editor?.editorView.focus();
-    }, 50);
+    setTimeout(() => activePane?.editor?.editorView.focus(), 50);
     
     this._updateURL();
     window.thoughtform.sidebar?.refresh();
@@ -89,9 +93,7 @@ export class WorkspaceManager {
 
   async switchGarden(gardenName) {
     const editor = this.getActiveEditor();
-    if (!editor || editor.gitClient.gardenName === gardenName) {
-      return;
-    }
+    if (!editor || editor.gitClient.gardenName === gardenName) return;
 
     const newGitClient = await this.getGitClient(gardenName);
     editor.gitClient = newGitClient;
@@ -123,9 +125,8 @@ export class WorkspaceManager {
 
     const existingBufferIndex = node.buffers.findIndex(b => b.garden === garden && b.path === path);
 
-    if (existingBufferIndex !== -1) {
-      node.activeBufferIndex = existingBufferIndex;
-    } else {
+    if (existingBufferIndex !== -1) node.activeBufferIndex = existingBufferIndex;
+    else {
       node.buffers.push({ garden, path });
       node.activeBufferIndex = node.buffers.length - 1;
     }
@@ -150,17 +151,12 @@ export class WorkspaceManager {
     if (!linkContent || !sourcePaneId) return;
 
     const sourceEditor = this.panes.get(sourcePaneId)?.editor;
-    if (!sourceEditor) {
-        console.error(`[Workspace] Could not find source editor for pane ID: ${sourcePaneId}`);
-        return;
-    }
+    if (!sourceEditor) return;
 
     let path = linkContent.split('|')[0].trim();
     let garden = null;
   
-    if (path.includes('#')) {
-      [garden, path] = path.split('#');
-    }
+    if (path.includes('#')) [garden, path] = path.split('#');
 
     let finalPath, finalGarden;
 
@@ -194,20 +190,22 @@ export class WorkspaceManager {
 
       const newPathname = `${basePath}/${encodeURIComponent(activeBuffer.garden)}`;
       const newHash = `#${encodeURI(activeBuffer.path)}`;
-      const newUrl = `${newPathname}${newHash}`;
+      
+      const currentHash = window.location.hash.split('?')[0];
+      const isWindowed = (window.location.hash || '').includes('?windowed=true');
+      const finalHash = isWindowed ? `${newHash}?windowed=true` : newHash;
 
-      if (window.location.pathname !== newPathname || window.location.hash !== newHash) {
-          window.history.pushState(null, '', newUrl);
+      if (window.location.pathname !== newPathname || currentHash !== newHash) {
+          window.history.pushState(null, '', `${newPathname}${finalHash}`);
+          
+          if (isWindowed) {
+              window.parent.postMessage({ type: 'preview-url-changed', payload: { newUrl: window.location.href } }, '*');
+          }
       }
   }
 
   async notifyFileUpdate(gardenName, filePath, sourcePaneId) {
-    this.broadcastChannel.postMessage({
-        type: 'file_updated',
-        gardenName,
-        filePath,
-        sourcePaneId
-    });
+    this.broadcastChannel.postMessage({ type: 'file_updated', gardenName, filePath, sourcePaneId });
 
     for (const [paneId, pane] of this.panes.entries()) {
         if (paneId !== sourcePaneId && pane.editor.gitClient.gardenName === gardenName && pane.editor.filePath === filePath) {
@@ -218,12 +216,7 @@ export class WorkspaceManager {
 
   notifyFileRename({ oldPath, newPath, gardenName }) {
     this._performRenameUpdate(oldPath, newPath, gardenName);
-    this.broadcastChannel.postMessage({
-      type: 'file_renamed',
-      oldPath,
-      newPath,
-      gardenName
-    });
+    this.broadcastChannel.postMessage({ type: 'file_renamed', oldPath, newPath, gardenName });
   }
 
   _performRenameUpdate(oldPath, newPath, gardenName) {
@@ -232,9 +225,7 @@ export class WorkspaceManager {
     const updateTree = (node) => {
       if (node.type === 'leaf') {
         node.buffers.forEach(buffer => {
-          if (buffer.garden === gardenName && buffer.path === oldPath) {
-            buffer.path = newPath;
-          }
+          if (buffer.garden === gardenName && buffer.path === oldPath) buffer.path = newPath;
         });
       } else if (node.type.startsWith('split-')) {
         node.children.forEach(updateTree);
@@ -247,15 +238,11 @@ export class WorkspaceManager {
       if (editor.gitClient.gardenName === gardenName && editor.filePath === oldPath) {
         editor.filePath = newPath;
         editor.refreshStatusBar();
-        if (editor.paneId === this.activePaneId) {
-          activePaneWasUpdated = true;
-        }
+        if (editor.paneId === this.activePaneId) activePaneWasUpdated = true;
       }
     });
 
-    if (activePaneWasUpdated) {
-      this._updateURL();
-    }
+    if (activePaneWasUpdated) this._updateURL();
     
     window.thoughtform.sidebar?.refresh();
     this._stateManager.saveState();

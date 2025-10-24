@@ -29,6 +29,11 @@ import defaultClosePaneJs from './keymaps/close-pane.js?raw';
 import defaultMaximizePaneJS from './keymaps/toggle-maximize-pane.js?raw';
 import defaultQueryTestJs from './query/test.js?raw';
 
+// --- NEW HOOKS ---
+import defaultHookOnCreateWindowJs from './hooks/on-create-window.js?raw';
+import defaultHookOnCloseWindowJs from './hooks/on-close-window.js?raw';
+import defaultHookOnResizeWindowJs from './hooks/on-resize-window.js?raw';
+
 // --- AGENT DEFAULTS ---
 import defaultSelectToolMd from './prompts/select-tool.md?raw';
 import defaultCritiqueStepMd from './prompts/critique-step.md?raw';
@@ -38,7 +43,7 @@ import defaultReadFileJs from './tools/readFile.js?raw';
 import defaultReadURLJs from './tools/readURL.js?raw';
 import defaultWebSearchJs from './tools/webSearch.js?raw';
 import defaultListFilesJs from './tools/listFiles.js?raw';
-import defaultRequestMemoryCompressionJs from './tools/requestMemoryCompression.js?raw'; // New
+import defaultRequestMemoryCompressionJs from './tools/requestMemoryCompression.js?raw';
 
 
 export const defaultFiles = [
@@ -71,6 +76,11 @@ export const defaultFiles = [
   ['/settings/hooks/delete.js', defaultHookDeleteJs],
   ['/settings/query/test.js', defaultQueryTestJs],
 
+  // --- NEW HOOKS ---
+  ['/settings/hooks/on-create-window.js', defaultHookOnCreateWindowJs],
+  ['/settings/hooks/on-close-window.js', defaultHookOnCloseWindowJs],
+  ['/settings/hooks/on-resize-window.js', defaultHookOnResizeWindowJs],
+
   // --- AGENT DEFAULTS ---
   ['/settings/prompts/select-tool.md', defaultSelectToolMd],
   ['/settings/prompts/critique-step.md', defaultCritiqueStepMd],
@@ -80,5 +90,5 @@ export const defaultFiles = [
   ['/settings/tools/readURL.js', defaultReadURLJs],
   ['/settings/tools/webSearch.js', defaultWebSearchJs],
   ['/settings/tools/listFiles.js', defaultListFilesJs],
-  ['/settings/tools/requestMemoryCompression.js', defaultRequestMemoryCompressionJs], // New
+  ['/settings/tools/requestMemoryCompression.js', defaultRequestMemoryCompressionJs],
 ];

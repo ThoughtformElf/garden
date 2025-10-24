@@ -8,9 +8,21 @@ const previewState = {
   activeWindows: new Map(),
   dragState: null,
   zIndexCounter: 1000,
-  lastSpawnedLink: null, // Track the last link that spawned a window
-  lastSpawnTime: 0,      // Track when it was spawned
+  lastSpawnedLink: null,
+  lastSpawnTime: 0,
 };
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
 
 function saveWindowStates() {
   const states = [];
@@ -53,8 +65,13 @@ function getLinkURL(linkContent, appContext) {
 
 function hidePreview(windowEl) {
   if (windowEl) {
-    previewState.activeWindows.delete(windowEl.dataset.windowId);
+    const windowId = windowEl.dataset.windowId;
+    previewState.activeWindows.delete(windowId);
     windowEl.classList.remove('visible');
+    
+    // PUBLISH EVENT
+    window.thoughtform.events.publish('window:close', { windowId });
+
     setTimeout(() => {
       windowEl.remove();
       saveWindowStates();
@@ -205,7 +222,25 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
     document.getElementById('preview-windows-container').appendChild(windowEl);
     previewState.activeWindows.set(windowId, windowEl);
     
-    new ResizeObserver(saveWindowStates).observe(windowEl);
+    // PUBLISH EVENT
+    if (!savedState) { // Only publish for newly created windows, not restored ones
+        window.thoughtform.events.publish('window:create', { windowId, url });
+    }
+
+    const debouncedResize = debounce((entry) => {
+        saveWindowStates();
+        const { width, height } = entry.contentRect;
+        // PUBLISH EVENT
+        window.thoughtform.events.publish('window:resize', {
+            windowId: windowId,
+            width: Math.round(width),
+            height: Math.round(height),
+        });
+    }, 250);
+
+    new ResizeObserver((entries) => {
+        for (const entry of entries) debouncedResize(entry);
+    }).observe(windowEl);
     
     setTimeout(() => {
         windowEl.classList.add('visible');
@@ -280,21 +315,23 @@ class WikilinkPlugin {
     this.onTouchEnd = this.onTouchEnd.bind(this);
     this.onTouchMove = this.onTouchMove.bind(this);
     this.onMouseOver = this.onMouseOver.bind(this);
-
+    
+    if (!this.isWindowed) {
+        if (window.thoughtform && window.thoughtform.ui && !window.thoughtform.ui.openWindow) {
+            window.thoughtform.ui.openWindow = createPreviewWindow;
+        }
+        if (!window.thoughtform_windows_loaded) {
+            loadWindowStates();
+            window.thoughtform_windows_loaded = true;
+        }
+    }
+    
     this.view.dom.addEventListener('mousedown', this.onMouseDown);
     this.view.dom.addEventListener('mouseup', this.onMouseUp);
     this.view.dom.addEventListener('touchstart', this.onTouchStart, { passive: false });
     this.view.dom.addEventListener('touchend', this.onTouchEnd);
     this.view.dom.addEventListener('touchmove', this.onTouchMove, { passive: true });
     this.view.dom.addEventListener('mouseover', this.onMouseOver);
-    
-    if (!this.isWindowed && !window.thoughtform_windows_loaded) {
-        if (window.thoughtform && window.thoughtform.ui && !window.thoughtform.ui.openWindow) {
-            window.thoughtform.ui.openWindow = createPreviewWindow;
-        }
-        loadWindowStates();
-        window.thoughtform_windows_loaded = true;
-    }
   }
 
   destroy() {
@@ -312,10 +349,9 @@ class WikilinkPlugin {
     const linkEl = event.target.closest('.cm-wikilink');
     if (!linkEl) return;
 
-    // THIS IS THE FIX: Implement a cooldown per link.
     const now = Date.now();
     if (linkEl.textContent === previewState.lastSpawnedLink && (now - previewState.lastSpawnTime < 500)) {
-        return; // Cooldown active for this specific link, do nothing.
+        return;
     }
 
     const appContext = this.view.state.field(appContextField);
@@ -328,7 +364,6 @@ class WikilinkPlugin {
         createPreviewWindow(url, event.clientX, event.clientY);
     }
     
-    // THIS IS THE FIX: Update the state after spawning.
     previewState.lastSpawnedLink = linkEl.textContent;
     previewState.lastSpawnTime = now;
   }
