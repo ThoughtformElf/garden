@@ -65,12 +65,10 @@ function getLinkURL(linkContent, appContext) {
 
 function hidePreview(windowEl) {
   if (windowEl) {
-    const windowId = windowEl.dataset.windowId;
-    previewState.activeWindows.delete(windowId);
+    previewState.activeWindows.delete(windowEl.dataset.windowId);
     windowEl.classList.remove('visible');
     
-    // PUBLISH EVENT
-    window.thoughtform.events.publish('window:close', { windowId });
+    window.thoughtform.events.publish('window:close', { windowId: windowEl.dataset.windowId });
 
     setTimeout(() => {
       windowEl.remove();
@@ -210,11 +208,23 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
         windowEl.style.height = `${savedState.height}px`;
     } else {
         const { innerWidth, innerHeight } = window;
+        const winWidth = 640;
+        const winHeight = 424;
         const offset = (previewState.activeWindows.size % 5) * 25;
-        let top = initialY + 20 + offset;
-        let left = initialX + 20 + offset;
-        if (left + 640 > innerWidth) left = initialX - 640 - 20 - offset;
-        if (top + 424 > innerHeight) top = initialY - 424 - 20 - offset;
+        
+        let top, left;
+        const isCentering = Math.abs(initialX - innerWidth / 2) < 100 && Math.abs(initialY - innerHeight / 2) < 100;
+
+        if (isCentering) {
+            left = initialX - (winWidth / 2) + offset;
+            top = initialY - (winHeight / 2) + offset;
+        } else {
+            top = initialY + 20 + offset;
+            left = initialX + 20 + offset;
+            if (left + winWidth > innerWidth) left = initialX - winWidth - 20 - offset;
+            if (top + winHeight > innerHeight) top = initialY - winHeight - 20 - offset;
+        }
+        
         windowEl.style.left = `${Math.max(5, left)}px`;
         windowEl.style.top = `${Math.max(5, top)}px`;
     }
@@ -222,15 +232,13 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
     document.getElementById('preview-windows-container').appendChild(windowEl);
     previewState.activeWindows.set(windowId, windowEl);
     
-    // PUBLISH EVENT
-    if (!savedState) { // Only publish for newly created windows, not restored ones
+    if (!savedState) {
         window.thoughtform.events.publish('window:create', { windowId, url });
     }
 
     const debouncedResize = debounce((entry) => {
         saveWindowStates();
         const { width, height } = entry.contentRect;
-        // PUBLISH EVENT
         window.thoughtform.events.publish('window:resize', {
             windowId: windowId,
             width: Math.round(width),

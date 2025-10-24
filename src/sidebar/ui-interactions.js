@@ -19,15 +19,6 @@ function initializeSidebarInteractions() {
 
   if (!container || !resizer || !overlay) return;
 
-  // THIS IS THE FIX: In preview mode, force collapse and disable all interaction.
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has('preview')) {
-    container.classList.add('sidebar-collapsed');
-    document.documentElement.style.setProperty('--sidebar-width', '0px');
-    resizer.style.display = 'none'; // Also hide the resizer handle
-    return; // Do not attach any event listeners
-  }
-
   const toggleButton = document.createElement('button');
   toggleButton.id = 'sidebar-toggle-icon';
   toggleButton.title = 'Toggle Sidebar (Ctrl + [)';
@@ -57,7 +48,6 @@ function initializeSidebarInteractions() {
     }
   };
   
-  // Expose the toggle function on the global thoughtform API
   if (window.thoughtform && window.thoughtform.ui) {
     window.thoughtform.ui.toggleSidebar = toggleCollapse;
   }
@@ -66,12 +56,9 @@ function initializeSidebarInteractions() {
     if (e.type === 'touchmove') e.preventDefault();
     const currentX = e.clientX || (e.touches && e.touches[0].clientX);
     
-    if (Math.abs(currentX - dragStartX) > 5) {
-      isDragging = true;
-    }
+    if (Math.abs(currentX - dragStartX) > 5) isDragging = true;
     
     if (isDragging) {
-      // Prevent sidebar from becoming too small during a drag
       const newWidth = Math.max(24, Math.min(currentX, window.innerWidth - 100));
       document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
       container.classList.remove('sidebar-collapsed');
@@ -115,9 +102,12 @@ function initializeSidebarInteractions() {
   resizer.addEventListener('mousedown', sidebarStartResize);
   resizer.addEventListener('touchstart', sidebarStartResize, { passive: false });
 
-  // Restore State
+  // --- THIS IS THE FIX ---
+  // Restore State, but force collapse if in windowed mode.
+  const hash = window.location.hash || '';
+  const isWindowed = hash.includes('?windowed=true');
   const savedWidth = localStorage.getItem('sidebarWidth');
-  const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  const isCollapsed = isWindowed || localStorage.getItem('sidebarCollapsed') === 'true';
 
   if (isCollapsed) {
     container.classList.add('sidebar-collapsed');
@@ -211,7 +201,7 @@ function initializeErudaResizer() {
     
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', erudaHandleMove);
+    document.addEventListener('mousemove', erudaHandleMove, { passive: false });
     document.addEventListener('touchmove', erudaHandleMove, { passive: false });
     document.addEventListener('mouseup', erudaEndResize);
     document.addEventListener('touchend', erudaEndResize);
@@ -219,10 +209,15 @@ function initializeErudaResizer() {
   erudaResizer.addEventListener('mousedown', erudaStartResize);
   erudaResizer.addEventListener('touchstart', erudaStartResize, { passive: false });
 
+  // --- THIS IS THE FIX ---
+  // Restore State logic, but force collapse if in windowed mode.
   const observer = new MutationObserver(() => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (erudaDevTools) {
-      const isCollapsed = localStorage.getItem('erudaCollapsed') === 'true';
+      const hash = window.location.hash || '';
+      const isWindowed = hash.includes('?windowed=true');
+      const isCollapsed = isWindowed || localStorage.getItem('erudaCollapsed') === 'true';
+
       if (isCollapsed) {
         erudaDevTools.style.height = '0px';
         erudaToggle.textContent = '▲';

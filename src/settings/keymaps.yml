@@ -12,6 +12,10 @@
 - key: "Mod-Shift-Enter"
   run: "settings/keymaps/navigate-in-new-pane.js"
 
+# --- NEW KEYBINDING ---
+- key: "Alt-Enter"
+  run: "settings/keymaps/open-in-window.js"
+
 - key: "Mod-`"
   run: "settings/keymaps/toggle-devtools.js"
 

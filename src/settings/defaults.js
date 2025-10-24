@@ -29,10 +29,12 @@ import defaultClosePaneJs from './keymaps/close-pane.js?raw';
 import defaultMaximizePaneJS from './keymaps/toggle-maximize-pane.js?raw';
 import defaultQueryTestJs from './query/test.js?raw';
 
-// --- NEW HOOKS ---
 import defaultHookOnCreateWindowJs from './hooks/on-create-window.js?raw';
 import defaultHookOnCloseWindowJs from './hooks/on-close-window.js?raw';
 import defaultHookOnResizeWindowJs from './hooks/on-resize-window.js?raw';
+
+// --- NEW KEYMAP SCRIPT ---
+import defaultOpenInWindowJs from './keymaps/open-in-window.js?raw';
 
 // --- AGENT DEFAULTS ---
 import defaultSelectToolMd from './prompts/select-tool.md?raw';
@@ -76,10 +78,12 @@ export const defaultFiles = [
   ['/settings/hooks/delete.js', defaultHookDeleteJs],
   ['/settings/query/test.js', defaultQueryTestJs],
 
-  // --- NEW HOOKS ---
   ['/settings/hooks/on-create-window.js', defaultHookOnCreateWindowJs],
   ['/settings/hooks/on-close-window.js', defaultHookOnCloseWindowJs],
   ['/settings/hooks/on-resize-window.js', defaultHookOnResizeWindowJs],
+  
+  // --- NEW KEYMAP SCRIPT ---
+  ['/settings/keymaps/open-in-window.js', defaultOpenInWindowJs],
 
   // --- AGENT DEFAULTS ---
   ['/settings/prompts/select-tool.md', defaultSelectToolMd],
