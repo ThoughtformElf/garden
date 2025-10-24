@@ -3,6 +3,8 @@ import { streamChatCompletion as streamOpenAICompatible } from './models/openai-
 import { streamChatCompletion as streamWebLlm, initializeEngine as initializeWebLlm } from './models/web-llm.js';
 import { TaskRunner } from '../agent/runner.js';
 import { countTokens } from 'gpt-tokenizer';
+// --- THIS IS THE CORRECT IMPORT ---
+import * as webllm from "@mlc-ai/web-llm";
 
 class AiService {
   constructor() {
@@ -30,8 +32,18 @@ class AiService {
       await initializeWebLlm(modelId, progressCallback);
     } catch (err) {
       console.error("[AI Service] Failed to initialize WebLLM engine:", err);
-      progressCallback({ progress: -1, text: `Error: ${err.message}. Check console for details.` });
+      let userMessage = `Error: ${err.message}. Check console for details.`;
+      if (err.message && err.message.toLowerCase().includes('f16')) {
+        userMessage = "GPU Error: This model requires f16 support. Please enable the 'WebGPU Shader f16 Support' flag in your browser (e.g., brave://flags).";
+      }
+      progressCallback({ progress: -1, text: userMessage });
     }
+  }
+
+  // --- THIS IS THE CORRECT CACHE DELETION FUNCTION ---
+  async deleteWebLlmCache(modelId) {
+    // We pass the modelId and the prebuilt app config to the correct function.
+    await webllm.deleteModelAllInfoInCache(modelId, webllm.prebuiltAppConfig);
   }
 
   async getCompletion(prompt, onTokenCount, signal) {
@@ -46,8 +58,14 @@ class AiService {
       const statusEl = document.getElementById('webllm-status');
       const progressCallback = (report) => {
         if (statusEl) {
-          const percentage = (report.progress * 100).toFixed(1);
-          statusEl.textContent = `${report.text} (${percentage}%)`;
+          if (report.progress === -1) {
+            statusEl.style.color = 'var(--base-accent-destructive)';
+            statusEl.textContent = report.text;
+          } else {
+            statusEl.style.color = 'var(--base-accent-info)';
+            const percentage = (report.progress * 100).toFixed(1);
+            statusEl.textContent = `${report.text} (${percentage}%)`;
+          }
         }
       };
       streamPromise = streamWebLlm(this.config.webllmModelId, prompt, signal, progressCallback);

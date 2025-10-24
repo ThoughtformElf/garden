@@ -1,4 +1,4 @@
-import { prebuiltAppConfig } from "@mlc-ai/web-llm";
+import * as webllm from "@mlc-ai/web-llm";
 
 // Helper function to prevent excessive calls while typing.
 function debounce(func, wait) {
@@ -31,6 +31,7 @@ class AiTool {
       show: () => {
         this._$el.show();
         this._loadAndRenderProviders();
+        this._renderCacheTable();
       },
       hide: () => this._$el.hide(),
     });
@@ -52,9 +53,7 @@ class AiTool {
           <h3>WebLLM (In-Browser)</h3>
           <div class="sync-row" style="margin-bottom: 10px;">
             <label for="webllm-model-select" class="sync-label">Model:</label>
-            <select id="webllm-model-select" class="eruda-select flex-grow">
-              <!-- This will be populated dynamically -->
-            </select>
+            <select id="webllm-model-select" class="eruda-select flex-grow"></select>
           </div>
           <div class="sync-row">
             <button id="load-webllm-btn" class="eruda-button" style="width: 100%;">Load Model</button>
@@ -62,6 +61,7 @@ class AiTool {
           <div id="webllm-status" style="margin-top: 10px; color: var(--base-accent-info); font-size: 0.9em;">
             Status: Not loaded.
           </div>
+          <div id="webllm-cache-container" style="margin-top: 15px;"></div>
         </div>
 
         <div class="sync-panel">
@@ -93,18 +93,58 @@ class AiTool {
       </div>
     `);
   }
+
+  async _renderCacheTable() {
+    const container = this._$el.find('#webllm-cache-container')[0];
+    if (!container) return;
+    container.innerHTML = '<h4>Cached Models</h4><p>Scanning cache...</p>';
+
+    let tableHTML = `
+      <table class="eruda-table">
+        <thead>
+          <tr>
+            <th>Model ID</th>
+            <th>Size (VRAM)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    let cachedCount = 0;
+    for (const model of webllm.prebuiltAppConfig.model_list) {
+      const isCached = await webllm.hasModelInCache(model.model_id, webllm.prebuiltAppConfig);
+      if (isCached) {
+        cachedCount++;
+        tableHTML += `
+          <tr>
+            <td>${model.model_id}</td>
+            <td>${model.vram_required_MB} MB</td>
+            <td>
+              <button class="eruda-button destructive delete-cache-btn" data-model-id="${model.model_id}">
+                Delete
+              </button>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    if (cachedCount === 0) {
+      container.innerHTML = '<h4>Cached Models</h4><p>No models are currently cached in this browser.</p>';
+      return;
+    }
+
+    tableHTML += '</tbody></table>';
+    container.innerHTML = tableHTML;
+  }
   
   _loadAndRenderProviders() {
       let providers = JSON.parse(localStorage.getItem('thoughtform_ai_providers_list') || '[]');
       const activeProvider = localStorage.getItem('thoughtform_ai_provider') || 'gemini';
       
       if (providers.length === 0) {
-        providers.push({
-          id: 'custom',
-          endpoint: 'http://localhost:11434/v1',
-          model: '',
-          apiKey: ''
-        });
+        providers.push({ id: 'custom', endpoint: 'http://localhost:11434/v1', model: '', apiKey: '' });
       }
 
       const providerListContainer = this._$el.find('#custom-providers-list')[0];
@@ -119,7 +159,6 @@ class AiTool {
       providers.forEach(provider => {
           const providerEl = this._createProviderElement(provider);
           providerListContainer.appendChild(providerEl);
-          
           const option = document.createElement('option');
           option.value = provider.id;
           option.textContent = provider.id;
@@ -158,13 +197,10 @@ class AiTool {
   _bindEvents() {
     const $el = this._$el;
 
-    // --- NEW: DYNAMICALLY POPULATE WEBLMM MODELS ---
     const modelSelect = $el.find('#webllm-model-select')[0];
-    const categorizedModels = {
-      Llama: [], Phi: [], Gemma: [], Mistral: [], Qwen: [], Other: []
-    };
+    const categorizedModels = { Llama: [], Phi: [], Gemma: [], Mistral: [], Qwen: [], Other: [] };
 
-    prebuiltAppConfig.model_list.forEach(model => {
+    webllm.prebuiltAppConfig.model_list.forEach(model => {
       const id = model.model_id.toLowerCase();
       if (id.startsWith('llama')) categorizedModels.Llama.push(model);
       else if (id.startsWith('phi')) categorizedModels.Phi.push(model);
@@ -185,7 +221,6 @@ class AiTool {
       }
     }
     modelSelect.innerHTML = selectHTML;
-    // --- END OF NEW LOGIC ---
 
     $el.find('#gemini-api-key')[0].value = localStorage.getItem('thoughtform_gemini_api_key') || '';
     $el.find('#gemini-model-name')[0].value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
@@ -196,24 +231,17 @@ class AiTool {
             const providerInstance = e.target.closest('.provider-instance');
             const newId = e.target.value.trim();
             const oldId = providerInstance.dataset.providerId;
-
             const activeProviderSelect = this._$el.find('#ai-active-provider')[0];
             const optionToUpdate = activeProviderSelect.querySelector(`option[value="${oldId}"]`);
-
             if (optionToUpdate) {
                 const wasSelected = activeProviderSelect.value === oldId;
                 optionToUpdate.value = newId;
                 optionToUpdate.textContent = newId;
-                if (wasSelected) {
-                    activeProviderSelect.value = newId;
-                }
+                if (wasSelected) activeProviderSelect.value = newId;
             }
             providerInstance.dataset.providerId = newId;
         }
-
-        if (e.target.tagName === 'INPUT') {
-            this.debouncedSave();
-        }
+        if (e.target.tagName === 'INPUT') this.debouncedSave();
     });
 
     $el[0].addEventListener('change', (e) => {
@@ -222,7 +250,7 @@ class AiTool {
         }
     });
 
-    $el[0].addEventListener('click', (e) => {
+    $el[0].addEventListener('click', async (e) => {
         if (e.target.id === 'add-provider-btn') {
             const newProvider = { id: `new-provider-${crypto.randomUUID().slice(0, 4)}`, endpoint: '', model: '', apiKey: '' };
             const providerEl = this._createProviderElement(newProvider);
@@ -233,24 +261,39 @@ class AiTool {
             e.target.closest('.provider-instance').remove();
             this._handleSaveConfig({ render: true });
         }
+        if (e.target.classList.contains('delete-cache-btn')) {
+            const modelId = e.target.dataset.modelId;
+            e.target.textContent = 'Deleting...';
+            e.target.disabled = true;
+            await window.thoughtform.ai.deleteWebLlmCache(modelId);
+            this._renderCacheTable();
+        }
     });
 
     const loadBtn = $el.find('#load-webllm-btn')[0];
     const statusEl = $el.find('#webllm-status')[0];
-    
     modelSelect.value = localStorage.getItem('thoughtform_webllm_model_id') || 'Llama-3-8B-Instruct-q4f16_1-MLC';
 
     loadBtn.addEventListener('click', () => {
         const selectedModel = modelSelect.value;
         loadBtn.disabled = true;
         loadBtn.textContent = 'Loading...';
+        statusEl.style.color = 'var(--base-accent-info)';
         
         const progressCallback = (report) => {
-            const percentage = (report.progress * 100).toFixed(1);
-            statusEl.textContent = `${report.text} (${percentage}%)`;
-            if (report.progress >= 1) {
-                loadBtn.disabled = false;
-                loadBtn.textContent = 'Reload Model';
+            if (report.progress === -1) {
+              statusEl.style.color = 'var(--base-accent-destructive)';
+              statusEl.textContent = report.text;
+              loadBtn.disabled = false;
+              loadBtn.textContent = 'Load Model';
+            } else {
+              const percentage = (report.progress * 100).toFixed(1);
+              statusEl.textContent = `${report.text} (${percentage}%)`;
+              if (report.progress >= 1) {
+                  loadBtn.disabled = false;
+                  loadBtn.textContent = 'Reload Model';
+                  this._renderCacheTable();
+              }
             }
         };
         window.thoughtform.ai.initializeWebLlmEngine(selectedModel, progressCallback);
@@ -259,7 +302,6 @@ class AiTool {
 
   _handleSaveConfig({ render = false } = {}) {
     const $el = this._$el;
-
     localStorage.setItem('thoughtform_ai_provider', $el.find('#ai-active-provider')[0].value);
     localStorage.setItem('thoughtform_webllm_model_id', $el.find('#webllm-model-select')[0].value);
     localStorage.setItem('thoughtform_gemini_api_key', $el.find('#gemini-api-key')[0].value.trim());
@@ -277,9 +319,7 @@ class AiTool {
     });
     localStorage.setItem('thoughtform_ai_providers_list', JSON.stringify(providers));
 
-    if (render) {
-        this._loadAndRenderProviders();
-    }
+    if (render) this._loadAndRenderProviders();
     
     window.thoughtform.ai?.loadConfig();
 
