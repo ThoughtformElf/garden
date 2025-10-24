@@ -22,16 +22,15 @@ export class WorkspaceManager {
     
     window.thoughtform.events.subscribe('file:rename', (data) => this.notifyFileRename(data));
     
-    // Instantiate helper classes
     this._renderer = new WorkspaceRenderer(this);
     this._paneManager = new PaneManager(this);
     this._stateManager = new WorkspaceStateManager(this);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const isPreview = urlParams.has('preview');
+    // THIS IS THE FIX: Correctly detect the preview flag from the URL hash.
+    const hash = window.location.hash || '';
+    const isPreview = hash.includes('?preview=true');
     const savedState = this._stateManager.loadState();
 
-    // THIS IS THE FIX: If we are in preview mode, IGNORE the saved state.
     if (savedState && !isPreview) {
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
@@ -46,7 +45,9 @@ export class WorkspaceManager {
   }
 
   _createInitialPaneTree() {
-    const initialPath = (window.location.hash || '#/home').substring(1);
+    // THIS IS THE FIX: Strip the query params from the path.
+    let initialPath = (window.location.hash || '#/home').substring(1);
+    initialPath = initialPath.split('?')[0]; 
     return {
       type: 'leaf',
       id: 'pane-1',
@@ -66,7 +67,7 @@ export class WorkspaceManager {
 
   setActivePane(paneId) {
     if (this._paneManager.isMaximized && this.activePaneId !== paneId) {
-      this.toggleMaximizePane(); // This will restore the view
+      this.toggleMaximizePane();
     }
     if (!this.panes.has(paneId)) return;
     this.activePaneId = paneId;
@@ -285,7 +286,6 @@ export class WorkspaceManager {
     return await this.getGitClient(activeBuffer.garden);
   }
   
-  // Delegated Public API
   render() { return this._renderer.render(); }
   updateLayout() { return this._renderer.updateLayout(); }
   splitPane(paneId, direction, fileToOpen = null) { return this._paneManager.splitPane(paneId, direction, fileToOpen); }

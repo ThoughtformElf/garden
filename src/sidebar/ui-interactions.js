@@ -19,6 +19,15 @@ function initializeSidebarInteractions() {
 
   if (!container || !resizer || !overlay) return;
 
+  // THIS IS THE FIX: In preview mode, force collapse and disable all interaction.
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('preview')) {
+    container.classList.add('sidebar-collapsed');
+    document.documentElement.style.setProperty('--sidebar-width', '0px');
+    resizer.style.display = 'none'; // Also hide the resizer handle
+    return; // Do not attach any event listeners
+  }
+
   const toggleButton = document.createElement('button');
   toggleButton.id = 'sidebar-toggle-icon';
   toggleButton.title = 'Toggle Sidebar (Ctrl + [)';
@@ -107,12 +116,8 @@ function initializeSidebarInteractions() {
   resizer.addEventListener('touchstart', sidebarStartResize, { passive: false });
 
   // Restore State
-  const urlParams = new URLSearchParams(window.location.search);
-  const isPreview = urlParams.has('preview');
-  
   const savedWidth = localStorage.getItem('sidebarWidth');
-  // THIS IS THE FIX: Force collapse if in preview mode, otherwise use saved state
-  const isCollapsed = isPreview || localStorage.getItem('sidebarCollapsed') === 'true';
+  const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 
   if (isCollapsed) {
     container.classList.add('sidebar-collapsed');
@@ -140,11 +145,6 @@ function initializeErudaResizer() {
   let dragStartY = 0;
   let isDragging = false;
 
-  /**
-   * Toggles or sets the visibility of the Eruda dev tools panel.
-   * @param {boolean|null} [state=null] - `true` to show, `false` to hide, `null` to toggle.
-   * @param {string|null} [targetTab=null] - If provided, switches to this tab when showing.
-   */
   const toggleEruda = (state = null, targetTab = null) => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (!erudaDevTools) return;
@@ -158,11 +158,10 @@ function initializeErudaResizer() {
       erudaToggle.textContent = '▼';
       localStorage.setItem('erudaCollapsed', 'false');
       if (targetTab) {
-        // Use a small timeout to ensure the UI is ready before switching tabs
         setTimeout(() => window.thoughtform.eruda?.show(targetTab), 50);
       }
-    } else { // should hide
-      if (isCurrentlyCollapsed) return; // Do nothing if already hidden
+    } else { 
+      if (isCurrentlyCollapsed) return;
       localStorage.setItem('erudaHeight', erudaDevTools.style.height);
       erudaDevTools.style.height = '0px';
       erudaToggle.textContent = '▲';
@@ -170,8 +169,6 @@ function initializeErudaResizer() {
     }
   };
 
-
-  // Expose the toggle function on the global thoughtform API
   if (window.thoughtform && window.thoughtform.ui) {
     window.thoughtform.ui.toggleDevtools = toggleEruda;
   }
@@ -179,9 +176,7 @@ function initializeErudaResizer() {
   const erudaHandleMove = (e) => {
     if (e.type === 'touchmove') e.preventDefault();
     const currentY = e.clientY || (e.touches && e.touches[0].clientY);
-    if (Math.abs(currentY - dragStartY) > 5) {
-      isDragging = true;
-    }
+    if (Math.abs(currentY - dragStartY) > 5) isDragging = true;
     if (!isDragging) return;
     
     const newHeight = window.innerHeight - currentY;
@@ -224,7 +219,6 @@ function initializeErudaResizer() {
   erudaResizer.addEventListener('mousedown', erudaStartResize);
   erudaResizer.addEventListener('touchstart', erudaStartResize, { passive: false });
 
-  // Restore State logic
   const observer = new MutationObserver(() => {
     erudaDevTools = document.querySelector('.eruda-dev-tools');
     if (erudaDevTools) {

@@ -16,13 +16,11 @@ import { initializeEventBus } from './workspace/manager/events.js';
 import { HookRunner } from './workspace/hooks.js';
 import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';
-import { initializeWorkspaceManager } from './workspace/index.js'; // Import the new manager
+import { initializeWorkspaceManager } from './workspace/index.js';
 import { initializeQueryLoader } from './workspace/query-loader.js';
 
-// --- This function now handles BOTH preview mode setup AND regular navigation ---
 function initializeNavigationListener(isPreview) {
     const handleNav = async () => {
-        // For iframes, notify parent of URL changes for address bar sync
         if (isPreview) {
             window.parent.postMessage({ type: 'preview-url-changed', payload: { newUrl: window.location.href } }, '*');
         }
@@ -38,19 +36,22 @@ function initializeNavigationListener(isPreview) {
         gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
         gardenName = decodeURIComponent(gardenName);
 
+        // THIS IS THE FIX: Strip query params from the file path
         let filePath = (window.location.hash || '#/home').substring(1);
-        filePath = decodeURI(filePath);
+        filePath = decodeURI(filePath).split('?')[0];
 
         await window.thoughtform.workspace.openFile(gardenName, filePath);
     };
 
     window.addEventListener('popstate', handleNav);
     
-    // Initial setup for preview mode
     if (isPreview) {
         document.body.classList.add('is-preview-mode');
 
-        // Any interaction with the preview should mark it as persistent
+        document.body.addEventListener('mousedown', () => {
+            window.parent.postMessage({ type: 'preview-focus' }, '*');
+        }, { capture: true });
+
         const markInteracted = () => {
             window.parent.postMessage({ type: 'preview-interacted' }, '*');
             document.body.removeEventListener('mousedown', markInteracted, true);
@@ -68,13 +69,12 @@ async function main() {
   const srcIndex = fullPath.lastIndexOf('/src/');
   const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const isPreview = urlParams.has('preview');
+  // THIS IS THE FIX: Correctly detect preview mode from the hash
+  const hash = window.location.hash || '';
+  const isPreview = hash.includes('?preview=true');
 
-  // --- Ensure the Settings garden exists on every load ---
   const settingsGit = new Git('Settings');
   await settingsGit.initRepo();
-  // ---
 
   let gardenName = window.location.pathname.startsWith(basePath)
     ? window.location.pathname.substring(basePath.length)
@@ -88,19 +88,15 @@ async function main() {
 
   const gitClient = new Git(gardenName);
 
-  // --- Expose a global API for the app ---
   window.thoughtform = {
     ui: {},
     ai: initializeAiService(),
     config: initializeConfigService(),
     events: initializeEventBus(),
-    // workspace will be assigned below
   };
   
-  // Now that window.thoughtform.events exists, we can initialize the workspace.
   window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
 
-  // --- PWA Update Logic ---
   const updateSW = registerSW({
     onNeedRefresh() {
       Modal.confirm({
@@ -108,9 +104,7 @@ async function main() {
         message: 'A new version of Thoughtform Garden is available. Reload to apply the update?',
         okText: 'Reload'
       }).then(confirmed => {
-        if (confirmed) {
-          updateSW(true); // Reloads the page with the new version
-        }
+        if (confirmed) updateSW(true);
       });
     },
     onOfflineReady() {
@@ -118,14 +112,12 @@ async function main() {
     }
   });
 
-  // Attach the update check function to the global API so devtools can call it
   window.thoughtform.updateApp = updateSW;
 
   initializeAppInteractions();
   initializeDevTools();
   window.thoughtform.runMigration = runMigration;
 
-  // --- Global Error Handling ---
   window.onerror = function(message, source, lineno, colno, error) {
     console.error("Caught global error:", message, error);
     if (!isPreview) window.thoughtform.ui.toggleDevtools?.(true, 'console');
@@ -140,7 +132,6 @@ async function main() {
   const editorShim = { gitClient }; 
   window.thoughtform.editor = editorShim;
 
-  // The CommandPalette now manages all search modes.
   const commandPalette = new CommandPalette();
   window.thoughtform.commandPalette = commandPalette;
 
@@ -158,7 +149,6 @@ async function main() {
   hookRunner.initialize();
   window.thoughtform.hooks = hookRunner;
   
-  // Pass the isPreview flag to the listener
   initializeNavigationListener(isPreview);
 
   await initializeQueryLoader();

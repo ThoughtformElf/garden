@@ -4,9 +4,9 @@ import { appContextField } from '../navigation.js';
 
 // --- State for managing previews ---
 const previewState = {
-  activeWindows: new Map(), // Use a Map to track multiple windows by link
+  activeWindows: new Map(), // Use a unique ID for each window instance
   dragState: null,
-  zIndexCounter: 1000, // Start z-index high to float above other UI
+  zIndexCounter: 1000,
 };
 
 // --- Helper Functions ---
@@ -18,39 +18,31 @@ function getLinkURL(linkContent, appContext) {
     [garden, path] = path.split('#');
   }
 
-  const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
-  return `${window.location.origin}${basePath}/${encodeURIComponent(garden)}#${encodeURI(path)}?preview=true`;
+  // THIS IS THE FIX: Use a root-relative path to avoid base path issues.
+  return `/${encodeURIComponent(garden)}#${encodeURI(path)}?preview=true`;
 }
 
 function hidePreview(windowEl) {
   if (windowEl) {
-    const link = windowEl.dataset.link;
-    previewState.activeWindows.delete(link);
+    const windowId = windowEl.dataset.windowId;
+    previewState.activeWindows.delete(windowId);
     windowEl.classList.remove('visible');
     setTimeout(() => windowEl.remove(), 200);
   }
 }
 
 function createPreviewWindow(url, initialX, initialY) {
-    const linkText = url; // Use the full URL as a unique key
-    if (previewState.activeWindows.has(linkText)) {
-      // If window already exists, just bring it to the front
-      const existingWindow = previewState.activeWindows.get(linkText);
-      existingWindow.style.zIndex = ++previewState.zIndexCounter;
-      return;
-    }
+    const windowId = `preview-${crypto.randomUUID()}`;
 
     const windowEl = document.createElement('div');
     windowEl.className = 'preview-window';
-    windowEl.dataset.link = linkText;
+    windowEl.dataset.windowId = windowId; // Use unique ID
     
-    // Z-INDEX MANAGEMENT: Assign a new, higher z-index
     windowEl.style.zIndex = ++previewState.zIndexCounter;
     
-    // Z-INDEX MANAGEMENT: Bring to front on click
     windowEl.addEventListener('mousedown', () => {
       windowEl.style.zIndex = ++previewState.zIndexCounter;
-    }, { capture: true }); // Use capture to ensure this fires first
+    }, { capture: true });
 
     const addressBar = document.createElement('div');
     addressBar.className = 'preview-address-bar';
@@ -76,11 +68,14 @@ function createPreviewWindow(url, initialX, initialY) {
     iframe.src = url;
 
     const loadUrl = () => {
-      try {
-        const newUrl = new URL(addressInput.value);
-        iframe.src = newUrl.href;
-      } catch (e) {
-        addressInput.value = iframe.src;
+      // Use the iframe's contentWindow to navigate, which preserves the origin
+      // and avoids cross-origin issues when the base path changes.
+      if (iframe.contentWindow) {
+          try {
+             iframe.contentWindow.location.href = new URL(addressInput.value, window.location.origin).href;
+          } catch(e) {
+             addressInput.value = iframe.src;
+          }
       }
     };
     goBtn.onclick = loadUrl;
@@ -89,9 +84,9 @@ function createPreviewWindow(url, initialX, initialY) {
     windowEl.append(addressBar, iframe);
 
     const { innerWidth, innerHeight } = window;
-    const winWidth = 640; // Approx 60rem
-    const winHeight = 424; // Approx 40rem
-    const offset = previewState.activeWindows.size * 25;
+    const winWidth = 640;
+    const winHeight = 424;
+    const offset = (previewState.activeWindows.size % 5) * 25; // Cascade up to 5 windows
     
     let top = initialY + 20 + offset;
     let left = initialX + 20 + offset;
@@ -102,20 +97,8 @@ function createPreviewWindow(url, initialX, initialY) {
     windowEl.style.left = `${Math.max(5, left)}px`;
     windowEl.style.top = `${Math.max(5, top)}px`;
 
-    const markInteracted = () => windowEl.dataset.interacted = 'true';
-    windowEl.addEventListener('mouseover', () => clearTimeout(windowEl.hideTimeout));
-    windowEl.addEventListener('mousedown', markInteracted);
-    windowEl.addEventListener('wheel', markInteracted);
-    windowEl.addEventListener('mouseout', (e) => {
-        if (e.relatedTarget === null || e.relatedTarget.tagName === 'HTML') {
-            if (windowEl.dataset.interacted !== 'true') {
-                 windowEl.hideTimeout = setTimeout(() => hidePreview(windowEl), 300);
-            }
-        }
-    });
-
     document.getElementById('preview-windows-container').appendChild(windowEl);
-    previewState.activeWindows.set(linkText, windowEl);
+    previewState.activeWindows.set(windowId, windowEl);
     
     setTimeout(() => windowEl.classList.add('visible'), 10);
 }
@@ -123,19 +106,24 @@ function createPreviewWindow(url, initialX, initialY) {
 // --- Communication with iframes ---
 window.addEventListener('message', (event) => {
   const { type, payload } = event.data;
-  const previewWindow = event.source.frameElement?.closest('.preview-window');
+  const iframe = event.source.frameElement;
+  if (!iframe) return;
+
+  const previewWindow = iframe.closest('.preview-window');
+  if (!previewWindow) return;
 
   switch (type) {
-    case 'preview-interacted':
-      if (previewWindow) previewWindow.dataset.interacted = 'true';
+    case 'preview-focus':
+      previewWindow.style.zIndex = ++previewState.zIndexCounter;
       break;
     case 'preview-url-changed':
-      const addressInput = previewWindow?.querySelector('.preview-address-input');
+      const addressInput = previewWindow.querySelector('.preview-address-input');
       if (addressInput && payload.newUrl) {
-          addressInput.value = payload.newUrl;
+          // Reconstruct a root-relative URL for the address bar
+          const url = new URL(payload.newUrl);
+          addressInput.value = `${url.pathname}${url.hash}`;
       }
       break;
-    // THIS IS THE FIX for nested previews
     case 'request-preview-window':
       if (payload) {
         createPreviewWindow(payload.url, payload.clientX, payload.clientY);
@@ -147,7 +135,6 @@ window.addEventListener('message', (event) => {
 
 // --- Drag and Resize Logic ---
 function startDrag(windowEl, e) {
-  windowEl.dataset.interacted = 'true';
   const rect = windowEl.getBoundingClientRect();
   previewState.dragState = {
     windowEl,
@@ -216,7 +203,6 @@ class WikilinkPlugin {
     const linkContent = linkEl.textContent.slice(2, -2);
     const url = getLinkURL(linkContent, appContext);
     
-    // THIS IS THE FIX for nested previews
     const isNestedPreview = window.self !== window.top;
     if (isNestedPreview) {
         window.top.postMessage({
