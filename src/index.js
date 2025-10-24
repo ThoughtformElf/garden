@@ -86,22 +86,27 @@ async function main() {
   
   window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
 
-  const updateSW = registerSW({
+  registerSW({
     onNeedRefresh() {
       Modal.confirm({
         title: 'Update Available',
         message: 'A new version of Thoughtform Garden is available. Reload to apply the update?',
         okText: 'Reload'
       }).then(confirmed => {
-        if (confirmed) updateSW(true);
+        if (confirmed) {
+          // This will message the service worker to skip waiting and activate the new version.
+          // The 'autoUpdate' strategy in vite.config.js will then handle the reload.
+          const registration = window.pwaRegistration;
+          if (registration && registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        }
       });
     },
     onOfflineReady() {
       console.log('App is ready for offline use.');
     }
   });
-
-  window.thoughtform.updateApp = updateSW;
 
   initializeAppInteractions();
   initializeDevTools();
