@@ -36,6 +36,7 @@ export class Editor {
     this.filePath = initialFile || '/home';
     this.isReady = false;
     this.keymapService = null;
+    this.aiOverrides = {}; // Property to hold session-specific AI settings
 
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();

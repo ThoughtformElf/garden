@@ -3,6 +3,7 @@ import { appContextField, findFileCaseInsensitive } from '../editor/navigation.j
 import { WorkspaceRenderer } from './renderer.js';
 import { PaneManager } from './manager/pane.js';
 import { WorkspaceStateManager } from './manager/state.js';
+import { UrlManager } from './manager/url.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,
@@ -16,6 +17,7 @@ export class WorkspaceManager {
     this.isResizing = false;
     this.gitClients = new Map();
     this.gitClients.set(initialGitClient.gardenName, initialGitClient);
+    this.isInitialized = false; 
     
     this.broadcastChannel = new BroadcastChannel('thoughtform_garden_sync');
     this.broadcastChannel.onmessage = this.handleBroadcastMessage.bind(this);
@@ -25,27 +27,23 @@ export class WorkspaceManager {
     this._renderer = new WorkspaceRenderer(this);
     this._paneManager = new PaneManager(this);
     this._stateManager = new WorkspaceStateManager(this);
+    this._urlManager = new UrlManager();
 
-    // THIS IS THE DEFINITIVE FIX: Explicitly prioritize windowed mode to force a fresh state.
-    const hash = window.location.hash || '';
-    const isWindowed = hash.includes('?windowed=true');
+    // The UrlManager now handles reading from sessionStorage, so we only need to check its state.
+    const isWindowed = this._urlManager.getSessionParams().has('windowed');
     const savedState = this._stateManager.loadState();
 
     if (isWindowed) {
-        // If in a window, ALWAYS start with a fresh, single-pane layout.
-        // Ignore any saved state from the parent window's session.
         this.paneTree = this._createInitialPaneTree();
         this.activePaneId = 'pane-1';
         this.initialEditorStates = {};
         this._paneManager.isMaximized = false;
     } else if (savedState) {
-        // If not in a window and a saved state exists, load it.
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
         this.initialEditorStates = savedState.editorStates || {};
         this._paneManager.isMaximized = savedState.isMaximized || false;
     } else {
-        // Otherwise (first visit, or cleared session), create a fresh default layout.
         this.paneTree = this._createInitialPaneTree();
         this.activePaneId = 'pane-1';
         this.initialEditorStates = {};
@@ -63,6 +61,13 @@ export class WorkspaceManager {
       buffers: [ { garden: this.initialGitClient.gardenName, path: initialPath } ]
     };
   }
+  
+  // --- THIS IS THE FIX (Part 1) ---
+  // Public method to be called by the main navigation listener.
+  updateSessionFromUrl() {
+    this._urlManager.updateFromUrl();
+  }
+  // --- END OF FIX (Part 1) ---
   
   async getGitClient(gardenName) {
       if (!this.gitClients.has(gardenName)) {
@@ -156,7 +161,9 @@ export class WorkspaceManager {
     let path = linkContent.split('|')[0].trim();
     let garden = null;
   
-    if (path.includes('#')) [garden, path] = path.split('#');
+    if (path.includes('#')) {
+      [garden, path] = path.split('#');
+    }
 
     let finalPath, finalGarden;
 
@@ -180,23 +187,19 @@ export class WorkspaceManager {
   }
 
   _updateURL() {
+      if (!this.isInitialized) return;
+
       const info = this._paneManager.getActivePaneInfo();
       if (!info) return;
       const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
       
-      const fullUrlPath = new URL(import.meta.url).pathname;
-      const srcIndex = fullUrlPath.lastIndexOf('/src/');
-      const basePath = srcIndex > -1 ? fullUrlPath.substring(0, srcIndex) : '';
-
-      const newPathname = `${basePath}/${encodeURIComponent(activeBuffer.garden)}`;
-      const newHash = `#${encodeURI(activeBuffer.path)}`;
+      const fullUrl = this._urlManager.buildUrl(activeBuffer.garden, activeBuffer.path);
+      const isWindowed = this._urlManager.getSessionParams().has('windowed');
       
-      const currentHash = window.location.hash.split('?')[0];
-      const isWindowed = (window.location.hash || '').includes('?windowed=true');
-      const finalHash = isWindowed ? `${newHash}?windowed=true` : newHash;
-
-      if (window.location.pathname !== newPathname || currentHash !== newHash) {
-          window.history.pushState(null, '', `${newPathname}${finalHash}`);
+      const currentFullUrl = window.location.pathname + window.location.hash;
+      
+      if (currentFullUrl !== fullUrl) {
+          window.history.pushState(null, '', fullUrl);
           
           if (isWindowed) {
               window.parent.postMessage({ type: 'preview-url-changed', payload: { newUrl: window.location.href } }, '*');
@@ -271,6 +274,10 @@ export class WorkspaceManager {
     if (!info) return this.initialGitClient;
     const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
     return await this.getGitClient(activeBuffer.garden);
+  }
+  
+  buildUrl(garden, path, isForWindow = false) {
+    return this._urlManager.buildUrl(garden, path, isForWindow);
   }
   
   render() { return this._renderer.render(); }

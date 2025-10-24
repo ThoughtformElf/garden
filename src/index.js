@@ -19,11 +19,14 @@ import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace/index.js';
 import { initializeQueryLoader } from './workspace/query-loader.js';
 
-function initializeNavigationListener(isPreview) {
+function initializeNavigationListener() {
     const handleNav = async () => {
-        if (isPreview) {
-            window.parent.postMessage({ type: 'preview-url-changed', payload: { newUrl: window.location.href } }, '*');
-        }
+        // --- THIS IS THE FIX (Part 2) ---
+        // At the beginning of any navigation, update the session state from the URL.
+        window.thoughtform.workspace.updateSessionFromUrl();
+        // Now run the autoloaders based on the newly synced session state.
+        await initializeQueryLoader();
+        // --- END OF FIX (Part 2) ---
 
         const fullPath = new URL(import.meta.url).pathname;
         const srcIndex = fullPath.lastIndexOf('/src/');
@@ -36,30 +39,20 @@ function initializeNavigationListener(isPreview) {
         gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
         gardenName = decodeURIComponent(gardenName);
 
-        // THIS IS THE FIX: Strip query params from the file path
-        let filePath = (window.location.hash || '#/home').substring(1);
-        filePath = decodeURI(filePath).split('?')[0];
+        const hash = window.location.hash || '#/home';
+        const filePath = decodeURI(hash.substring(1).split('?')[0]);
+        
+        const isPreview = (window.location.hash || '').includes('?windowed=true');
+        if (isPreview) {
+            window.parent.postMessage({ type: 'preview-url-changed', payload: { newUrl: window.location.href } }, '*');
+        }
 
         await window.thoughtform.workspace.openFile(gardenName, filePath);
     };
 
     window.addEventListener('popstate', handleNav);
     
-    if (isPreview) {
-        document.body.classList.add('is-preview-mode');
-
-        document.body.addEventListener('mousedown', () => {
-            window.parent.postMessage({ type: 'preview-focus' }, '*');
-        }, { capture: true });
-
-        const markInteracted = () => {
-            window.parent.postMessage({ type: 'preview-interacted' }, '*');
-            document.body.removeEventListener('mousedown', markInteracted, true);
-            document.body.removeEventListener('wheel', markInteracted, true);
-        };
-        document.body.addEventListener('mousedown', markInteracted, true);
-        document.body.addEventListener('wheel', markInteracted, true);
-    }
+    return handleNav;
 }
 
 
@@ -68,11 +61,7 @@ async function main() {
   const fullPath = new URL(import.meta.url).pathname;
   const srcIndex = fullPath.lastIndexOf('/src/');
   const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
-
-  // THIS IS THE FIX: Correctly detect preview mode from the hash
-  const hash = window.location.hash || '';
-  const isPreview = hash.includes('?preview=true');
-
+  
   const settingsGit = new Git('Settings');
   await settingsGit.initRepo();
 
@@ -117,7 +106,8 @@ async function main() {
   initializeAppInteractions();
   initializeDevTools();
   window.thoughtform.runMigration = runMigration;
-
+  
+  const isPreview = (window.location.hash || '').includes('?windowed=true');
   window.onerror = function(message, source, lineno, colno, error) {
     console.error("Caught global error:", message, error);
     if (!isPreview) window.thoughtform.ui.toggleDevtools?.(true, 'console');
@@ -149,9 +139,14 @@ async function main() {
   hookRunner.initialize();
   window.thoughtform.hooks = hookRunner;
   
-  initializeNavigationListener(isPreview);
+  const handleInitialNav = initializeNavigationListener();
+  
+  // This initial call will now correctly set up the session state
+  // BEFORE any content is loaded.
+  await handleInitialNav(); 
 
-  await initializeQueryLoader();
+  // Now that all initial loading is complete, we can enable URL updates.
+  window.thoughtform.workspace.isInitialized = true;
 
   window.thoughtform.events.publish('app:load');
 }

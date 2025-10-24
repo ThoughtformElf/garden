@@ -32,8 +32,6 @@ import defaultQueryTestJs from './query/test.js?raw';
 import defaultHookOnCreateWindowJs from './hooks/on-create-window.js?raw';
 import defaultHookOnCloseWindowJs from './hooks/on-close-window.js?raw';
 import defaultHookOnResizeWindowJs from './hooks/on-resize-window.js?raw';
-
-// --- NEW KEYMAP SCRIPT ---
 import defaultOpenInWindowJs from './keymaps/open-in-window.js?raw';
 
 // --- AGENT DEFAULTS ---
@@ -46,6 +44,11 @@ import defaultReadURLJs from './tools/readURL.js?raw';
 import defaultWebSearchJs from './tools/webSearch.js?raw';
 import defaultListFilesJs from './tools/listFiles.js?raw';
 import defaultRequestMemoryCompressionJs from './tools/requestMemoryCompression.js?raw';
+
+// --- NEW QUERY SCRIPTS ---
+import defaultQueryModelJs from './query/model.js?raw';
+import defaultQueryApiJs from './query/api.js?raw';
+import defaultQueryApiKeyJs from './query/apiKey.js?raw';
 
 
 export const defaultFiles = [
@@ -81,8 +84,6 @@ export const defaultFiles = [
   ['/settings/hooks/on-create-window.js', defaultHookOnCreateWindowJs],
   ['/settings/hooks/on-close-window.js', defaultHookOnCloseWindowJs],
   ['/settings/hooks/on-resize-window.js', defaultHookOnResizeWindowJs],
-  
-  // --- NEW KEYMAP SCRIPT ---
   ['/settings/keymaps/open-in-window.js', defaultOpenInWindowJs],
 
   // --- AGENT DEFAULTS ---
@@ -95,4 +96,9 @@ export const defaultFiles = [
   ['/settings/tools/webSearch.js', defaultWebSearchJs],
   ['/settings/tools/listFiles.js', defaultListFilesJs],
   ['/settings/tools/requestMemoryCompression.js', defaultRequestMemoryCompressionJs],
+
+  // --- NEW QUERY SCRIPTS ---
+  ['/settings/query/model.js', defaultQueryModelJs],
+  ['/settings/query/api.js', defaultQueryApiJs],
+  ['/settings/query/apiKey.js', defaultQueryApiKeyJs],
 ];

@@ -33,7 +33,7 @@ class AiService {
   }
   
   async getCompletion(prompt, onTokenCount, signal) {
-    this.loadConfig(); // Ensure config is fresh for every call
+    // No longer calling loadConfig() here, allowing for temporary overrides.
 
     let streamPromise;
     const provider = this.config.activeProvider;
@@ -44,11 +44,8 @@ class AiService {
       }
       streamPromise = streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
     } else if (provider === 'custom') {
-      // --- THIS IS THE FIX (Part 1) ---
-      // Use the configured endpoint or fall back to the Ollama default.
       const endpointToUse = this.config.customEndpointUrl || 'http://localhost:11434/v1';
 
-      // The model name is required and cannot be defaulted. Throw a specific error.
       if (!this.config.customModelName) {
          throw new Error('Active provider is Custom, but Model Name is not set. You must specify a model (e.g., "llama3") in the DevTools > AI panel.');
       }
@@ -60,7 +57,6 @@ class AiService {
         prompt,
         signal
       );
-      // --- END OF FIX (Part 1) ---
     } else {
         throw new Error(`Unknown AI provider selected: "${provider}"`);
     }
@@ -89,6 +85,7 @@ class AiService {
   }
 
   async getCompletionAsString(prompt, onTokenCount, signal) {
+      // No longer calling loadConfig() here.
       const stream = await this.getCompletion(prompt, onTokenCount, signal);
       const reader = stream.getReader();
       let fullResponse = '';
@@ -146,9 +143,22 @@ class AiService {
       const rawContext = view.state.doc.toString();
       const initialContext = rawContext.replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
 
+      // --- THIS IS THE REFACTOR ---
+      // Check for per-session overrides on the editor instance. If they exist,
+      // create a temporary proxy of the AiService with the overridden config.
+      let serviceForRunner = this; // Default to the global AiService instance
+      if (editor.aiOverrides && Object.keys(editor.aiOverrides).length > 0) {
+        console.log('[AI Service] Applying session-specific AI overrides:', editor.aiOverrides);
+        serviceForRunner = {
+          ...this, // Inherit all methods from the global service
+          config: { ...this.config, ...editor.aiOverrides } // Provide a temporary, merged config
+        };
+      }
+      // --- END OF REFACTOR ---
+
       const runner = new TaskRunner({
           gitClient: editor.gitClient,
-          aiService: this,
+          aiService: serviceForRunner, // Pass the correct service (global or scoped)
           initialContext: initialContext
       });
       const stream = runner.run(userPrompt, controller.signal);
