@@ -4,7 +4,7 @@ import { appContextField } from '../navigation.js';
 
 // --- State for managing previews ---
 const previewState = {
-  activeIframe: null,
+  activeWindow: null,
   hideTimeout: null,
   dragState: null,
 };
@@ -22,54 +22,45 @@ function getLinkURL(linkContent, appContext) {
   return `${window.location.origin}${basePath}/${encodeURIComponent(garden)}#${encodeURI(path)}?preview=true`;
 }
 
-function hidePreview(iframe) {
-  if (iframe) {
-    iframe.classList.remove('visible');
-    setTimeout(() => iframe.remove(), 200);
+function hidePreview(windowEl) {
+  if (windowEl) {
+    windowEl.classList.remove('visible');
+    setTimeout(() => windowEl.remove(), 200);
   }
-  if (previewState.activeIframe === iframe) {
-    previewState.activeIframe = null;
+  if (previewState.activeWindow === windowEl) {
+    previewState.activeWindow = null;
   }
 }
 
 // --- Communication with iframes ---
 window.addEventListener('message', (event) => {
-  if (!event.source.frameElement || !event.source.frameElement.classList.contains('preview-iframe')) {
-    return;
-  }
+  const previewWindow = event.source.frameElement?.closest('.preview-window');
+  if (!previewWindow) return;
 
-  const iframe = event.source.frameElement;
   const { type, payload } = event.data;
 
   switch (type) {
     case 'preview-interacted':
-      iframe.dataset.interacted = 'true';
+      previewWindow.dataset.interacted = 'true';
       break;
-    case 'preview-close':
-      hidePreview(iframe);
-      break;
-    case 'preview-drag-start':
-      startDrag(iframe, payload.x, payload.y);
-      break;
-    case 'preview-maximize':
-      iframe.style.top = '1rem';
-      iframe.style.left = '1rem';
-      iframe.style.width = 'calc(100vw - 2rem)';
-      iframe.style.height = 'calc(100vh - 2rem)';
-      iframe.dataset.interacted = 'true';
+    case 'preview-url-changed':
+      const addressInput = previewWindow.querySelector('.preview-address-input');
+      if (addressInput && payload.newUrl) {
+          addressInput.value = payload.newUrl;
+      }
       break;
   }
 });
 
 
 // --- Drag and Resize Logic ---
-function startDrag(iframe, initialMouseX, initialMouseY) {
-  iframe.dataset.interacted = 'true';
-  const rect = iframe.getBoundingClientRect();
+function startDrag(windowEl, e) {
+  windowEl.dataset.interacted = 'true';
+  const rect = windowEl.getBoundingClientRect();
   previewState.dragState = {
-    iframe,
-    offsetX: initialMouseX - rect.left,
-    offsetY: initialMouseY - rect.top,
+    windowEl,
+    offsetX: e.clientX - rect.left,
+    offsetY: e.clientY - rect.top,
   };
 
   document.addEventListener('mousemove', onDragMove);
@@ -79,9 +70,9 @@ function startDrag(iframe, initialMouseX, initialMouseY) {
 function onDragMove(e) {
   if (!previewState.dragState) return;
   e.preventDefault();
-  const { iframe, offsetX, offsetY } = previewState.dragState;
-  iframe.style.left = `${e.clientX - offsetX}px`;
-  iframe.style.top = `${e.clientY - offsetY}px`;
+  const { windowEl, offsetX, offsetY } = previewState.dragState;
+  windowEl.style.left = `${e.clientX - offsetX}px`;
+  windowEl.style.top = `${e.clientY - offsetY}px`;
 }
 
 function onDragEnd() {
@@ -134,52 +125,99 @@ class WikilinkPlugin {
 
     clearTimeout(previewState.hideTimeout);
 
-    if (previewState.activeIframe && previewState.activeIframe.dataset.link === linkEl.textContent) {
+    if (previewState.activeWindow && previewState.activeWindow.dataset.link === linkEl.textContent) {
       return; // Already showing this preview
     }
     
-    // Hide any existing preview before showing a new one
-    if(previewState.activeIframe) hidePreview(previewState.activeIframe);
+    if(previewState.activeWindow) hidePreview(previewState.activeWindow);
 
     const appContext = this.view.state.field(appContextField);
     const linkContent = linkEl.textContent.slice(2, -2);
     const url = getLinkURL(linkContent, appContext);
 
+    const windowEl = document.createElement('div');
+    windowEl.className = 'preview-window';
+    windowEl.dataset.link = linkEl.textContent;
+    
+    // Create Address Bar
+    const addressBar = document.createElement('div');
+    addressBar.className = 'preview-address-bar';
+    addressBar.addEventListener('mousedown', (e) => startDrag(windowEl, e));
+    
+    const addressInput = document.createElement('input');
+    addressInput.type = 'text';
+    addressInput.className = 'preview-address-input';
+    addressInput.value = url;
+
+    const goBtn = document.createElement('button');
+    goBtn.textContent = 'Go';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.className = 'preview-close-btn';
+    closeBtn.onclick = () => hidePreview(windowEl);
+    
+    addressBar.append(addressInput, goBtn, closeBtn);
+
+    // Create Iframe
     const iframe = document.createElement('iframe');
     iframe.className = 'preview-iframe';
     iframe.src = url;
-    iframe.dataset.link = linkEl.textContent;
 
-    // Position the iframe near the mouse
-    const x = event.clientX + 20;
-    const y = event.clientY + 20;
-    iframe.style.left = `${x}px`;
-    iframe.style.top = `${y}px`;
+    const loadUrl = () => {
+      try {
+        const newUrl = new URL(addressInput.value);
+        iframe.src = newUrl.href;
+      } catch (e) {
+        addressInput.value = iframe.src; // Revert on invalid URL
+      }
+    };
+    goBtn.onclick = loadUrl;
+    addressInput.onkeydown = (e) => { if(e.key === 'Enter') loadUrl(); };
 
-    iframe.addEventListener('mouseover', () => {
-      clearTimeout(previewState.hideTimeout);
-      iframe.dataset.interacted = 'true';
-    });
+    windowEl.append(addressBar, iframe);
 
-    iframe.addEventListener('mouseout', (e) => {
-        // Only hide if the mouse moves out of the iframe to the main page
+    // Smart Positioning
+    const { clientX, clientY } = event;
+    const { innerWidth, innerHeight } = window;
+    const winWidth = parseFloat(getComputedStyle(windowEl).width);
+    const winHeight = parseFloat(getComputedStyle(windowEl).height);
+    
+    let top = clientY + 20;
+    let left = clientX + 20;
+
+    if (left + winWidth > innerWidth) {
+      left = clientX - winWidth - 20;
+    }
+    if (top + winHeight > innerHeight) {
+      top = clientY - winHeight - 20;
+    }
+    
+    windowEl.style.left = `${Math.max(5, left)}px`;
+    windowEl.style.top = `${Math.max(5, top)}px`;
+
+    // Interaction listeners
+    const markInteracted = () => windowEl.dataset.interacted = 'true';
+    windowEl.addEventListener('mouseover', () => clearTimeout(previewState.hideTimeout));
+    windowEl.addEventListener('mousedown', markInteracted);
+    windowEl.addEventListener('wheel', markInteracted);
+    windowEl.addEventListener('mouseout', (e) => {
         if (e.relatedTarget === null || e.relatedTarget.tagName === 'HTML') {
             this.onMouseOut();
         }
     });
 
-    document.getElementById('preview-windows-container').appendChild(iframe);
-    previewState.activeIframe = iframe;
+    document.getElementById('preview-windows-container').appendChild(windowEl);
+    previewState.activeWindow = windowEl;
     
-    // Use a tiny timeout to allow the element to be in the DOM before transitioning
-    setTimeout(() => iframe.classList.add('visible'), 10);
+    setTimeout(() => windowEl.classList.add('visible'), 10);
   }
 
   onMouseOut() {
     clearTimeout(previewState.hideTimeout);
     previewState.hideTimeout = setTimeout(() => {
-      if (previewState.activeIframe && previewState.activeIframe.dataset.interacted !== 'true') {
-        hidePreview(previewState.activeIframe);
+      if (previewState.activeWindow && previewState.activeWindow.dataset.interacted !== 'true') {
+        hidePreview(previewState.activeWindow);
       }
     }, 300);
   }

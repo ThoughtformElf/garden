@@ -1,4 +1,4 @@
-/* --- Preview Window Container & Iframe --- */
+/* --- Preview Window Container & Wrapper --- */
 #preview-windows-container {
     position: fixed;
     top: 0;
@@ -9,7 +9,7 @@
     z-index: 999;
 }
 
-.preview-iframe {
+.preview-window {
     position: absolute;
     width: 60rem; /* Use rem for scalability */
     height: 40rem;
@@ -19,17 +19,78 @@
     border-radius: 0.4rem;
     overflow: hidden;
     resize: both;
-    min-width: 25rem;
-    min-height: 15rem;
-    pointer-events: auto; /* The iframe itself is interactive */
+    min-width: 30rem;
+    min-height: 20rem;
+    pointer-events: auto; /* The window itself is interactive */
     opacity: 0;
     transform: scale(0.95);
     transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    display: flex;
+    flex-direction: column;
 }
 
-.preview-iframe.visible {
+.preview-window.visible {
     opacity: 1;
     transform: scale(1);
+}
+
+.preview-iframe {
+    flex-grow: 1;
+    border: none;
+    width: 100%;
+    height: 100%;
+}
+
+/* --- Preview Address Bar --- */
+.preview-address-bar {
+    width: 100%;
+    height: 2.5rem;
+    background-color: var(--color-background-secondary);
+    border-bottom: 1px solid var(--color-border-primary);
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    flex-shrink: 0;
+    cursor: grab;
+}
+
+.preview-address-bar:active {
+    cursor: grabbing;
+}
+
+.preview-address-input {
+    flex-grow: 1;
+    background-color: var(--color-background-primary);
+    border: 1px solid var(--color-border-primary);
+    color: var(--color-text-primary);
+    border-radius: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    margin-right: 0.5rem;
+}
+
+.preview-address-bar button {
+    background: none;
+    border: 1px solid var(--color-border-primary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: 0.3rem 0.7rem;
+    line-height: 1;
+    border-radius: 0.3rem;
+    font-size: 0.9rem;
+    margin-left: 0.2rem;
+}
+
+.preview-address-bar button:hover {
+    background-color: var(--color-background-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-hover);
+}
+
+.preview-address-bar .preview-close-btn {
+    font-size: 1.2rem;
+    padding: 0.1rem 0.6rem;
 }
 
 
@@ -38,7 +99,8 @@
 .is-preview-mode #sidebar,
 .is-preview-mode #resizer,
 .is-preview-mode #eruda-container,
-.is-preview-mode #eruda-resizer {
+.is-preview-mode #eruda-resizer,
+.is-preview-mode .preview-header { /* Remove internal header */
     display: none !important;
 }
 
@@ -49,51 +111,4 @@
 
 .is-preview-mode .main-content {
     grid-template-columns: 1fr; /* Remove sidebar column */
-}
-
-
-/* --- Draggable Header for Preview Windows --- */
-.preview-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 2.5rem;
-    background-color: var(--color-background-secondary);
-    border-bottom: 1px solid var(--color-border-primary);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 0.8rem;
-    cursor: grab;
-    z-index: 1000;
-    user-select: none;
-    color: var(--color-text-secondary);
-}
-
-.preview-header:active {
-    cursor: grabbing;
-}
-
-.preview-header-filename {
-    font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.preview-header-controls button {
-    background: none;
-    border: none;
-    color: var(--color-text-secondary);
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 0.2rem 0.5rem;
-    line-height: 1;
-    border-radius: 0.3rem;
-}
-
-.preview-header-controls button:hover {
-    background-color: var(--color-background-hover);
-    color: var(--color-text-primary);
 }

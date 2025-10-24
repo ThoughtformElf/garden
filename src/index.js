@@ -19,9 +19,14 @@ import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace/index.js'; // Import the new manager
 import { initializeQueryLoader } from './workspace/query-loader.js';
 
-// Handles browser back/forward buttons.
-function initializeNavigationListener() {
-    window.addEventListener('popstate', async () => {
+// --- This function now handles BOTH preview mode setup AND regular navigation ---
+function initializeNavigationListener(isPreview) {
+    const handleNav = async () => {
+        // For iframes, notify parent of URL changes for address bar sync
+        if (isPreview) {
+            window.parent.postMessage({ type: 'preview-url-changed', payload: { newUrl: window.location.href } }, '*');
+        }
+
         const fullPath = new URL(import.meta.url).pathname;
         const srcIndex = fullPath.lastIndexOf('/src/');
         const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
@@ -36,63 +41,24 @@ function initializeNavigationListener() {
         let filePath = (window.location.hash || '#/home').substring(1);
         filePath = decodeURI(filePath);
 
-        // Tell the workspace to load this state into the active pane.
         await window.thoughtform.workspace.openFile(gardenName, filePath);
-    });
-}
-
-// --- Logic for when running inside a preview iframe ---
-function initializePreviewMode() {
-    document.body.classList.add('is-preview-mode');
-
-    const header = document.createElement('div');
-    header.className = 'preview-header';
-    
-    const filenameEl = document.createElement('div');
-    filenameEl.className = 'preview-header-filename';
-    
-    const controlsEl = document.createElement('div');
-    controlsEl.className = 'preview-header-controls';
-    
-    const maximizeBtn = document.createElement('button');
-    maximizeBtn.innerHTML = '&#x26F6;'; // Square Four Corners
-    maximizeBtn.title = 'Maximize';
-    maximizeBtn.onclick = () => window.parent.postMessage({ type: 'preview-maximize' }, '*');
-    
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '&times;';
-    closeBtn.title = 'Close';
-    closeBtn.onclick = () => window.parent.postMessage({ type: 'preview-close' }, '*');
-    
-    controlsEl.appendChild(maximizeBtn);
-    controlsEl.appendChild(closeBtn);
-    header.appendChild(filenameEl);
-    header.appendChild(controlsEl);
-    
-    document.body.prepend(header);
-
-    // Any interaction with the preview should mark it as persistent
-    const markInteracted = () => {
-        window.parent.postMessage({ type: 'preview-interacted' }, '*');
-        document.body.removeEventListener('mousedown', markInteracted, true);
-        document.body.removeEventListener('wheel', markInteracted, true);
     };
-    document.body.addEventListener('mousedown', markInteracted, true);
-    document.body.addEventListener('wheel', markInteracted, true);
 
-    // Make the header draggable
-    header.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        window.parent.postMessage({ type: 'preview-drag-start', payload: { x: e.clientX, y: e.clientY }}, '*');
-    });
+    window.addEventListener('popstate', handleNav);
+    
+    // Initial setup for preview mode
+    if (isPreview) {
+        document.body.classList.add('is-preview-mode');
 
-    // Update the filename in the header when the file changes
-    window.thoughtform.events.subscribe('file:update', (data) => {
-        const displayPath = `[${data.gardenName}] ${data.path}`;
-        if (filenameEl.textContent !== displayPath) {
-            filenameEl.textContent = displayPath;
-        }
-    });
+        // Any interaction with the preview should mark it as persistent
+        const markInteracted = () => {
+            window.parent.postMessage({ type: 'preview-interacted' }, '*');
+            document.body.removeEventListener('mousedown', markInteracted, true);
+            document.body.removeEventListener('wheel', markInteracted, true);
+        };
+        document.body.addEventListener('mousedown', markInteracted, true);
+        document.body.addEventListener('wheel', markInteracted, true);
+    }
 }
 
 
@@ -131,10 +97,6 @@ async function main() {
     // workspace will be assigned below
   };
   
-  if (isPreview) {
-    initializePreviewMode();
-  }
-
   // Now that window.thoughtform.events exists, we can initialize the workspace.
   window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
 
@@ -196,7 +158,8 @@ async function main() {
   hookRunner.initialize();
   window.thoughtform.hooks = hookRunner;
   
-  initializeNavigationListener();
+  // Pass the isPreview flag to the listener
+  initializeNavigationListener(isPreview);
 
   await initializeQueryLoader();
 
