@@ -2,46 +2,78 @@ import { ViewPlugin, Decoration } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 import { appContextField } from '../navigation.js';
 
-// --- State for managing previews ---
+const SESSION_STORAGE_KEY = 'thoughtform_window_states';
+
 const previewState = {
-  activeWindows: new Map(), // Use a unique ID for each window instance
+  activeWindows: new Map(),
   dragState: null,
   zIndexCounter: 1000,
+  lastSpawnedLink: null, // Track the last link that spawned a window
+  lastSpawnTime: 0,      // Track when it was spawned
 };
 
-// --- Helper Functions ---
+function saveWindowStates() {
+  const states = [];
+  previewState.activeWindows.forEach(windowEl => {
+    const rect = windowEl.getBoundingClientRect();
+    states.push({
+      id: windowEl.dataset.windowId,
+      url: windowEl.querySelector('.preview-address-input').value,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      zIndex: parseInt(windowEl.style.zIndex, 10),
+    });
+  });
+  sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(states));
+}
+
+function loadWindowStates() {
+  const savedStates = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (savedStates) {
+    try {
+      const states = JSON.parse(savedStates);
+      states.sort((a, b) => a.zIndex - b.zIndex).forEach(state => {
+        createPreviewWindow(state.url, 0, 0, state);
+      });
+    } catch (e) {
+      console.error("Failed to load window states from session storage.", e);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }
+}
+
 function getLinkURL(linkContent, appContext) {
   let path = linkContent.split('|')[0].trim();
   let garden = appContext.gitClient.gardenName;
-
-  if (path.includes('#')) {
-    [garden, path] = path.split('#');
-  }
-
-  // THIS IS THE FIX: Use a root-relative path to avoid base path issues.
-  return `/${encodeURIComponent(garden)}#${encodeURI(path)}?preview=true`;
+  if (path.includes('#')) [garden, path] = path.split('#');
+  return `/${encodeURIComponent(garden)}#${encodeURI(path)}?windowed=true`;
 }
 
 function hidePreview(windowEl) {
   if (windowEl) {
-    const windowId = windowEl.dataset.windowId;
-    previewState.activeWindows.delete(windowId);
+    previewState.activeWindows.delete(windowEl.dataset.windowId);
     windowEl.classList.remove('visible');
-    setTimeout(() => windowEl.remove(), 200);
+    setTimeout(() => {
+      windowEl.remove();
+      saveWindowStates();
+    }, 200);
   }
 }
 
-function createPreviewWindow(url, initialX, initialY) {
-    const windowId = `preview-${crypto.randomUUID()}`;
-
+function createPreviewWindow(url, initialX, initialY, savedState = null) {
+    const windowId = savedState ? savedState.id : `preview-${crypto.randomUUID()}`;
     const windowEl = document.createElement('div');
     windowEl.className = 'preview-window';
-    windowEl.dataset.windowId = windowId; // Use unique ID
+    windowEl.dataset.windowId = windowId;
     
-    windowEl.style.zIndex = ++previewState.zIndexCounter;
-    
+    windowEl.style.zIndex = savedState ? savedState.zIndex : ++previewState.zIndexCounter;
+    if (savedState) previewState.zIndexCounter = Math.max(previewState.zIndexCounter, savedState.zIndex);
+
     windowEl.addEventListener('mousedown', () => {
       windowEl.style.zIndex = ++previewState.zIndexCounter;
+      saveWindowStates();
     }, { capture: true });
 
     const addressBar = document.createElement('div');
@@ -51,7 +83,7 @@ function createPreviewWindow(url, initialX, initialY) {
     const addressInput = document.createElement('input');
     addressInput.type = 'text';
     addressInput.className = 'preview-address-input';
-    addressInput.value = url;
+    addressInput.value = savedState ? savedState.url : url;
 
     const goBtn = document.createElement('button');
     goBtn.textContent = 'Go';
@@ -65,45 +97,122 @@ function createPreviewWindow(url, initialX, initialY) {
 
     const iframe = document.createElement('iframe');
     iframe.className = 'preview-iframe';
-    iframe.src = url;
+    iframe.src = savedState ? savedState.url : url;
+
+    const searchResultsEl = document.createElement('ul');
+    searchResultsEl.className = 'preview-search-results';
+    searchResultsEl.style.display = 'none';
+    addressBar.appendChild(searchResultsEl);
+
+    let searchResults = [];
+    let selectedSearchIndex = -1;
+
+    const updateSearchDropdown = () => {
+        searchResultsEl.innerHTML = '';
+        if(searchResults.length === 0) {
+            searchResultsEl.style.display = 'none';
+            return;
+        }
+        searchResults.forEach((result, index) => {
+            const li = document.createElement('li');
+            li.className = 'preview-result-item';
+            li.innerHTML = `<span class="preview-result-path">${result.doc.path.substring(1)}</span> <span class="preview-result-garden">[${result.doc.garden}]</span>`;
+            if (index === selectedSearchIndex) li.classList.add('active');
+            li.onmousedown = (e) => {
+                e.preventDefault();
+                addressInput.value = `/${result.doc.garden}#${result.doc.path}?windowed=true`;
+                loadUrl();
+                searchResultsEl.style.display = 'none';
+            };
+            searchResultsEl.appendChild(li);
+        });
+        searchResultsEl.style.display = 'block';
+    };
+    
+    addressInput.addEventListener('input', async (e) => {
+      const query = e.target.value;
+      if (!query || query.startsWith('/')) {
+        searchResults = [];
+        updateSearchDropdown();
+        return;
+      }
+      const results = await window.thoughtform.commandPalette.unifiedIndex.searchAsync(query, { enrich: true, limit: 10 });
+      searchResults = results[0]?.result || [];
+      selectedSearchIndex = 0;
+      updateSearchDropdown();
+    });
+
+    addressInput.addEventListener('keydown', (e) => {
+        if (searchResultsEl.style.display !== 'none') {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedSearchIndex = Math.min(selectedSearchIndex + 1, searchResults.length - 1);
+                updateSearchDropdown();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedSearchIndex = Math.max(selectedSearchIndex - 1, 0);
+                updateSearchDropdown();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedSearchIndex > -1 && searchResults[selectedSearchIndex]) {
+                    const result = searchResults[selectedSearchIndex];
+                    addressInput.value = `/${result.doc.garden}#${result.doc.path}?windowed=true`;
+                    loadUrl();
+                } else {
+                    loadUrl();
+                }
+                searchResults = [];
+                updateSearchDropdown();
+            } else if (e.key === 'Escape') {
+                searchResults = [];
+                updateSearchDropdown();
+            }
+        } else if (e.key === 'Enter') {
+            loadUrl();
+        }
+    });
+    
+    addressInput.addEventListener('blur', () => setTimeout(() => { searchResultsEl.style.display = 'none' }, 150));
+    addressInput.addEventListener('focus', () => { if(searchResults.length > 0) searchResultsEl.style.display = 'block'; });
 
     const loadUrl = () => {
-      // Use the iframe's contentWindow to navigate, which preserves the origin
-      // and avoids cross-origin issues when the base path changes.
       if (iframe.contentWindow) {
           try {
              iframe.contentWindow.location.href = new URL(addressInput.value, window.location.origin).href;
-          } catch(e) {
-             addressInput.value = iframe.src;
-          }
+          } catch(e) { addressInput.value = iframe.src; }
       }
     };
     goBtn.onclick = loadUrl;
-    addressInput.onkeydown = (e) => { if(e.key === 'Enter') loadUrl(); };
 
     windowEl.append(addressBar, iframe);
 
-    const { innerWidth, innerHeight } = window;
-    const winWidth = 640;
-    const winHeight = 424;
-    const offset = (previewState.activeWindows.size % 5) * 25; // Cascade up to 5 windows
-    
-    let top = initialY + 20 + offset;
-    let left = initialX + 20 + offset;
-
-    if (left + winWidth > innerWidth) left = initialX - winWidth - 20 - offset;
-    if (top + winHeight > innerHeight) top = initialY - winHeight - 20 - offset;
-    
-    windowEl.style.left = `${Math.max(5, left)}px`;
-    windowEl.style.top = `${Math.max(5, top)}px`;
+    if (savedState) {
+        windowEl.style.left = `${savedState.left}px`;
+        windowEl.style.top = `${savedState.top}px`;
+        windowEl.style.width = `${savedState.width}px`;
+        windowEl.style.height = `${savedState.height}px`;
+    } else {
+        const { innerWidth, innerHeight } = window;
+        const offset = (previewState.activeWindows.size % 5) * 25;
+        let top = initialY + 20 + offset;
+        let left = initialX + 20 + offset;
+        if (left + 640 > innerWidth) left = initialX - 640 - 20 - offset;
+        if (top + 424 > innerHeight) top = initialY - 424 - 20 - offset;
+        windowEl.style.left = `${Math.max(5, left)}px`;
+        windowEl.style.top = `${Math.max(5, top)}px`;
+    }
 
     document.getElementById('preview-windows-container').appendChild(windowEl);
     previewState.activeWindows.set(windowId, windowEl);
     
-    setTimeout(() => windowEl.classList.add('visible'), 10);
+    new ResizeObserver(saveWindowStates).observe(windowEl);
+    
+    setTimeout(() => {
+        windowEl.classList.add('visible');
+        if (!savedState) saveWindowStates();
+    }, 10);
 }
 
-// --- Communication with iframes ---
 window.addEventListener('message', (event) => {
   const { type, payload } = event.data;
   const iframe = event.source.frameElement;
@@ -115,33 +224,26 @@ window.addEventListener('message', (event) => {
   switch (type) {
     case 'preview-focus':
       previewWindow.style.zIndex = ++previewState.zIndexCounter;
+      saveWindowStates();
       break;
     case 'preview-url-changed':
       const addressInput = previewWindow.querySelector('.preview-address-input');
       if (addressInput && payload.newUrl) {
-          // Reconstruct a root-relative URL for the address bar
           const url = new URL(payload.newUrl);
           addressInput.value = `${url.pathname}${url.hash}`;
+          saveWindowStates();
       }
       break;
     case 'request-preview-window':
-      if (payload) {
-        createPreviewWindow(payload.url, payload.clientX, payload.clientY);
-      }
+      if (payload) createPreviewWindow(payload.url, payload.clientX, payload.clientY);
       break;
   }
 });
 
-
-// --- Drag and Resize Logic ---
 function startDrag(windowEl, e) {
+  windowEl.classList.add('is-dragging');
   const rect = windowEl.getBoundingClientRect();
-  previewState.dragState = {
-    windowEl,
-    offsetX: e.clientX - rect.left,
-    offsetY: e.clientY - rect.top,
-  };
-
+  previewState.dragState = { windowEl, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd, { once: true });
 }
@@ -155,12 +257,14 @@ function onDragMove(e) {
 }
 
 function onDragEnd() {
+  if (previewState.dragState) {
+    previewState.dragState.windowEl.classList.remove('is-dragging');
+    saveWindowStates();
+  }
   previewState.dragState = null;
   document.removeEventListener('mousemove', onDragMove);
 }
 
-
-// --- Main Plugin Class ---
 const wikilinkDecoration = Decoration.mark({ class: 'cm-wikilink' });
 
 class WikilinkPlugin {
@@ -168,6 +272,7 @@ class WikilinkPlugin {
     this.view = view;
     this.decorations = this.findWikilinks(view);
     this.longPressTimeout = null;
+    this.isWindowed = window.self !== window.top;
 
     this.onMouseDown = this.onMouseDown.bind(this);
     this.onMouseUp = this.onMouseUp.bind(this);
@@ -182,6 +287,14 @@ class WikilinkPlugin {
     this.view.dom.addEventListener('touchend', this.onTouchEnd);
     this.view.dom.addEventListener('touchmove', this.onTouchMove, { passive: true });
     this.view.dom.addEventListener('mouseover', this.onMouseOver);
+    
+    if (!this.isWindowed && !window.thoughtform_windows_loaded) {
+        if (window.thoughtform && window.thoughtform.ui && !window.thoughtform.ui.openWindow) {
+            window.thoughtform.ui.openWindow = createPreviewWindow;
+        }
+        loadWindowStates();
+        window.thoughtform_windows_loaded = true;
+    }
   }
 
   destroy() {
@@ -199,31 +312,30 @@ class WikilinkPlugin {
     const linkEl = event.target.closest('.cm-wikilink');
     if (!linkEl) return;
 
+    // THIS IS THE FIX: Implement a cooldown per link.
+    const now = Date.now();
+    if (linkEl.textContent === previewState.lastSpawnedLink && (now - previewState.lastSpawnTime < 500)) {
+        return; // Cooldown active for this specific link, do nothing.
+    }
+
     const appContext = this.view.state.field(appContextField);
     const linkContent = linkEl.textContent.slice(2, -2);
     const url = getLinkURL(linkContent, appContext);
     
-    const isNestedPreview = window.self !== window.top;
-    if (isNestedPreview) {
-        window.top.postMessage({
-            type: 'request-preview-window',
-            payload: {
-                url: url,
-                clientX: event.clientX,
-                clientY: event.clientY,
-            }
-        }, '*');
-        return;
+    if (this.isWindowed) {
+        window.top.postMessage({ type: 'request-preview-window', payload: { url, clientX: event.clientX, clientY: event.clientY }}, '*');
+    } else {
+        createPreviewWindow(url, event.clientX, event.clientY);
     }
-
-    createPreviewWindow(url, event.clientX, event.clientY);
+    
+    // THIS IS THE FIX: Update the state after spawning.
+    previewState.lastSpawnedLink = linkEl.textContent;
+    previewState.lastSpawnTime = now;
   }
 
   handleNavigation(linkEl) {
     const appContext = this.view.state.field(appContextField);
-    if (appContext.editor) {
-      appContext.editor.navigateTo(linkEl.textContent.slice(2, -2));
-    }
+    if (appContext.editor) appContext.editor.navigateTo(linkEl.textContent.slice(2, -2));
   }
 
   onMouseDown(event) {
@@ -231,7 +343,6 @@ class WikilinkPlugin {
     if (linkEl && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       const linkContent = linkEl.textContent.slice(2, -2);
-      
       if (event.shiftKey) {
         const appContext = this.view.state.field(appContextField);
         if (appContext && appContext.editor && appContext.editor.paneId) {
@@ -243,10 +354,7 @@ class WikilinkPlugin {
     }
   }
 
-  onMouseUp() {
-    this.clearLongPressTimeout();
-  }
-
+  onMouseUp() { this.clearLongPressTimeout(); }
   onTouchStart(event) {
     const linkEl = event.target.closest('.cm-wikilink');
     if (linkEl) {
@@ -257,15 +365,8 @@ class WikilinkPlugin {
       }, 500);
     }
   }
-
-  onTouchEnd() {
-    this.clearLongPressTimeout();
-  }
-  
-  onTouchMove() {
-      this.clearLongPressTimeout();
-  }
-
+  onTouchEnd() { this.clearLongPressTimeout(); }
+  onTouchMove() { this.clearLongPressTimeout(); }
   clearLongPressTimeout() {
     if (this.longPressTimeout) {
       clearTimeout(this.longPressTimeout);

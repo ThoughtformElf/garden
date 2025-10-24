@@ -2,7 +2,6 @@ import FlexSearch from 'flexsearch';
 import { Git } from './git-integration.js';
 import { executeFile } from '../workspace/executor.js';
 
-// A set of common binary extensions to skip during indexing.
 const binaryExtensions = new Set([
   'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp', 'tiff',
   'mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a',
@@ -13,7 +12,6 @@ const binaryExtensions = new Set([
   'db', 'sqlite', 'bin', 'exe', 'dll', 'iso'
 ]);
 
-// Debounce function to limit how often search is called
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -32,27 +30,24 @@ export class CommandPalette {
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
-    this.mode = 'searchFiles'; // Default mode
-    this.lastEditorState = null; // To store editor and selection for link insertion
+    this.mode = 'searchFiles';
+    this.lastEditorState = null;
     
     this.isIndexing = false;
     this.indexPromise = null;
     this.isIndexBuilt = false;
 
-    // The new unified index for paths and content
     this.unifiedIndex = new FlexSearch.Document({
-        document: {
-            id: "id",
-            index: ["pathSearch", "content"], // Index both a path string and the content
-            store: ["garden", "path"]
-        },
+        document: { id: "id", index: ["pathSearch", "content"], store: ["garden", "path"] },
         tokenize: "forward"
     });
 
+    // THIS IS THE FIX: Bind normal methods, and create the debounced one as a new property.
     this.handleKeyDown = this.handleKeyDown.bind(this);
-    this.handleInput = debounce(this.handleInput.bind(this), 150);
     this.handleResultClick = this.handleResultClick.bind(this);
     this.close = this.close.bind(this);
+    this.debouncedHandleInput = debounce(this.handleInput.bind(this), 150);
+    
     this.createDOMElements();
     this.listenForFileChanges();
   }
@@ -72,7 +67,8 @@ export class CommandPalette {
     this.input = document.createElement('input');
     this.input.type = 'text';
     this.input.className = 'command-input';
-    this.input.addEventListener('input', this.handleInput);
+    // THIS IS THE FIX: Use the new debounced handler property.
+    this.input.addEventListener('input', this.debouncedHandleInput);
 
     this.resultsList = document.createElement('ul');
     this.resultsList.className = 'command-results-list';
@@ -89,25 +85,25 @@ export class CommandPalette {
     if (window.thoughtform && window.thoughtform.events) {
         const updateIndex = (eventType, data) => {
             if (!this.isIndexBuilt || this.isIndexing) return;
-
             const extension = data.path.split('.').pop()?.toLowerCase();
             if (binaryExtensions.has(extension) && eventType !== 'file:delete') return;
+
+            const pathSearch = `${data.gardenName} ${data.path.substring(1)}`.toLowerCase();
+            const id = `${data.gardenName}#${data.path}`;
 
             switch(eventType) {
                 case 'file:create':
                     window.thoughtform.workspace.getGitClient(data.gardenName).then(git => {
                         git.readFile(data.path).then(content => {
-                            const pathSearch = `${data.gardenName} ${data.path.substring(1)}`.toLowerCase();
-                            this.unifiedIndex.add({ id: `${data.gardenName}#${data.path}`, garden: data.gardenName, path: data.path, pathSearch, content });
+                            this.unifiedIndex.add({ id, garden: data.gardenName, path: data.path, pathSearch, content });
                         });
                     });
                     break;
                 case 'file:update':
-                    const pathSearch = `${data.gardenName} ${data.path.substring(1)}`.toLowerCase();
-                    this.unifiedIndex.update({ id: `${data.gardenName}#${data.path}`, garden: data.gardenName, path: data.path, pathSearch, content: data.content });
+                    this.unifiedIndex.update({ id, garden: data.gardenName, path: data.path, pathSearch, content: data.content });
                     break;
                 case 'file:delete':
-                    this.unifiedIndex.remove(`${data.gardenName}#${data.path}`);
+                    this.unifiedIndex.remove(id);
                     break;
             }
         };
@@ -136,9 +132,10 @@ export class CommandPalette {
                 if (!file.isDirectory) {
                     const extension = file.path.split('.').pop()?.toLowerCase();
                     const pathSearch = `${gardenName} ${file.path.substring(1)}`.toLowerCase();
+                    const id = `${gardenName}#${file.path}`;
 
                     if (binaryExtensions.has(extension)) {
-                        this.unifiedIndex.add({ id: `${gardenName}#${file.path}`, garden: gardenName, path: file.path, pathSearch, content: "" });
+                        this.unifiedIndex.add({ id, garden: gardenName, path: file.path, pathSearch, content: "" });
                         indexedCount++;
                         continue;
                     }
@@ -146,7 +143,7 @@ export class CommandPalette {
                     try {
                         const content = await tempGitClient.readFile(file.path);
                         if (typeof content === 'string') {
-                            this.unifiedIndex.add({ id: `${gardenName}#${file.path}`, garden: gardenName, path: file.path, pathSearch, content });
+                            this.unifiedIndex.add({ id, garden: gardenName, path: file.path, pathSearch, content });
                             indexedCount++;
                         }
                     } catch (e) { /* Silently fail on unreadable files */ }
@@ -171,18 +168,13 @@ export class CommandPalette {
     this.isOpen = true;
     this.mode = mode;
 
-    // Capture the editor state at the moment the palette is opened
     const activeEditor = window.thoughtform.workspace.getActiveEditor();
     if (activeEditor && activeEditor.editorView) {
-        this.lastEditorState = {
-            editor: activeEditor,
-            selection: activeEditor.editorView.state.selection.main
-        };
+        this.lastEditorState = { editor: activeEditor, selection: activeEditor.editorView.state.selection.main };
     } else {
         this.lastEditorState = null;
     }
 
-    // Configure UI based on mode
     switch(this.mode) {
         case 'executeCommand':
             this.titleElement.textContent = 'Execute Command';
@@ -223,12 +215,10 @@ export class CommandPalette {
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
-    this.lastEditorState = null; // Clear the saved editor state
+    this.lastEditorState = null;
     document.removeEventListener('keydown', this.handleKeyDown);
     const activeEditor = window.thoughtform.workspace.getActiveEditor();
-    if (activeEditor && activeEditor.editorView) {
-      activeEditor.editorView.focus();
-    }
+    if (activeEditor && activeEditor.editorView) activeEditor.editorView.focus();
   }
 
   async search(query) {
@@ -241,7 +231,7 @@ export class CommandPalette {
     }
 
     let searchConfig = { enrich: true, limit: 100 };
-    let searchField = "pathSearch"; // Default for files and commands
+    let searchField = "pathSearch";
 
     if (this.mode === 'searchContent') {
         searchField = "content";
@@ -253,7 +243,6 @@ export class CommandPalette {
         const searchResults = await this.unifiedIndex.searchAsync(this.query, { index: searchField, ...searchConfig });
         flatResults = searchResults[0]?.result || [];
     } else if (this.mode !== 'searchContent') {
-        // For file/command search, show all if query is empty
         flatResults = this.unifiedIndex.search({ index: searchField, ...searchConfig })[0]?.result || [];
     }
 
@@ -269,7 +258,7 @@ export class CommandPalette {
         const bIsCurrent = b.doc.garden === currentGardenName;
         if (aIsCurrent && !bIsCurrent) return -1;
         if (!aIsCurrent && bIsCurrent) return 1;
-        return a.doc.path.localeCompare(b.doc.path); // Alphabetical sort as fallback
+        return a.doc.path.localeCompare(b.doc.path);
     });
 
     this.results = flatResults;
@@ -285,9 +274,8 @@ export class CommandPalette {
         const queryLower = this.query.toLowerCase();
         let bestLine = lines.find(line => line.toLowerCase().includes(queryLower));
         
-        if (!bestLine) {
-            bestLine = lines.find(line => line.trim() !== '') || "No content preview available.";
-        }
+        if (!bestLine) bestLine = lines.find(line => line.trim() !== '') || "No content preview available.";
+
         const regex = new RegExp(this.query.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
         return bestLine.trim().replace(regex, '<mark>$&</mark>');
     } catch (e) {
@@ -314,10 +302,7 @@ export class CommandPalette {
         
         if (this.mode === 'searchContent') {
             const snippet = await this.getSnippet(file.garden, file.path);
-            li.innerHTML = `
-                <div class="command-path">${gardenSpan} ${pathText}</div>
-                <div class="global-search-snippet">${snippet}</div>
-            `;
+            li.innerHTML = `<div class="command-path">${gardenSpan} ${pathText}</div><div class="global-search-snippet">${snippet}</div>`;
         } else {
             li.innerHTML = `<div class="command-path">${gardenSpan} ${pathText}</div>`;
         }
@@ -338,10 +323,7 @@ export class CommandPalette {
     if (this.mode === 'executeCommand') {
         const editor = window.thoughtform.workspace.getActiveEditor();
         const git = await window.thoughtform.workspace.getActiveGitClient();
-        if (editor && git) {
-            const fullPath = `${file.garden}#${file.path}`;
-            executeFile(fullPath, editor, git);
-        }
+        if (editor && git) executeFile(`${file.garden}#${file.path}`, editor, git);
     } else {
         window.thoughtform.workspace.openFile(file.garden, file.path);
     }
@@ -358,12 +340,7 @@ export class CommandPalette {
     const activeGarden = editor.gitClient.gardenName;
     
     const targetPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
-    let linkContent;
-    if (file.garden === activeGarden) {
-        linkContent = targetPath;
-    } else {
-        linkContent = `${file.garden}#${targetPath}`;
-    }
+    let linkContent = (file.garden === activeGarden) ? targetPath : `${file.garden}#${targetPath}`;
     const linkText = `[[${linkContent}]]`;
 
     editor.editorView.dispatch({
@@ -378,24 +355,32 @@ export class CommandPalette {
     if (index < 0 || index >= this.results.length || !this.lastEditorState) return;
 
     const { editor } = this.lastEditorState;
-    if (!editor || !editor.paneId) {
-        console.error('[CommandPalette] Cannot open in new pane, source editor or paneId not found.');
-        return;
-    }
+    if (!editor || !editor.paneId) return;
 
     const file = this.results[index].doc;
     const sourceGarden = editor.gitClient.gardenName;
     
     const targetPath = file.path.startsWith('/') ? file.path.substring(1) : file.path;
-    let linkContent;
-    if (file.garden === sourceGarden) {
-        linkContent = targetPath;
-    } else {
-        linkContent = `${file.garden}#${targetPath}`;
-    }
+    let linkContent = (file.garden === sourceGarden) ? targetPath : `${file.garden}#${targetPath}`;
 
     window.thoughtform.workspace.openInNewPane(linkContent, editor.paneId);
+    this.close();
+  }
+  
+  async openInWindow(index) {
+    if (index < 0 || index >= this.results.length) return;
+    if (typeof window.thoughtform.ui.openWindow !== 'function') {
+        console.error("Windowing function not available.");
+        return;
+    }
+
+    const file = this.results[index].doc;
+    const url = `/${file.garden}#${file.path}?windowed=true`;
     
+    const x = window.innerWidth / 2;
+    const y = window.innerHeight / 2;
+
+    window.thoughtform.ui.openWindow(url, x, y);
     this.close();
   }
 
@@ -426,7 +411,9 @@ export class CommandPalette {
       case 'Enter':
         e.preventDefault();
         if (this.results.length > 0) {
-            if (e.shiftKey && (e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
+            if (e.altKey && this.mode !== 'executeCommand') {
+                await this.openInWindow(this.selectedIndex);
+            } else if (e.shiftKey && (e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
                 await this.openInNewPane(this.selectedIndex);
             } else if ((e.ctrlKey || e.metaKey) && this.mode !== 'executeCommand') {
                 await this.insertLink(this.selectedIndex);
