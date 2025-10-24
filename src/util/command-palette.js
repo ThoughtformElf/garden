@@ -42,7 +42,6 @@ export class CommandPalette {
         tokenize: "forward"
     });
 
-    // THIS IS THE FIX: Bind normal methods, and create the debounced one as a new property.
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleResultClick = this.handleResultClick.bind(this);
     this.close = this.close.bind(this);
@@ -67,7 +66,6 @@ export class CommandPalette {
     this.input = document.createElement('input');
     this.input.type = 'text';
     this.input.className = 'command-input';
-    // THIS IS THE FIX: Use the new debounced handler property.
     this.input.addEventListener('input', this.debouncedHandleInput);
 
     this.resultsList = document.createElement('ul');
@@ -369,18 +367,25 @@ export class CommandPalette {
   
   async openInWindow(index) {
     if (index < 0 || index >= this.results.length) return;
-    if (typeof window.thoughtform.ui.openWindow !== 'function') {
-        console.error("Windowing function not available.");
-        return;
-    }
-
+    
     const file = this.results[index].doc;
     const url = `/${file.garden}#${file.path}?windowed=true`;
     
     const x = window.innerWidth / 2;
     const y = window.innerHeight / 2;
 
-    window.thoughtform.ui.openWindow(url, x, y);
+    // THIS IS THE FIX: Check context before attempting to open a window.
+    const isNested = window.self !== window.top;
+    if (isNested) {
+        // If we are in an iframe, delegate to the top-level window.
+        window.top.postMessage({ type: 'request-preview-window', payload: { url, clientX: x, clientY: y }}, '*');
+    } else if (typeof window.thoughtform.ui.openWindow === 'function') {
+        // Otherwise, if we are the top-level window, open it directly.
+        window.thoughtform.ui.openWindow(url, x, y);
+    } else {
+        console.error("Windowing function not available.");
+    }
+    
     this.close();
   }
 
