@@ -257,10 +257,26 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
 }
 
 window.addEventListener('message', (event) => {
-  const { type, payload } = event.data;
-  const iframe = event.source.frameElement;
-  if (!iframe) return;
+  // --- THIS IS THE FIX ---
+  // Defensively check the message structure and wrap the dangerous access
+  // in a try...catch block to handle cross-origin security errors.
+  if (!event.data || typeof event.data.type === 'undefined') {
+    return;
+  }
 
+  let iframe;
+  try {
+    iframe = event.source.frameElement;
+  } catch (e) {
+    // This error is expected if the message is from a cross-origin iframe
+    // that we don't control, like Eruda's dev tools. We can safely ignore it.
+    return;
+  }
+  
+  if (!iframe) return;
+  // --- END OF FIX ---
+
+  const { type, payload } = event.data;
   const previewWindow = iframe.closest('.preview-window');
   if (!previewWindow) return;
 

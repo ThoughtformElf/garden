@@ -1,36 +1,71 @@
 import { streamChatCompletion as streamGemini } from './models/gemini.js';
+import { streamChatCompletion as streamOpenAICompatible } from './models/openai-compatible.js';
 import { TaskRunner } from '../agent/runner.js';
 import { countTokens } from 'gpt-tokenizer';
 
 class AiService {
   constructor() {
     this.config = {
+      // Default structure
+      activeProvider: 'gemini',
       geminiApiKey: '',
-      geminiModelName: 'gemini-2.5-flash'
+      geminiModelName: 'gemini-2.5-flash',
+      customEndpointUrl: '',
+      customModelName: '',
+      customApiKey: '',
     };
     this.activeAgentControllers = new Map(); // Track running agents per pane
     this.loadConfig();
   }
 
   loadConfig() {
+    this.config.activeProvider = localStorage.getItem('thoughtform_ai_provider') || 'gemini';
     this.config.geminiApiKey = localStorage.getItem('thoughtform_gemini_api_key') || '';
-    const savedModel = localStorage.getItem('thoughtform_gemini_model_name');
-    this.config.geminiModelName = savedModel || 'gemini-2.5-flash';
+    this.config.geminiModelName = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
+    this.config.customEndpointUrl = localStorage.getItem('thoughtform_custom_endpoint_url') || '';
+    this.config.customModelName = localStorage.getItem('thoughtform_custom_model_name') || '';
+    this.config.customApiKey = localStorage.getItem('thoughtform_custom_api_key') || '';
   }
 
-  saveConfig(apiKey, modelName) {
-    localStorage.setItem('thoughtform_gemini_api_key', apiKey || '');
-    localStorage.setItem('thoughtform_gemini_model_name', modelName || '');
+  // This method is no longer needed as the devtools panel handles saving directly.
+  saveConfig(newConfig) {
     this.loadConfig();
   }
-
+  
   async getCompletion(prompt, onTokenCount, signal) {
-    this.loadConfig();
-    if (!this.config.geminiApiKey) {
-      throw new Error('Gemini API key is not set. Get a key from https://aistudio.google.com/app/api-keys and add it in the DevTools > AI panel.');
+    this.loadConfig(); // Ensure config is fresh for every call
+
+    let streamPromise;
+    const provider = this.config.activeProvider;
+
+    if (provider === 'gemini') {
+      if (!this.config.geminiApiKey) {
+        throw new Error('Active provider is Gemini, but the API key is not set. Get a key from https://aistudio.google.com/ and add it in the DevTools > AI panel.');
+      }
+      streamPromise = streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
+    } else if (provider === 'custom') {
+      // --- THIS IS THE FIX (Part 1) ---
+      // Use the configured endpoint or fall back to the Ollama default.
+      const endpointToUse = this.config.customEndpointUrl || 'http://localhost:11434/v1';
+
+      // The model name is required and cannot be defaulted. Throw a specific error.
+      if (!this.config.customModelName) {
+         throw new Error('Active provider is Custom, but Model Name is not set. You must specify a model (e.g., "llama3") in the DevTools > AI panel.');
+      }
+      
+      streamPromise = streamOpenAICompatible(
+        endpointToUse,
+        this.config.customApiKey,
+        this.config.customModelName,
+        prompt,
+        signal
+      );
+      // --- END OF FIX (Part 1) ---
+    } else {
+        throw new Error(`Unknown AI provider selected: "${provider}"`);
     }
-    
-    const originalStream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
+
+    const originalStream = await streamPromise;
 
     if (!onTokenCount) {
         return originalStream;
@@ -54,23 +89,13 @@ class AiService {
   }
 
   async getCompletionAsString(prompt, onTokenCount, signal) {
-      this.loadConfig();
-      if (!this.config.geminiApiKey) {
-        throw new Error('Gemini API key is not set. Get a key from https://aistudio.google.com/app/api-keys and add it in the DevTools > AI panel.');
-      }
-      const stream = await streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
+      const stream = await this.getCompletion(prompt, onTokenCount, signal);
       const reader = stream.getReader();
       let fullResponse = '';
       while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           fullResponse += value;
-      }
-      
-      if (onTokenCount) {
-          const inputTokens = countTokens(prompt);
-          const outputTokens = countTokens(fullResponse);
-          onTokenCount({ input: inputTokens, output: outputTokens });
       }
       return fullResponse;
   }
@@ -194,8 +219,6 @@ class AiService {
       if (error.name === 'AbortError') {
         console.log('AI chat request was intentionally cancelled by the user.');
         if (contentStartPos !== -1) {
-          // Replace everything from the start of the response tag to the end of the agent's output
-          // with a clean cancellation message.
           const startReplacePos = contentStartPos - '\n<response>\n'.length;
           const cancelledText = '🛑 Agent cancelled by user.';
           view.dispatch({ 
