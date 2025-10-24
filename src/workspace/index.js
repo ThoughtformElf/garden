@@ -27,8 +27,12 @@ export class WorkspaceManager {
     this._paneManager = new PaneManager(this);
     this._stateManager = new WorkspaceStateManager(this);
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const isPreview = urlParams.has('preview');
     const savedState = this._stateManager.loadState();
-    if (savedState) {
+
+    // THIS IS THE FIX: If we are in preview mode, IGNORE the saved state.
+    if (savedState && !isPreview) {
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
         this.initialEditorStates = savedState.editorStates || {};
@@ -138,21 +142,18 @@ export class WorkspaceManager {
     }
 
     await editor.loadFile(path);
-    this.setActivePane(this.activePaneId); // Call setActivePane to handle focus and state saving
-    // No need to save state here, setActivePane does it.
+    this.setActivePane(this.activePaneId);
   }
 
   async openInNewPane(linkContent, sourcePaneId) {
     if (!linkContent || !sourcePaneId) return;
 
-    // 1. Get the context of the pane where the action was triggered.
     const sourceEditor = this.panes.get(sourcePaneId)?.editor;
     if (!sourceEditor) {
         console.error(`[Workspace] Could not find source editor for pane ID: ${sourcePaneId}`);
         return;
     }
 
-    // 2. Resolve the wikilink content into a garden and path.
     let path = linkContent.split('|')[0].trim();
     let garden = null;
   
@@ -173,13 +174,11 @@ export class WorkspaceManager {
         finalPath = foundPath || (path.startsWith('/') ? path : `/${path}`);
     }
     
-    // 3. Determine the split direction based on the source pane's dimensions.
     const sourcePane = this.panes.get(sourcePaneId);
     if (!sourcePane || !sourcePane.element) return;
     const paneElement = sourcePane.element;
     const direction = paneElement.offsetWidth > paneElement.offsetHeight ? 'vertical' : 'horizontal';
 
-    // 4. Call the enhanced splitPane method with the file info.
     await this.splitPane(sourcePaneId, direction, { garden: finalGarden, path: finalPath });
   }
 
@@ -246,7 +245,7 @@ export class WorkspaceManager {
       const editor = pane.editor;
       if (editor.gitClient.gardenName === gardenName && editor.filePath === oldPath) {
         editor.filePath = newPath;
-        editor.refreshStatusBar(); // Explicitly update the status bar
+        editor.refreshStatusBar();
         if (editor.paneId === this.activePaneId) {
           activePaneWasUpdated = true;
         }

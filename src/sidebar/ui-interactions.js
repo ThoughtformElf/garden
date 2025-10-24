@@ -107,8 +107,13 @@ function initializeSidebarInteractions() {
   resizer.addEventListener('touchstart', sidebarStartResize, { passive: false });
 
   // Restore State
+  const urlParams = new URLSearchParams(window.location.search);
+  const isPreview = urlParams.has('preview');
+  
   const savedWidth = localStorage.getItem('sidebarWidth');
-  const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  // THIS IS THE FIX: Force collapse if in preview mode, otherwise use saved state
+  const isCollapsed = isPreview || localStorage.getItem('sidebarCollapsed') === 'true';
+
   if (isCollapsed) {
     container.classList.add('sidebar-collapsed');
     document.documentElement.style.setProperty('--sidebar-width', '0px');
@@ -236,4 +241,3 @@ function initializeErudaResizer() {
   });
   observer.observe(erudaContainer, { childList: true });
 }
-
