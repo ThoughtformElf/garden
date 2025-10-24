@@ -45,10 +45,10 @@ import defaultWebSearchJs from './tools/webSearch.js?raw';
 import defaultListFilesJs from './tools/listFiles.js?raw';
 import defaultRequestMemoryCompressionJs from './tools/requestMemoryCompression.js?raw';
 
-// --- NEW QUERY SCRIPTS ---
+// --- QUERY SCRIPTS ---
 import defaultQueryModelJs from './query/model.js?raw';
 import defaultQueryApiJs from './query/api.js?raw';
-import defaultQueryApiKeyJs from './query/apiKey.js?raw';
+import defaultQueryApiKeyJs from './query/apikey.js?raw'; // Corrected import path
 
 
 export const defaultFiles = [
@@ -97,8 +97,8 @@ export const defaultFiles = [
   ['/settings/tools/listFiles.js', defaultListFilesJs],
   ['/settings/tools/requestMemoryCompression.js', defaultRequestMemoryCompressionJs],
 
-  // --- NEW QUERY SCRIPTS ---
+  // --- QUERY SCRIPTS ---
   ['/settings/query/model.js', defaultQueryModelJs],
   ['/settings/query/api.js', defaultQueryApiJs],
-  ['/settings/query/apiKey.js', defaultQueryApiKeyJs],
+  ['/settings/query/apikey.js', defaultQueryApiKeyJs], // Corrected script path
 ];

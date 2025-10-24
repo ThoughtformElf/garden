@@ -9,9 +9,8 @@ export class UrlManager {
   }
 
   /**
-   * Reads parameters from the current URL hash and updates the session state.
-   * This is the single source of truth for session-wide parameters and MUST be
-   * called at the beginning of any navigation event.
+   * Reads parameters from the current URL hash, normalizes them (lowercase keys, decoded values),
+   * and updates the session state. This is the single source of truth for the session.
    */
   updateFromUrl() {
     const hash = window.location.hash;
@@ -21,14 +20,21 @@ export class UrlManager {
       const queryString = hash.substring(queryStringIndex + 1);
       const urlParams = new URLSearchParams(queryString);
       
-      this.sessionParams = urlParams;
-      sessionStorage.setItem('thoughtform_session_params', this.sessionParams.toString());
+      const normalizedParams = {};
+      for (const [key, value] of urlParams.entries()) {
+        normalizedParams[key.toLowerCase()] = value;
+      }
+      
+      this.sessionParams = new URLSearchParams(normalizedParams);
+      sessionStorage.setItem('thoughtform_session_params', JSON.stringify(normalizedParams));
       
     } else {
-      // If the URL has no params, we CLEAR the session params. This allows the user
-      // to create a "clean" session by manually removing the query string.
-      this.sessionParams = new URLSearchParams();
-      sessionStorage.removeItem('thoughtform_session_params');
+      // If the URL has no params, but we have stored ones, it means the user manually
+      // navigated back to a clean URL. We should clear the session state.
+      if (sessionStorage.getItem('thoughtform_session_params')) {
+        this.sessionParams = new URLSearchParams();
+        sessionStorage.removeItem('thoughtform_session_params');
+      }
     }
   }
 
@@ -54,7 +60,6 @@ export class UrlManager {
     const pathname = `${basePath}/${encodeURIComponent(garden)}`;
     const hashPath = `#${encodeURI(path)}`;
 
-    // Create a mutable copy of the session params to work with.
     const finalParams = new URLSearchParams(this.sessionParams);
 
     if (isForWindow) {

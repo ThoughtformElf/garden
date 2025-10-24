@@ -29,7 +29,6 @@ export class WorkspaceManager {
     this._stateManager = new WorkspaceStateManager(this);
     this._urlManager = new UrlManager();
 
-    // The UrlManager now handles reading from sessionStorage, so we only need to check its state.
     const isWindowed = this._urlManager.getSessionParams().has('windowed');
     const savedState = this._stateManager.loadState();
 
@@ -62,12 +61,9 @@ export class WorkspaceManager {
     };
   }
   
-  // --- THIS IS THE FIX (Part 1) ---
-  // Public method to be called by the main navigation listener.
   updateSessionFromUrl() {
     this._urlManager.updateFromUrl();
   }
-  // --- END OF FIX (Part 1) ---
   
   async getGitClient(gardenName) {
       if (!this.gitClients.has(gardenName)) {

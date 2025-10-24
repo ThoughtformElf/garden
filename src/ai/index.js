@@ -27,16 +27,21 @@ class AiService {
     this.config.customApiKey = localStorage.getItem('thoughtform_custom_api_key') || '';
   }
 
-  // This method is no longer needed as the devtools panel handles saving directly.
   saveConfig(newConfig) {
     this.loadConfig();
   }
   
   async getCompletion(prompt, onTokenCount, signal) {
-    // No longer calling loadConfig() here, allowing for temporary overrides.
-
     let streamPromise;
-    const provider = this.config.activeProvider;
+    let provider = this.config.activeProvider;
+
+    // --- THIS IS THE FIX ---
+    // If the config for this specific run contains any custom settings (either from
+    // localStorage or from a URL override), implicitly switch to the custom provider.
+    if (this.config.customModelName || this.config.customEndpointUrl) {
+        provider = 'custom';
+    }
+    // --- END OF FIX ---
 
     if (provider === 'gemini') {
       if (!this.config.geminiApiKey) {
@@ -85,7 +90,6 @@ class AiService {
   }
 
   async getCompletionAsString(prompt, onTokenCount, signal) {
-      // No longer calling loadConfig() here.
       const stream = await this.getCompletion(prompt, onTokenCount, signal);
       const reader = stream.getReader();
       let fullResponse = '';
@@ -143,22 +147,18 @@ class AiService {
       const rawContext = view.state.doc.toString();
       const initialContext = rawContext.replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
 
-      // --- THIS IS THE REFACTOR ---
-      // Check for per-session overrides on the editor instance. If they exist,
-      // create a temporary proxy of the AiService with the overridden config.
-      let serviceForRunner = this; // Default to the global AiService instance
+      let serviceForRunner = this;
       if (editor.aiOverrides && Object.keys(editor.aiOverrides).length > 0) {
         console.log('[AI Service] Applying session-specific AI overrides:', editor.aiOverrides);
         serviceForRunner = {
-          ...this, // Inherit all methods from the global service
-          config: { ...this.config, ...editor.aiOverrides } // Provide a temporary, merged config
+          ...this, 
+          config: { ...this.config, ...editor.aiOverrides }
         };
       }
-      // --- END OF REFACTOR ---
 
       const runner = new TaskRunner({
           gitClient: editor.gitClient,
-          aiService: serviceForRunner, // Pass the correct service (global or scoped)
+          aiService: serviceForRunner,
           initialContext: initialContext
       });
       const stream = runner.run(userPrompt, controller.signal);
