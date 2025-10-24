@@ -48,7 +48,8 @@ import defaultRequestMemoryCompressionJs from './tools/requestMemoryCompression.
 // --- QUERY SCRIPTS ---
 import defaultQueryModelJs from './query/model.js?raw';
 import defaultQueryApiJs from './query/api.js?raw';
-import defaultQueryApiKeyJs from './query/apikey.js?raw'; // Corrected import path
+import defaultQueryApiKeyJs from './query/apikey.js?raw';
+import defaultQueryProviderJs from './query/provider.js?raw'; // New import
 
 
 export const defaultFiles = [
@@ -100,5 +101,6 @@ export const defaultFiles = [
   // --- QUERY SCRIPTS ---
   ['/settings/query/model.js', defaultQueryModelJs],
   ['/settings/query/api.js', defaultQueryApiJs],
-  ['/settings/query/apikey.js', defaultQueryApiKeyJs], // Corrected script path
+  ['/settings/query/apikey.js', defaultQueryApiKeyJs],
+  ['/settings/query/provider.js', defaultQueryProviderJs], // New script
 ];

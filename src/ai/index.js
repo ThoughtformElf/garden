@@ -6,15 +6,12 @@ import { countTokens } from 'gpt-tokenizer';
 class AiService {
   constructor() {
     this.config = {
-      // Default structure
       activeProvider: 'gemini',
       geminiApiKey: '',
       geminiModelName: 'gemini-2.5-flash',
-      customEndpointUrl: '',
-      customModelName: '',
-      customApiKey: '',
+      providers: [],
     };
-    this.activeAgentControllers = new Map(); // Track running agents per pane
+    this.activeAgentControllers = new Map();
     this.loadConfig();
   }
 
@@ -22,59 +19,50 @@ class AiService {
     this.config.activeProvider = localStorage.getItem('thoughtform_ai_provider') || 'gemini';
     this.config.geminiApiKey = localStorage.getItem('thoughtform_gemini_api_key') || '';
     this.config.geminiModelName = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
-    this.config.customEndpointUrl = localStorage.getItem('thoughtform_custom_endpoint_url') || '';
-    this.config.customModelName = localStorage.getItem('thoughtform_custom_model_name') || '';
-    this.config.customApiKey = localStorage.getItem('thoughtform_custom_api_key') || '';
-  }
-
-  saveConfig(newConfig) {
-    this.loadConfig();
+    this.config.providers = JSON.parse(localStorage.getItem('thoughtform_ai_providers_list') || '[]');
   }
   
   async getCompletion(prompt, onTokenCount, signal) {
     let streamPromise;
-    let provider = this.config.activeProvider;
+    let providerId = this.config.activeProvider;
 
-    // --- THIS IS THE FIX ---
-    // If the config for this specific run contains any custom settings (either from
-    // localStorage or from a URL override), implicitly switch to the custom provider.
-    if (this.config.customModelName || this.config.customEndpointUrl) {
-        provider = 'custom';
+    // --- THIS IS THE NEW DISPATCHER LOGIC ---
+    // A URL override can change the provider for this run only.
+    if (this.config.override_activeProvider) {
+        providerId = this.config.override_activeProvider;
     }
-    // --- END OF FIX ---
 
-    if (provider === 'gemini') {
+    if (providerId === 'gemini') {
       if (!this.config.geminiApiKey) {
-        throw new Error('Active provider is Gemini, but the API key is not set. Get a key from https://aistudio.google.com/ and add it in the DevTools > AI panel.');
+        throw new Error('Active provider is Gemini, but the API key is not set. Add it in DevTools > AI.');
       }
       streamPromise = streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
-    } else if (provider === 'custom') {
-      const endpointToUse = this.config.customEndpointUrl || 'http://localhost:11434/v1';
+    } else {
+      // Find the selected custom provider from the list
+      const providerConfig = this.config.providers.find(p => p.id === providerId);
+      if (!providerConfig) {
+        throw new Error(`AI provider "${providerId}" not found. Please configure it in DevTools > AI.`);
+      }
 
-      if (!this.config.customModelName) {
-         throw new Error('Active provider is Custom, but Model Name is not set. You must specify a model (e.g., "llama3") in the DevTools > AI panel.');
+      // Allow URL params to override specific fields of the found provider
+      const modelToUse = this.config.override_customModelName || providerConfig.model;
+      const endpointToUse = this.config.override_customEndpointUrl || providerConfig.endpoint || 'http://localhost:11434/v1';
+      const apiKeyToUse = this.config.override_customApiKey || providerConfig.apiKey;
+
+      if (!modelToUse) {
+         throw new Error(`Provider "${providerId}" has no Model Name configured. This is a required field.`);
       }
       
-      streamPromise = streamOpenAICompatible(
-        endpointToUse,
-        this.config.customApiKey,
-        this.config.customModelName,
-        prompt,
-        signal
-      );
-    } else {
-        throw new Error(`Unknown AI provider selected: "${provider}"`);
+      streamPromise = streamOpenAICompatible(endpointToUse, apiKeyToUse, modelToUse, prompt, signal);
     }
+    // --- END OF NEW LOGIC ---
 
     const originalStream = await streamPromise;
 
-    if (!onTokenCount) {
-        return originalStream;
-    }
+    if (!onTokenCount) return originalStream;
 
     const inputTokens = countTokens(prompt);
     let fullResponse = '';
-
     const countingStream = new TransformStream({
       transform(chunk, controller) {
         fullResponse += chunk;
@@ -85,7 +73,6 @@ class AiService {
         onTokenCount({ input: inputTokens, output: outputTokens });
       }
     });
-
     return originalStream.pipeThrough(countingStream);
   }
 
@@ -115,10 +102,7 @@ class AiService {
       }
       editorPaneId = editor.paneId;
 
-      if (this.activeAgentControllers.has(editorPaneId)) {
-        console.warn(`Agent already running in pane ${editorPaneId}. Ignoring request.`);
-        return;
-      }
+      if (this.activeAgentControllers.has(editorPaneId)) return;
       
       const controller = new AbortController();
       this.activeAgentControllers.set(editorPaneId, controller);
@@ -144,22 +128,28 @@ class AiService {
       view.dispatch(placeholderTransaction);
       thinkingMessagePosition = insertPos + '\n'.length;
 
-      const rawContext = view.state.doc.toString();
-      const initialContext = rawContext.replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
+      const rawContext = view.state.doc.toString().replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
 
       let serviceForRunner = this;
       if (editor.aiOverrides && Object.keys(editor.aiOverrides).length > 0) {
         console.log('[AI Service] Applying session-specific AI overrides:', editor.aiOverrides);
-        serviceForRunner = {
-          ...this, 
-          config: { ...this.config, ...editor.aiOverrides }
+        
+        // Create a temporary, flat config for the scoped service
+        const overrideConfig = {
+            ...this.config,
+            override_activeProvider: editor.aiOverrides.activeProvider,
+            override_customModelName: editor.aiOverrides.customModelName,
+            override_customEndpointUrl: editor.aiOverrides.customEndpointUrl,
+            override_customApiKey: editor.aiOverrides.customApiKey,
         };
+        
+        serviceForRunner = { ...this, config: overrideConfig };
       }
 
       const runner = new TaskRunner({
           gitClient: editor.gitClient,
           aiService: serviceForRunner,
-          initialContext: initialContext
+          initialContext: rawContext
       });
       const stream = runner.run(userPrompt, controller.signal);
       
@@ -172,72 +162,38 @@ class AiService {
       contentEndPos = contentStartPos;
 
       const streamEventRegex = /^\[(STATUS|THOUGHT|ACTION|OBSERVATION)\]\s(.*)/s;
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
         const chunkText = value;
         const match = chunkText.match(streamEventRegex);
-
         if (match) {
             if (finalAnswerStarted) continue; 
-
             const type = match[1];
             const content = match[2].trim();
-
-            const titles = {
-                STATUS: '> Status:',
-                THOUGHT: '## Thought',
-                ACTION: '## Action',
-                OBSERVATION: '## Observation'
-            };
-            
+            const titles = { STATUS: '> Status:', THOUGHT: '## Thought', ACTION: '## Action', OBSERVATION: '## Observation' };
             const newLogChunk = `${titles[type]}\n${content}\n\n`;
-
-            view.dispatch({
-                changes: { from: contentEndPos, insert: newLogChunk }
-            });
+            view.dispatch({ changes: { from: contentEndPos, insert: newLogChunk } });
             contentEndPos += newLogChunk.length;
         } else {
             if (!finalAnswerStarted) {
                 finalAnswerStarted = true;
-                view.dispatch({
-                    changes: { 
-                        from: contentStartPos, 
-                        to: contentEndPos, 
-                        insert: chunkText 
-                    }
-                });
+                view.dispatch({ changes: { from: contentStartPos, to: contentEndPos, insert: chunkText } });
                 contentEndPos = contentStartPos + chunkText.length;
             } else {
-                view.dispatch({
-                    changes: { from: contentEndPos, insert: chunkText }
-                });
+                view.dispatch({ changes: { from: contentEndPos, insert: chunkText } });
                 contentEndPos += chunkText.length;
             }
         }
       }
-
       const finalInsert = `\n</response>\n\n>$ `;
-      view.dispatch({
-        changes: { from: contentEndPos, insert: finalInsert },
-        selection: { anchor: contentEndPos + finalInsert.length }
-      });
-
+      view.dispatch({ changes: { from: contentEndPos, insert: finalInsert }, selection: { anchor: contentEndPos + finalInsert.length } });
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.log('AI chat request was intentionally cancelled by the user.');
         if (contentStartPos !== -1) {
           const startReplacePos = contentStartPos - '\n<response>\n'.length;
           const cancelledText = '🛑 Agent cancelled by user.';
-          view.dispatch({ 
-            changes: { 
-              from: startReplacePos, 
-              to: contentEndPos, 
-              insert: `\n<response>\n${cancelledText}\n</response>`
-            } 
-          });
+          view.dispatch({ changes: { from: startReplacePos, to: contentEndPos, insert: `\n<response>\n${cancelledText}\n</response>`} });
         }
       } else {
         console.error("AI Chat Error:", error);
@@ -246,9 +202,7 @@ class AiService {
         }
       }
     } finally {
-      if (editorPaneId) {
-        this.activeAgentControllers.delete(editorPaneId);
-      }
+      if (editorPaneId) this.activeAgentControllers.delete(editorPaneId);
     }
   }
 }
