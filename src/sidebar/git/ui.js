@@ -5,37 +5,30 @@ export class GitUI {
     this.contentContainer = sidebarContext.contentContainer;
   }
 
-  render(statusMatrix, commits, branchInfo, conflictedFiles = []) {
+  render(statusMatrix, commits, branchInfo) {
     const stagedFiles = new Map();
     const unstagedFiles = new Map();
-    const conflictSet = new Set(conflictedFiles.map(f => `/${f}`));
 
     // --- DEFINITIVE FIX for status interpretation ---
-    // HEAD status: 0=new, 1=unmodified
-    // WORKDIR status: 0=deleted, 1=unmodified, 2=modified, 3=new
-    // STAGE status: 0=absent, 1=unmodified, 2=modified, 3=new
+    // This logic now correctly differentiates between staged, unstaged, and unmerged files,
+    // mimicking the behavior of the standard `git status` command.
     for (const [filepath, head, workdir, stage] of statusMatrix) {
         const path = `/${filepath}`;
-        const isConflict = conflictSet.has(path);
 
-        // A file has UNSTAGED changes if its status in the working directory differs from the index.
+        // The key indicator from isomorphic-git for an unmerged path (a conflict) is stage === 0.
+        const isConflict = stage === 0;
+
+        // A file has STAGED changes if its index status differs from HEAD,
+        // AND it is NOT in a conflict state.
+        if (head !== stage && !isConflict) {
+            stagedFiles.set(path, { filepath: path, status: 'staged', isConflict: false });
+        }
+
+        // A file has UNSTAGED changes if its workdir status differs from its index status.
+        // This correctly includes conflicted files (where workdir is modified and stage is 0).
         if (workdir !== stage) {
-            unstagedFiles.set(path, { filepath: path, status: 'unstaged', isConflict });
+            unstagedFiles.set(path, { filepath: path, status: 'unstaged', isConflict: isConflict });
         }
-        
-        // A file has STAGED changes if its status in the index differs from HEAD.
-        if (head !== stage) {
-            stagedFiles.set(path, { filepath: path, status: 'staged', isConflict });
-        }
-    }
-
-    // Ensure conflicted files always appear in the unstaged list.
-    for (const path of conflictSet) {
-      if (!unstagedFiles.has(path)) {
-        unstagedFiles.set(path, { filepath: path, status: 'unstaged', isConflict: true });
-      } else {
-        unstagedFiles.get(path).isConflict = true;
-      }
     }
 
     return `

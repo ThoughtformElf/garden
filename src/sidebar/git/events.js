@@ -85,7 +85,7 @@ export class GitEvents {
       
       await this.sidebar.refresh();
       if (action === 'pull') {
-        await this.editor.forceReloadFile(this.editor.filePath);
+        await this.editor.loadFile(this.editor.filePath);
       }
     } catch (e) {
         console.error(`Git ${action} failed:`, e); // Full error to console
@@ -102,7 +102,7 @@ export class GitEvents {
             await this.sidebar.refresh(conflictedFiles);
             
             if (conflictedFiles.includes(this.editor.filePath.substring(1))) {
-                await this.editor.forceReloadFile(this.editor.filePath);
+                await this.editor.loadFile(this.editor.filePath);
             }
 
         } else if (e.name === 'PushRejectedError') {
@@ -149,7 +149,6 @@ export class GitEvents {
         this.editor.hideDiff();
         messageInput.value = '';
         
-        // THIS IS THE FIX (Part 4): Clear the conflict state after successful commit.
         this.sidebar.conflictedFiles = [];
         await this.sidebar.refresh();
         
@@ -166,14 +165,10 @@ export class GitEvents {
     const isConflict = fileItem.classList.contains('is-conflict');
 
     if (target.matches('.git-file-path')) {
-        // THIS IS THE FIX (Part 5): The core logic for showing conflicts.
         if (isConflict) {
-            // If it's a conflict, hide any active diff and load the raw file.
-            // The raw file from the filesystem now contains the conflict markers.
             this.editor.hideDiff();
             await this.editor.loadFile(filepath);
         } else {
-            // Otherwise, for normal changes, load the file and show a diff against HEAD.
             await this.editor.loadFile(filepath);
             this.editor.showDiff(await this.gitClient.readBlob(filepath));
         }
@@ -186,15 +181,15 @@ export class GitEvents {
         });
         if (confirmed) {
             await this.gitClient.discard(filepath);
-            if (this.editor.filePath === filepath) await this.editor.forceReloadFile(filepath);
+            if (this.editor.filePath === filepath) await this.editor.loadFile(filepath);
             await this.sidebar.refresh();
         }
     } else if (target.matches('.stage')) {
         await this.gitClient.stage(filepath);
-        await this.sidebar.refresh(); // Use refresh to preserve conflict state
+        await this.sidebar.refresh(); 
     } else if (target.matches('.unstage')) {
         await this.gitClient.unstage(filepath);
-        await this.sidebar.refresh(); // Use refresh to preserve conflict state
+        await this.sidebar.refresh(); 
     }
   }
 
@@ -250,7 +245,7 @@ export class GitEvents {
       // Reload all open files in all panes to reflect the new branch state
       for (const pane of window.thoughtform.workspace.panes.values()) {
         if (pane.editor.gitClient.gardenName === this.gitClient.gardenName) {
-            await pane.editor.forceReloadFile(pane.editor.filePath);
+            await pane.editor.loadFile(pane.editor.filePath);
         }
       }
     } catch (e) {

@@ -1,6 +1,7 @@
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
+import { diff3Merge } from 'node-diff3';
 
 /**
  * @class Git
@@ -216,20 +217,46 @@ export class Git {
         onProgress('Conflict detected. Writing markers to files...');
         const conflictedFiles = e.data.filepaths;
 
+        const ourOid = await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' });
+        const baseOids = await git.findMergeBase({ fs: this.fs, dir: '/', oids: [ourOid, theirOid] });
+        const baseOid = baseOids[0];
+
+        if (!baseOid) {
+          console.error("[PULL] Could not find a common ancestor. Cannot perform 3-way merge.");
+          throw new Error("Could not find a common ancestor for merging.");
+        }
+
         for (const filepath of conflictedFiles) {
-          console.log(`[PULL] Processing conflicted file: ${filepath}`);
-          const [ours, theirs] = await Promise.all([
-             git.readBlob({ fs: this.fs, dir: '/', oid: await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' }), filepath }),
-             git.readBlob({ fs: this.fs, dir: '/', oid: theirOid, filepath })
+          console.log(`[PULL] Generating 3-way merge for conflicted file: ${filepath}`);
+          
+          const [ours, base, theirs] = await Promise.all([
+            git.readBlob({ fs: this.fs, dir: '/', oid: ourOid, filepath }),
+            git.readBlob({ fs: this.fs, dir: '/', oid: baseOid, filepath }),
+            git.readBlob({ fs: this.fs, dir: '/', oid: theirOid, filepath })
           ]);
           
-          const oursContent = ours ? new TextDecoder().decode(ours.blob) : '';
-          const theirsContent = theirs ? new TextDecoder().decode(theirs.blob) : '';
-            
-          const conflictContent = `<<<<<<< HEAD\n${oursContent}\n=======\n${theirsContent}\n>>>>>>> ${theirOid.slice(0,7)}\n`;
-            
+          const oursContent = ours ? new TextDecoder().decode(ours.blob).split('\n') : [];
+          const baseContent = base ? new TextDecoder().decode(base.blob).split('\n') : [];
+          const theirsContent = theirs ? new TextDecoder().decode(theirs.blob).split('\n') : [];
+
+          const result = diff3Merge(oursContent, baseContent, theirsContent);
+          
+          const finalLines = [];
+          for (const chunk of result) {
+            if (chunk.ok) {
+              finalLines.push(...chunk.ok);
+            } else if (chunk.conflict) {
+              finalLines.push('<<<<<<< HEAD');
+              finalLines.push(...chunk.conflict.a);
+              finalLines.push('=======');
+              finalLines.push(...chunk.conflict.b);
+              finalLines.push(`>>>>>>> ${theirOid.slice(0, 7)}`);
+            }
+          }
+          const mergedText = finalLines.join('\n');
+
           console.log(`[PULL] Writing conflict markers to /${filepath}`);
-          await this.pfs.writeFile(`/${filepath}`, conflictContent, 'utf8');
+          await this.pfs.writeFile(`/${filepath}`, mergedText, 'utf8');
         }
       }
       throw e;

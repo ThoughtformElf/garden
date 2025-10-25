@@ -47,6 +47,7 @@
     "jszip": "^3.10.1",
     "lodash": "^4.17.21",
     "mermaid": "^11.12.0",
+    "node-diff3": "^3.2.0",
     "pdf-parse": "^2.4.5",
     "process": "^0.11.10",
     "puppeteer": "^24.23.0",
