@@ -2,7 +2,7 @@ import { GitUI } from './ui.js';
 import { GitEvents } from './events.js';
 
 export const gitActions = {
-  async renderGitView() {
+  async renderGitView(conflictedFiles = []) {
     try {
       const [statusMatrix, commits, branchInfo] = await Promise.all([
         this.gitClient.getStatuses(),
@@ -15,7 +15,8 @@ export const gitActions = {
 
       const oldMessage = this.contentContainer.querySelector('#git-commit-message')?.value || '';
       
-      this.contentContainer.innerHTML = gitUI.render(statusMatrix, commits, branchInfo);
+      // THIS IS THE FIX (Part 3)
+      this.contentContainer.innerHTML = gitUI.render(statusMatrix, commits, branchInfo, conflictedFiles);
       
       const newMessageInput = this.contentContainer.querySelector('#git-commit-message');
       if (newMessageInput) {

@@ -1,5 +1,5 @@
 node_modules
 test/
 backups/
-src/gardens/home
+src/gardens/
 src/workspace/bundles/*.json

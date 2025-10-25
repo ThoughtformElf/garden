@@ -71,15 +71,13 @@ const server = http.createServer((req, res) => {
   req.pipe(gitProcess.stdin);
   gitProcess.stderr.pipe(process.stderr);
 
-  // --- THIS IS THE ROBUST CGI HANDLING LOGIC ---
-  // Buffer the entire output from the CGI script.
   const chunks = [];
   gitProcess.stdout.on('data', (chunk) => {
     chunks.push(chunk);
   });
 
   gitProcess.on('close', (code) => {
-    // If a push was successful, auto-update the working directory.
+    // THIS IS THE FIX: If a push was successful, auto-update the working directory.
     if (code === 0 && isPush) {
       console.log(`[GitServer] Push to '${repoName}' successful. Updating working directory...`);
       exec('git reset --hard', { cwd: repoPath }, (err, stdout, stderr) => {
@@ -94,7 +92,6 @@ const server = http.createServer((req, res) => {
     const buffer = Buffer.concat(chunks);
     const responseString = buffer.toString('utf8');
     
-    // Find where the headers end and the body begins.
     const separatorIndex = responseString.indexOf('\r\n\r\n');
     if (separatorIndex === -1) {
       if (!res.headersSent) {
@@ -114,7 +111,6 @@ const server = http.createServer((req, res) => {
       statusCode = parseInt(statusLine.substring(8, 11), 10);
     }
     
-    // Set the headers on the Node response object.
     headers.forEach(header => {
       const [key, value] = header.split(': ', 2);
       if (key && value) {
@@ -125,7 +121,6 @@ const server = http.createServer((req, res) => {
     res.writeHead(statusCode);
     res.end(bodyPart);
   });
-  // --- END OF ROBUST CGI HANDLING ---
 });
 
 server.listen(8081, () => {

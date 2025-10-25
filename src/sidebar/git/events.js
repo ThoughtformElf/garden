@@ -45,6 +45,19 @@ export class GitEvents {
     
     const branchItem = target.closest('.git-branch-item');
     if (branchItem) await this._handleBranchItemClick(branchItem);
+    
+    const changesPanel = target.closest('.git-panel');
+    if (changesPanel) {
+        if (target.matches('[data-action="stage-all"]')) {
+            const files = Array.from(changesPanel.querySelectorAll('.git-file-item .stage'))
+                               .map(btn => btn.closest('.git-file-item').dataset.filepath);
+            await this._stageAll(files);
+        } else if (target.matches('[data-action="unstage-all"]')) {
+            const files = Array.from(changesPanel.querySelectorAll('.git-file-item .unstage'))
+                               .map(btn => btn.closest('.git-file-item').dataset.filepath);
+            await this._unstageAll(files);
+        }
+    }
   }
 
   async _handleRemoteAction(action, force = false) {
@@ -78,17 +91,19 @@ export class GitEvents {
         console.error(`Git ${action} failed:`, e); // Full error to console
         logArea.textContent = `Error: ${e.message}`; // Clean message to UI
         
-        if (e.name === 'MergeNotSupportedError') {
-            const choice = await Modal.choice({
-                title: 'Merge Conflict',
-                message: 'Automatic merge failed. The remote history has diverged. How would you like to resolve this?',
-                choices: [
-                    { id: 'force-pull', text: 'Force Pull (Overwrite Browser)', class: 'destructive' },
-                    { id: 'cancel', text: 'Cancel' }
-                ]
+        if (e.name === 'MergeConflictError') {
+            const conflictedFiles = e.data && Array.isArray(e.data.filepaths) ? e.data.filepaths : [];
+
+            await this.sidebar.showAlert({
+                title: 'Merge Conflict Detected',
+                message: `Automatic merge failed. Your files have been updated with conflict markers (e.g., '<<<<<<< HEAD').<br><br>The conflicted files are now marked in the 'Changes' list. Please review them, resolve the conflicts, then stage and commit the result to finalize the merge.`
             });
-            if (choice === 'force-pull') await this._handleRemoteAction('pull', true);
-            else logArea.textContent = 'Pull cancelled by user.';
+            
+            await this.sidebar.refresh(conflictedFiles);
+            
+            if (conflictedFiles.includes(this.editor.filePath.substring(1))) {
+                await this.editor.forceReloadFile(this.editor.filePath);
+            }
 
         } else if (e.name === 'PushRejectedError') {
             const choice = await Modal.choice({
@@ -103,6 +118,17 @@ export class GitEvents {
             if (choice === 'pull') await this._handleRemoteAction('pull', false);
             else if (choice === 'force-push') await this._handleRemoteAction('push', true);
             else logArea.textContent = 'Push cancelled by user.';
+        } else if (e.name === 'MergeNotSupportedError') {
+             const choice = await Modal.choice({
+                title: 'Merge Conflict',
+                message: 'Automatic merge failed. The remote history has diverged. How would you like to resolve this?',
+                choices: [
+                    { id: 'force-pull', text: 'Force Pull (Overwrite Browser)', class: 'destructive' },
+                    { id: 'cancel', text: 'Cancel' }
+                ]
+            });
+            if (choice === 'force-pull') await this._handleRemoteAction('pull', true);
+            else logArea.textContent = 'Pull cancelled by user.';
         }
     } finally {
       pushButton.disabled = false;
@@ -122,7 +148,11 @@ export class GitEvents {
         await this.gitClient.commit(message);
         this.editor.hideDiff();
         messageInput.value = '';
+        
+        // THIS IS THE FIX (Part 4): Clear the conflict state after successful commit.
+        this.sidebar.conflictedFiles = [];
         await this.sidebar.refresh();
+        
     } catch (err) {
         await this.sidebar.showAlert({ title: 'Commit Failed', message: 'See console for details.' });
     } finally {
@@ -133,10 +163,20 @@ export class GitEvents {
   
   async _handleFileItemClick(target, fileItem) {
     const filepath = fileItem.dataset.filepath;
-    
+    const isConflict = fileItem.classList.contains('is-conflict');
+
     if (target.matches('.git-file-path')) {
-        await this.editor.loadFile(filepath);
-        this.editor.showDiff(await this.gitClient.readBlob(filepath));
+        // THIS IS THE FIX (Part 5): The core logic for showing conflicts.
+        if (isConflict) {
+            // If it's a conflict, hide any active diff and load the raw file.
+            // The raw file from the filesystem now contains the conflict markers.
+            this.editor.hideDiff();
+            await this.editor.loadFile(filepath);
+        } else {
+            // Otherwise, for normal changes, load the file and show a diff against HEAD.
+            await this.editor.loadFile(filepath);
+            this.editor.showDiff(await this.gitClient.readBlob(filepath));
+        }
     } else if (target.matches('.discard')) {
         const confirmed = await this.sidebar.showConfirm({
             title: 'Discard Changes',
@@ -151,10 +191,10 @@ export class GitEvents {
         }
     } else if (target.matches('.stage')) {
         await this.gitClient.stage(filepath);
-        await this.sidebar.renderGitView();
+        await this.sidebar.refresh(); // Use refresh to preserve conflict state
     } else if (target.matches('.unstage')) {
         await this.gitClient.unstage(filepath);
-        await this.sidebar.renderGitView();
+        await this.sidebar.refresh(); // Use refresh to preserve conflict state
     }
   }
 
@@ -216,5 +256,17 @@ export class GitEvents {
     } catch (e) {
       await this.sidebar.showAlert({ title: 'Error', message: `Could not switch to branch: ${e.message}` });
     }
+  }
+  
+  async _stageAll(files) {
+    if (files.length === 0) return;
+    await Promise.all(files.map(file => this.gitClient.stage(file)));
+    await this.sidebar.refresh();
+  }
+
+  async _unstageAll(files) {
+    if (files.length === 0) return;
+    await Promise.all(files.map(file => this.gitClient.unstage(file)));
+    await this.sidebar.refresh();
   }
 }

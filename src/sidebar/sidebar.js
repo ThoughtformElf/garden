@@ -30,6 +30,7 @@ export class Sidebar {
     this.container.appendChild(this.contentContainer);
 
     this.activeTab = sessionStorage.getItem('sidebarActiveTab') || 'Files';
+    this.conflictedFiles = []; // THIS IS THE FIX (Part 1): Persist conflict state here.
 
     Object.assign(this, fileActions);
     Object.assign(this, gardenActions);
@@ -120,6 +121,7 @@ export class Sidebar {
         sessionStorage.setItem('sidebarActiveTab', this.activeTab);
 
         if (oldTab === 'Git' && newTab !== 'Git') {
+            this.editor.hideDiff(); // Ensure diff is hidden when leaving Git tab
             const currentFile = this.editor.getFilePath(window.location.hash);
             this.editor.loadFile(currentFile);
         }
@@ -129,7 +131,12 @@ export class Sidebar {
     });
   }
 
-  async refresh() {
+  async refresh(conflictedFiles = null) {
+    // THIS IS THE FIX (Part 2): Update the internal state if new conflict info arrives.
+    if (conflictedFiles !== null) {
+        this.conflictedFiles = conflictedFiles;
+    }
+
     this.tabsContainer.querySelectorAll('.sidebar-tab').forEach(button => {
       button.classList.toggle('active', button.dataset.tab === this.activeTab);
     });
@@ -144,18 +151,14 @@ export class Sidebar {
     } else if (this.activeTab === 'Gardens') {
       await this.renderGardens();
     } else if (this.activeTab === 'Git') {
-      await this.renderGitView();
+      // THIS IS THE FIX (Part 3): Always pass the persisted conflict state to the renderer.
+      await this.renderGitView(this.conflictedFiles);
     }
 
-    const isDirty = statuses.some(([, head, workdir]) => head !== workdir);
+    const isDirty = statuses.some(([, head, workdir, stage]) => workdir !== 1 || stage !== 1);
     this.tabsContainer.querySelector('[data-tab="Git"]').classList.toggle('dirty', isDirty);
   }
 
-  /**
-   * THIS IS THE BUGFIX.
-   * This function now recursively finds ALL paths, including empty directories,
-   * ensuring the sidebar is a true representation of the file system.
-   */
   async listAllPaths(gitClient, dir) {
     const pfs = gitClient.pfs;
     let allPaths = [];

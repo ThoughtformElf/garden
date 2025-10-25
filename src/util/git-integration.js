@@ -132,21 +132,7 @@ export class Git {
 
   async stage(filepath) {
     const cleanPath = filepath.startsWith('/') ? filepath.substring(1) : filepath;
-    const matrix = await this.getStatuses();
-    const statusEntry = matrix.find(row => row[0] === cleanPath);
-
-    if (!statusEntry) {
-      console.error(`Could not find status for "${cleanPath}". Cannot stage.`);
-      return;
-    }
-
-    const workdirStatus = statusEntry[2];
-
-    if (workdirStatus === 0) {
-      await git.remove({ fs: this.fs, dir: '/', filepath: cleanPath });
-    } else {
-      await git.add({ fs: this.fs, dir: '/', filepath: cleanPath });
-    }
+    await git.add({ fs: this.fs, dir: '/', filepath: cleanPath });
   }
 
   async unstage(filepath) {
@@ -184,7 +170,6 @@ export class Git {
   }
   
   async push(url, token, onProgress, force = false) {
-    // Reverted to safe default: force is an OPTION, not the default.
     return await git.push({
       fs: this.fs, http, dir: '/', url: url,
       force: force,
@@ -194,15 +179,61 @@ export class Git {
   }
 
   async pull(url, token, onProgress, force = false) {
-    return await git.pull({
+    const author = { name: 'User', email: 'user@thoughtform.garden' };
+    
+    console.log('[PULL] Step 1: Fetching from remote...');
+    onProgress('Fetching from remote...');
+    const fetchResult = await git.fetch({
       fs: this.fs, http, dir: '/', url: url,
       ref: 'main',
       singleBranch: true,
-      force: force,
-      onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
+      onProgress: (e) => onProgress(`Fetch: ${e.phase}`),
       onAuth: () => ({ username: token }),
-      author: { name: 'User', email: 'user@thoughtform.garden' },
     });
+    const theirOid = fetchResult.fetchHead;
+    console.log('[PULL] Step 1 Complete. Fetched OID:', theirOid);
+
+    if (!theirOid) {
+        console.log('[PULL] No new commits to merge.');
+        onProgress('Already up-to-date.');
+        return;
+    }
+
+    onProgress('Merging changes...');
+    console.log(`[PULL] Step 2: Attempting to merge OID ${theirOid} into main...`);
+    try {
+      const mergeResult = await git.merge({
+        fs: this.fs,
+        dir: '/',
+        ours: 'main',
+        theirs: theirOid,
+        author: author,
+      });
+      console.log('[PULL] Step 2 Complete: Merge was successful.', mergeResult);
+    } catch (e) {
+      console.error('[PULL] Step 2 Failed: Merge attempt threw an error.', e);
+      if (e.name === 'MergeConflictError') {
+        onProgress('Conflict detected. Writing markers to files...');
+        const conflictedFiles = e.data.filepaths;
+
+        for (const filepath of conflictedFiles) {
+          console.log(`[PULL] Processing conflicted file: ${filepath}`);
+          const [ours, theirs] = await Promise.all([
+             git.readBlob({ fs: this.fs, dir: '/', oid: await git.resolveRef({ fs: this.fs, dir: '/', ref: 'HEAD' }), filepath }),
+             git.readBlob({ fs: this.fs, dir: '/', oid: theirOid, filepath })
+          ]);
+          
+          const oursContent = ours ? new TextDecoder().decode(ours.blob) : '';
+          const theirsContent = theirs ? new TextDecoder().decode(theirs.blob) : '';
+            
+          const conflictContent = `<<<<<<< HEAD\n${oursContent}\n=======\n${theirsContent}\n>>>>>>> ${theirOid.slice(0,7)}\n`;
+            
+          console.log(`[PULL] Writing conflict markers to /${filepath}`);
+          await this.pfs.writeFile(`/${filepath}`, conflictContent, 'utf8');
+        }
+      }
+      throw e;
+    }
   }
 
   async log() {

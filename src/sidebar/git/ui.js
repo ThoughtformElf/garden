@@ -5,17 +5,36 @@ export class GitUI {
     this.contentContainer = sidebarContext.contentContainer;
   }
 
-  render(statusMatrix, commits, branchInfo) {
-    const stagedFiles = [];
-    const unstagedFiles = [];
+  render(statusMatrix, commits, branchInfo, conflictedFiles = []) {
+    const stagedFiles = new Map();
+    const unstagedFiles = new Map();
+    const conflictSet = new Set(conflictedFiles.map(f => `/${f}`));
+
+    // --- DEFINITIVE FIX for status interpretation ---
+    // HEAD status: 0=new, 1=unmodified
+    // WORKDIR status: 0=deleted, 1=unmodified, 2=modified, 3=new
+    // STAGE status: 0=absent, 1=unmodified, 2=modified, 3=new
     for (const [filepath, head, workdir, stage] of statusMatrix) {
-      const path = `/${filepath}`;
-      if (head !== workdir || head !== stage) {
-        if (workdir === stage) {
-          stagedFiles.push({ filepath: path, status: 'staged' });
-        } else {
-          unstagedFiles.push({ filepath: path, status: 'unstaged' });
+        const path = `/${filepath}`;
+        const isConflict = conflictSet.has(path);
+
+        // A file has UNSTAGED changes if its status in the working directory differs from the index.
+        if (workdir !== stage) {
+            unstagedFiles.set(path, { filepath: path, status: 'unstaged', isConflict });
         }
+        
+        // A file has STAGED changes if its status in the index differs from HEAD.
+        if (head !== stage) {
+            stagedFiles.set(path, { filepath: path, status: 'staged', isConflict });
+        }
+    }
+
+    // Ensure conflicted files always appear in the unstaged list.
+    for (const path of conflictSet) {
+      if (!unstagedFiles.has(path)) {
+        unstagedFiles.set(path, { filepath: path, status: 'unstaged', isConflict: true });
+      } else {
+        unstagedFiles.get(path).isConflict = true;
       }
     }
 
@@ -25,8 +44,8 @@ export class GitUI {
           ${this._renderRemotePanel()}
           ${this._renderBranchPanel(branchInfo)}
           ${this._renderCommitPanel()}
-          ${this._renderChangesPanel('Staged Changes', stagedFiles, true)}
-          ${this._renderChangesPanel('Changes', unstagedFiles, false)}
+          ${this._renderChangesPanel('Staged Changes', Array.from(stagedFiles.values()), true)}
+          ${this._renderChangesPanel('Changes', Array.from(unstagedFiles.values()), false)}
         </div>
         <div class="git-right-column">
           ${this._renderHistoryPanel(commits)}
@@ -92,14 +111,17 @@ export class GitUI {
     const actionSymbol = isStaged ? '−' : '+';
     const actionClass = isStaged ? 'unstage' : 'stage';
     const actionTitle = isStaged ? 'Unstage' : 'Stage';
+    const allAction = isStaged ? 'unstage-all' : 'stage-all';
+    const allTitle = isStaged ? 'Unstage All' : 'Stage All';
 
     let fileListHTML = '';
     if (files.length > 0) {
       fileListHTML = files.map(file => {
         const displayText = file.filepath.substring(1);
         const isActive = this.editor.filePath === file.filepath;
+        const isConflict = file.isConflict;
         return `
-          <li class="git-file-item ${isActive ? 'active' : ''}" data-filepath="${file.filepath}">
+          <li class="git-file-item ${isActive ? 'active' : ''} ${isConflict ? 'is-conflict' : ''}" data-filepath="${file.filepath}">
             <span class="git-file-path">${displayText}</span>
             <button class="git-action-button discard" title="Discard Changes">⭯</button>
             <button class="git-action-button ${actionClass}" title="${actionTitle}">${actionSymbol}</button>
@@ -112,7 +134,10 @@ export class GitUI {
 
     return `
       <div class="git-panel">
-        <h3 class="git-panel-header">${title} (${files.length})</h3>
+        <h3 class="git-panel-header">
+            ${title} (${files.length})
+            <button class="git-action-button-all" data-action="${allAction}" title="${allTitle}" ${files.length === 0 ? 'disabled' : ''}>All</button>
+        </h3>
         <ul class="git-file-list git-panel-content">
           ${fileListHTML}
         </ul>
