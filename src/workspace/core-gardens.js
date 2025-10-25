@@ -1,81 +1,39 @@
 import { Git } from '../util/git-integration.js';
-
-// Use the modern, recommended Vite glob syntax.
-const coreGardenFiles = import.meta.glob('/src/gardens/**/*', { 
-  query: '?raw', 
-  import: 'default', 
-  eager: true 
-});
+import { Buffer } from 'buffer';
 
 /**
- * Discovers and seeds core gardens from the /src/gardens directory on first launch.
+ * Discovers and seeds core gardens by unpacking pre-built JSON bundles.
  */
 export async function seedCoreGardens() {
-  const discoveredFiles = Object.keys(coreGardenFiles);
-  if (discoveredFiles.length === 0) {
-    // No submodules found, nothing to do.
-    return;
-  }
-
-  // --- THIS IS THE FIX: DYNAMICALLY DISCOVER GARDEN NAMES ---
-  // Instead of a hardcoded array, we derive the garden names from the file paths.
-  const discoveredGardenNames = new Set();
-  for (const path of discoveredFiles) {
-    // Path example: /src/gardens/settings/settings/interface.yml
-    const parts = path.split('/');
-    const gardensIndex = parts.indexOf('gardens');
-    if (gardensIndex !== -1 && parts.length > gardensIndex + 1) {
-      const gardenName = parts[gardensIndex + 1]; // This is the folder name (e.g., "settings")
-      discoveredGardenNames.add(gardenName);
-    }
-  }
-
-  if (discoveredGardenNames.size === 0) return;
-  console.log('[Seeder] Discovered core garden directories:', Array.from(discoveredGardenNames));
-  // --- END OF FIX ---
-
+  // Use Vite's glob to discover the JSON bundles created by the pre-build script.
+  const gardenBundles = import.meta.glob('./bundles/*-bundle.json', { eager: true });
 
   const seededGardensRaw = localStorage.getItem('thoughtform_seeded_gardens');
   const seededGardens = new Set(seededGardensRaw ? JSON.parse(seededGardensRaw) : []);
 
-  // Now, iterate over the gardens we actually found.
-  for (const gardenName of discoveredGardenNames) {
+  for (const path in gardenBundles) {
+    const gardenName = path.split('/').pop().replace('-bundle.json', '');
     if (seededGardens.has(gardenName)) {
-      continue; // This garden is already seeded, skip it.
+      continue;
     }
 
-    console.log(`%c[Seeder] Seeding new core garden: "${gardenName}"...`, 'font-weight: bold; color: #12ffbc;');
-    const git = new Git(gardenName);
-    await git.initRepo();
-    await git.clearWorkdir(); // Ensure the garden is empty before populating.
+    console.log(`%c[Seeder] Unpacking and seeding core garden: "${gardenName}"...`, 'font-weight: bold; color: #12ffbc;');
+    const gitClient = new Git(gardenName);
+    const bundle = gardenBundles[path].default; // Get the content of the JSON file
 
     let fileCount = 0;
-    // The prefix is now built from the dynamically discovered garden name.
-    const pathPrefix = `/src/gardens/${gardenName}/`;
-
-    for (const path in coreGardenFiles) {
-      // The check is now case-sensitive and correct because gardenName comes from the actual folder.
-      if (path.startsWith(pathPrefix)) {
-        const filePathInGarden = path.substring(pathPrefix.length);
-        const content = coreGardenFiles[path];
-        
-        try {
-          const finalPath = `/${filePathInGarden}`;
-          await git.writeFile(finalPath, content);
-          fileCount++;
-        } catch (error) {
-          console.error(`[Seeder] Failed to write file "/${filePathInGarden}" to garden "${gardenName}":`, error);
-        }
+    for (const [relativePath, base64Content] of Object.entries(bundle)) {
+      try {
+        const contentBuffer = Buffer.from(base64Content, 'base64');
+        await gitClient.writeFile(`/${relativePath}`, contentBuffer);
+        fileCount++;
+      } catch (error) {
+        console.error(`[Seeder] Failed to write file "/${relativePath}" to garden "${gardenName}":`, error);
       }
     }
     
-    if (fileCount > 0) {
-      await git.commit(`Initial commit: Seed core garden "${gardenName}"`);
-      console.log(`[Seeder] Wrote ${fileCount} files to "${gardenName}" and created initial commit.`);
-    } else {
-      console.warn(`[Seeder] No files were matched for the core garden "${gardenName}". The garden will be empty.`);
-    }
-
+    console.log(`[Seeder] Wrote ${fileCount} files to "${gardenName}", force-seeding the complete repository state.`);
+    gitClient.registerNewGarden();
     seededGardens.add(gardenName);
   }
 

@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "vite",
-    "dev": "vite --host",
-    "build": "vite build && shx cp docs/index.html docs/404.html",
+    "start": "node scripts/prepare-gardens.js && vite",
+    "dev": "node scripts/prepare-gardens.js && vite --host",
+    "build": "node scripts/prepare-gardens.js && vite build && shx cp docs/index.html docs/404.html",
     "deploy:ws": "fly deploy",
     "deploy:proxy": "fly deploy --config fly.proxy.toml",
     "deploy:all": "npm run deploy:ws && npm run deploy:proxy",

@@ -1,4 +1,4 @@
-import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens, resetDefaultSettings } from './data.js';
+import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
 import { Modal } from '../../util/modal.js';
 
 function createSelectionUI(title, items, allChecked = true) {
@@ -49,11 +49,6 @@ class DataTool {
         <button id="export-btn" class="eruda-button">Export...</button>
         <button id="import-btn" class="eruda-button">Import...</button>
         <input type="file" id="import-file-input" accept=".zip" style="display: none;">
-
-        <hr>
-        
-        <h2>Maintenance</h2>
-        <button id="reset-settings-btn" class="eruda-button">Reset Default Settings...</button>
         
         <hr>
 
@@ -71,28 +66,6 @@ class DataTool {
     $el.find('#import-btn')[0].addEventListener('click', () => $el.find('#import-file-input')[0].click());
     $el.find('#import-file-input')[0].addEventListener('change', (e) => this._handleFileSelect(e));
     $el.find('#clear-data-btn')[0].addEventListener('click', () => this._handleClearData());
-    $el.find('#reset-settings-btn')[0].addEventListener('click', () => this._handleResetSettings());
-  }
-
-  async _handleResetSettings() {
-    const confirmed = await Modal.confirm({
-      title: 'Reset Default Settings?',
-      message: `This will overwrite the default configuration and hook files in your 'Settings' garden with the latest versions from the application. <br><br><strong>Your custom scripts and other files will not be affected.</strong>`,
-      okText: 'Reset Files'
-    });
-
-    if (!confirmed) return;
-
-    const progressModal = new Modal({ title: 'Restoring Settings...' });
-    let progressHTML = '';
-    const logCallback = (msg) => {
-      console.log(`[Settings Reset] ${msg}`);
-      progressHTML += `<div>${msg}</div>`;
-      progressModal.updateContent(`<div style="font-family: monospace; max-height: 300px; overflow-y: auto;">${progressHTML}</div>`);
-    };
-    
-    progressModal.show();
-    await resetDefaultSettings(logCallback);
   }
 
   _handleExport() {

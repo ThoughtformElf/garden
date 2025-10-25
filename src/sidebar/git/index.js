@@ -4,31 +4,25 @@ import { GitEvents } from './events.js';
 export const gitActions = {
   async renderGitView() {
     try {
-      // The `this` context is the Sidebar instance itself.
-      const [statusMatrix, commits] = await Promise.all([
+      const [statusMatrix, commits, branchInfo] = await Promise.all([
         this.gitClient.getStatuses(),
-        this.gitClient.log()
+        this.gitClient.log(),
+        this.gitClient.listBranches()
       ]);
 
-      // Instantiate helpers with the sidebar context
       const gitUI = new GitUI(this);
       const gitEvents = new GitEvents(this);
 
-      // Preserve the commit message across re-renders
       const oldMessage = this.contentContainer.querySelector('#git-commit-message')?.value || '';
       
-      // Use the UI helper to generate the HTML
-      this.contentContainer.innerHTML = gitUI.render(statusMatrix, commits);
+      this.contentContainer.innerHTML = gitUI.render(statusMatrix, commits, branchInfo);
       
       const newMessageInput = this.contentContainer.querySelector('#git-commit-message');
       if (newMessageInput) {
           newMessageInput.value = oldMessage;
       }
 
-      // Use the events helper to attach all listeners
       gitEvents.addListeners();
-      
-      // Use the UI helper to set the initial button state
       this.updateCommitButtonState();
 
     } catch (e) {
@@ -36,9 +30,6 @@ export const gitActions = {
       this.contentContainer.innerHTML = `<p class="sidebar-error">Could not load Git status.</p>`;
     }
   },
-
-  // The methods below are now delegated to the helper classes but are kept on the
-  // sidebar instance's API for convenience, as they are called by the event handlers.
   
   updateCommitButtonState() {
     new GitUI(this).updateCommitButtonState();
@@ -48,11 +39,15 @@ export const gitActions = {
     const key = `thoughtform_remote_config_${this.gitClient.gardenName}`;
     try {
       const stored = localStorage.getItem(key);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.url) return parsed;
+      }
     } catch (e) {
       console.error("Could not parse remote config from localStorage", e);
     }
-    return { url: '', auth: '' };
+    // --- THE FIX: Revert to the simple URL format. ---
+    return { url: `http://localhost:8081/${this.gitClient.gardenName}`, auth: '' };
   },
 
   saveRemoteConfig(url, auth) {

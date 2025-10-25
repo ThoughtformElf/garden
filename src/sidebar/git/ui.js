@@ -5,7 +5,7 @@ export class GitUI {
     this.contentContainer = sidebarContext.contentContainer;
   }
 
-  render(statusMatrix, commits) {
+  render(statusMatrix, commits, branchInfo) {
     const stagedFiles = [];
     const unstagedFiles = [];
     for (const [filepath, head, workdir, stage] of statusMatrix) {
@@ -19,106 +19,133 @@ export class GitUI {
       }
     }
 
-    const remoteSectionHTML = this._renderRemoteSection();
-    const commitAreaHTML = `
-      <div class="git-commit-area">
-        <textarea id="git-commit-message" placeholder="Commit message..." rows="3"></textarea>
-        <button id="git-commit-button" disabled>Commit</button>
-      </div>
-    `;
-    const unstagedFilesHTML = this._renderFileSection('Changes', unstagedFiles, false);
-    const stagedFilesHTML = this._renderFileSection('Staged Changes', stagedFiles, true);
-    const historyHTML = this._renderHistorySection(commits);
-
     return `
-      <div class="git-view-container">
-        ${remoteSectionHTML}
-        ${commitAreaHTML}
-        ${stagedFilesHTML}
-        ${unstagedFilesHTML}
-        ${historyHTML}
+      <div class="git-main-layout">
+        <div class="git-left-column">
+          ${this._renderRemotePanel()}
+          ${this._renderBranchPanel(branchInfo)}
+          ${this._renderCommitPanel()}
+          ${this._renderChangesPanel('Staged Changes', stagedFiles, true)}
+          ${this._renderChangesPanel('Changes', unstagedFiles, false)}
+        </div>
+        <div class="git-right-column">
+          ${this._renderHistoryPanel(commits)}
+          <div id="git-commit-details" class="git-panel">
+            <h3 class="git-panel-header">Changed Files</h3>
+            <div class="git-panel-content">
+              <span class="no-changes">Select a commit to see details.</span>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   }
 
-  _renderRemoteSection() {
+  _renderRemotePanel() {
     const config = this.sidebar.getRemoteConfig();
     return `
-      <div class="git-remote-section">
-        <h3>Remote</h3>
-        <input type="text" id="git-remote-url" placeholder="Remote URL" value="${config.url}">
-        <input type="password" id="git-remote-auth" placeholder="Username or Token" value="${config.auth}">
-        <div class="git-remote-actions">
-          <button id="git-pull-button">Pull</button>
-          <button id="git-push-button">Push</button>
+      <div class="git-panel">
+        <h3 class="git-panel-header">Remote</h3>
+        <div class="git-panel-content">
+          <input type="text" id="git-remote-url" placeholder="Remote URL" value="${config.url}">
+          <input type="password" id="git-remote-auth" placeholder="Username or Token" value="${config.auth}">
+          <div class="git-remote-actions">
+            <button id="git-pull-button">Pull</button>
+            <button id="git-push-button">Push</button>
+          </div>
+          <div class="git-remote-log" id="git-remote-log">Ready</div>
         </div>
-        <div class="git-remote-log" id="git-remote-log">Ready</div>
+      </div>
+    `;
+  }
+  
+  _renderBranchPanel({ branches, currentBranch }) {
+    const branchList = branches.map(branch => `
+      <li class="git-branch-item ${branch === currentBranch ? 'active' : ''}" data-branch-name="${branch}">
+        <span class="branch-name">${branch}</span>
+      </li>
+    `).join('');
+
+    return `
+      <div class="git-panel">
+        <h3 class="git-panel-header">Branches</h3>
+        <div class="git-panel-content">
+          <ul class="git-branch-list">${branchList}</ul>
+          <button id="git-new-branch-button" class="full-width" style="margin-top: 8px;">New Branch</button>
+        </div>
       </div>
     `;
   }
 
-  _renderFileSection(title, files, isStaged) {
-    const actionButton = isStaged
-      ? `<button class="git-action-button unstage" title="Unstage Changes">-</button>`
-      : `<button class="git-action-button stage" title="Stage Changes">+</button>`;
-      
+  _renderCommitPanel() {
+    return `
+      <div class="git-panel">
+        <div class="git-panel-content">
+          <textarea id="git-commit-message" placeholder="Commit message..." rows="3"></textarea>
+          <button id="git-commit-button" class="full-width" disabled>Commit</button>
+        </div>
+      </div>
+    `;
+  }
+  
+  _renderChangesPanel(title, files, isStaged) {
+    const actionSymbol = isStaged ? '−' : '+';
+    const actionClass = isStaged ? 'unstage' : 'stage';
+    const actionTitle = isStaged ? 'Unstage' : 'Stage';
+
     let fileListHTML = '';
     if (files.length > 0) {
       fileListHTML = files.map(file => {
-        const displayText = file.filepath.startsWith('/') ? file.filepath.substring(1) : file.filepath;
+        const displayText = file.filepath.substring(1);
         const isActive = this.editor.filePath === file.filepath;
-        const activeClass = isActive ? 'active' : '';
         return `
-          <li class="git-file-item ${activeClass}" data-filepath="${file.filepath}">
+          <li class="git-file-item ${isActive ? 'active' : ''}" data-filepath="${file.filepath}">
             <span class="git-file-path">${displayText}</span>
-            <span class="git-file-actions">
-              <button class="git-action-button discard" title="Discard Changes">⭯</button>
-              ${actionButton}
-            </span>
+            <button class="git-action-button discard" title="Discard Changes">⭯</button>
+            <button class="git-action-button ${actionClass}" title="${actionTitle}">${actionSymbol}</button>
           </li>
         `;
       }).join('');
     } else {
-      fileListHTML = `<li><span class="no-changes">No ${isStaged ? 'staged ' : ''}changes.</span></li>`;
+      fileListHTML = `<li class="no-changes">No ${isStaged ? 'staged ' : ''}changes.</li>`;
     }
-    
-    const sectionClass = isStaged ? 'git-staged-section' : '';
+
     return `
-      <div class="git-file-section ${sectionClass}">
-        <h3 class="git-section-header">${title} (${files.length})</h3>
-        <ul class="git-file-list">
+      <div class="git-panel">
+        <h3 class="git-panel-header">${title} (${files.length})</h3>
+        <ul class="git-file-list git-panel-content">
           ${fileListHTML}
         </ul>
       </div>
     `;
   }
 
-  _renderHistorySection(commits) {
+  _renderHistoryPanel(commits) {
     let historyListHTML = '';
     if (commits.length > 0) {
         historyListHTML = commits.map(commit => {
             const message = commit.commit.message.split('\n')[0];
             const shortOid = commit.oid.substring(0, 7);
             const author = commit.commit.author.name;
-            const date = new Date(commit.commit.author.timestamp * 1000).toLocaleString();
-            const parentOid = commit.commit.parent[0] || '';
+            const date = new Date(commit.commit.author.timestamp * 1000).toLocaleDateString();
             return `
-              <li class="git-history-item" data-oid="${commit.oid}" data-parent-oid="${parentOid}" data-author="${author}" data-date="${date}">
-                <div class="git-history-header">
-                  <span class="git-history-message">${message}</span>
-                  <span class="git-history-oid">${shortOid}</span>
+              <li class="git-history-item" data-oid="${commit.oid}" data-parent-oid="${commit.commit.parent[0] || ''}">
+                <div class="commit-message">${message}</div>
+                <div class="commit-meta">
+                  <span class="commit-author">${author}</span>
+                  <span class="commit-oid">${shortOid}</span>
+                  <span class="commit-date">${date}</span>
                 </div>
-                <div class="git-history-details" style="display: none;"></div>
               </li>
             `;
         }).join('');
     } else {
-        historyListHTML = '<li><span class="no-changes">No commit history.</span></li>';
+        historyListHTML = '<li class="no-changes">No commit history.</li>';
     }
     return `
-        <div class="git-history-section">
-            <h3 class="git-section-header">History</h3>
-            <ul class="git-history-list">
+        <div class="git-panel git-history-panel">
+            <h3 class="git-panel-header">History</h3>
+            <ul class="git-history-list git-panel-content">
                 ${historyListHTML}
             </ul>
         </div>
@@ -129,7 +156,8 @@ export class GitUI {
     const commitMessage = this.contentContainer.querySelector('#git-commit-message');
     const commitButton = this.contentContainer.querySelector('#git-commit-button');
     if (!commitMessage || !commitButton) return;
-    const hasStagedFiles = this.contentContainer.querySelector('.git-staged-section .git-file-item') !== null;
+    
+    const hasStagedFiles = !!this.contentContainer.querySelector('.git-file-item .unstage');
     const hasMessage = commitMessage.value.trim().length > 0;
     
     commitButton.disabled = !(hasStagedFiles && hasMessage);

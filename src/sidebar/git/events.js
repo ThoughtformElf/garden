@@ -1,3 +1,5 @@
+import { Modal } from '../../util/modal.js';
+
 export class GitEvents {
   constructor(sidebarContext) {
     this.sidebar = sidebarContext;
@@ -9,39 +11,43 @@ export class GitEvents {
   addListeners() {
     const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
     const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
-    const pushButton = this.contentContainer.querySelector('#git-push-button');
-    const pullButton = this.contentContainer.querySelector('#git-pull-button');
-
-    const updateConfig = () => {
-        this.sidebar.saveRemoteConfig(remoteUrlInput.value, remoteAuthInput.value);
-    };
-
-    remoteUrlInput.addEventListener('input', updateConfig);
-    remoteAuthInput.addEventListener('input', updateConfig);
+    if (remoteUrlInput && remoteAuthInput) {
+        const updateConfig = () => this.sidebar.saveRemoteConfig(remoteUrlInput.value, remoteAuthInput.value);
+        remoteUrlInput.addEventListener('input', updateConfig);
+        remoteAuthInput.addEventListener('input', updateConfig);
+    }
     
-    pushButton.addEventListener('click', () => this._handleRemoteAction('push'));
-    pullButton.addEventListener('click', () => this._handleRemoteAction('pull'));
-    
+    const viewContainer = this.contentContainer.querySelector('.git-main-layout');
+    if (viewContainer && !viewContainer.dataset.listenerAttached) {
+        viewContainer.dataset.listenerAttached = 'true';
+        viewContainer.addEventListener('click', (e) => this._handleClick(e));
+    }
+
     const commitMessage = this.contentContainer.querySelector('#git-commit-message');
     if (commitMessage && !commitMessage.dataset.listenerAttached) {
         commitMessage.dataset.listenerAttached = 'true';
         commitMessage.addEventListener('input', () => this.sidebar.updateCommitButtonState());
     }
-    
-    const viewContainer = this.contentContainer.querySelector('.git-view-container');
-    if (viewContainer && !viewContainer.dataset.listenerAttached) {
-        viewContainer.dataset.listenerAttached = 'true';
-        viewContainer.addEventListener('click', (e) => this._handleViewContainerClick(e));
-    }
-
-    const commitButton = this.contentContainer.querySelector('#git-commit-button');
-    if (commitButton && !commitButton.dataset.listenerAttached) {
-        commitButton.dataset.listenerAttached = 'true';
-        commitButton.addEventListener('click', () => this._handleCommitClick());
-    }
   }
 
-  async _handleRemoteAction(action) {
+  async _handleClick(e) {
+    const target = e.target;
+    if (target.id === 'git-pull-button') await this._handleRemoteAction('pull');
+    else if (target.id === 'git-push-button') await this._handleRemoteAction('push');
+    else if (target.id === 'git-commit-button') await this._handleCommit();
+    else if (target.id === 'git-new-branch-button') await this._handleNewBranch();
+    
+    const fileItem = target.closest('.git-file-item');
+    if (fileItem) await this._handleFileItemClick(target, fileItem);
+
+    const historyItem = target.closest('.git-history-item');
+    if (historyItem) await this._handleHistoryItemClick(historyItem);
+    
+    const branchItem = target.closest('.git-branch-item');
+    if (branchItem) await this._handleBranchItemClick(branchItem);
+  }
+
+  async _handleRemoteAction(action, force = false) {
     const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
     const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
     const pushButton = this.contentContainer.querySelector('#git-push-button');
@@ -49,135 +55,62 @@ export class GitEvents {
     const logArea = this.contentContainer.querySelector('#git-remote-log');
 
     const url = remoteUrlInput.value.trim();
-    const token = remoteAuthInput.value.trim();
     if (!url) {
       logArea.textContent = 'Error: Remote URL is required.';
       return;
     }
+    const token = remoteAuthInput.value.trim();
     
     pushButton.disabled = true;
     pullButton.disabled = true;
-    const actionVerb = action === 'push' ? 'Pushing' : 'Pulling';
-    logArea.textContent = `${actionVerb} to ${url}...`;
+    const actionVerb = action.charAt(0).toUpperCase() + action.slice(1);
+    logArea.textContent = `${actionVerb}ing...`;
     
     try {
-      const result = await this.gitClient[action](url, token, (msg) => {
-        logArea.textContent = msg;
-      });
-
-      if (result.ok) {
-        logArea.textContent = `${actionVerb} complete.`;
-      } else {
-        logArea.textContent = `Error: ${result.error || 'Unknown error'}`;
-      }
+      await this.gitClient[action](url, token, (msg) => logArea.textContent = msg, force);
+      logArea.textContent = `${actionVerb} complete.`;
       
+      await this.sidebar.refresh();
       if (action === 'pull') {
-          await this.sidebar.refresh();
-          await this.editor.forceReloadFile(this.editor.filePath);
+        await this.editor.forceReloadFile(this.editor.filePath);
       }
-
     } catch (e) {
-      console.error(`${actionVerb} failed:`, e);
-      logArea.textContent = `Error: ${e.message || 'Check console for details.'}`;
+        console.error(`Git ${action} failed:`, e); // Full error to console
+        logArea.textContent = `Error: ${e.message}`; // Clean message to UI
+        
+        if (e.name === 'MergeNotSupportedError') {
+            const choice = await Modal.choice({
+                title: 'Merge Conflict',
+                message: 'Automatic merge failed. The remote history has diverged. How would you like to resolve this?',
+                choices: [
+                    { id: 'force-pull', text: 'Force Pull (Overwrite Browser)', class: 'destructive' },
+                    { id: 'cancel', text: 'Cancel' }
+                ]
+            });
+            if (choice === 'force-pull') await this._handleRemoteAction('pull', true);
+            else logArea.textContent = 'Pull cancelled by user.';
+
+        } else if (e.name === 'PushRejectedError') {
+            const choice = await Modal.choice({
+                title: 'Push Rejected',
+                message: 'The push was rejected because the remote has changes you do not have. You must pull first. What would you like to do?',
+                choices: [
+                    { id: 'pull', text: 'Pull Latest Changes' },
+                    { id: 'force-push', text: 'Force Push (Overwrite Remote)', class: 'destructive' },
+                    { id: 'cancel', text: 'Cancel' }
+                ]
+            });
+            if (choice === 'pull') await this._handleRemoteAction('pull', false);
+            else if (choice === 'force-push') await this._handleRemoteAction('push', true);
+            else logArea.textContent = 'Push cancelled by user.';
+        }
     } finally {
       pushButton.disabled = false;
       pullButton.disabled = false;
     }
   }
 
-  async _handleViewContainerClick(e) {
-    const target = e.target;
-    const fileItem = target.closest('.git-file-item');
-    const historyItem = target.closest('.git-history-item');
-
-    if (fileItem) {
-      await this._handleFileItemClick(target, fileItem);
-    } else if (historyItem && target.closest('.git-history-header')) {
-      this._toggleHistoryDetails(historyItem);
-    } else if (target.closest('.history-file-path')) {
-      this._handleHistoryFileClick(target);
-    }
-  }
-
-  async _handleFileItemClick(target, fileItem) {
-    const filepath = fileItem.dataset.filepath;
-    if (target.matches('.git-file-path')) {
-        if (this.editor.filePath !== filepath) {
-            await this.editor.loadFile(filepath);
-        }
-        this.editor.showDiff(await this.gitClient.readBlob(filepath));
-    } else if (target.matches('.git-action-button')) {
-        target.closest('.git-file-item').style.pointerEvents = 'none'; // Prevent double clicks
-        if (target.classList.contains('discard')) {
-            const confirmed = await this.sidebar.showConfirm({
-                title: 'Discard Changes',
-                message: `Are you sure you want to discard all changes to "${filepath}"? This cannot be undone.`,
-                okText: 'Discard',
-                destructive: true
-            });
-            if (confirmed) {
-                await this.gitClient.discard(filepath);
-                if (this.editor.filePath === filepath) {
-                    await this.editor.forceReloadFile(filepath);
-                }
-                await this.sidebar.refresh();
-            }
-        } else if (target.classList.contains('stage')) {
-            await this.gitClient.stage(filepath);
-            await this.sidebar.renderGitView();
-        } else if (target.classList.contains('unstage')) {
-            await this.gitClient.unstage(filepath);
-            await this.sidebar.renderGitView();
-        }
-    }
-  }
-
-  async _toggleHistoryDetails(historyItem) {
-    const detailsPanel = historyItem.querySelector('.git-history-details');
-    const isVisible = detailsPanel.style.display !== 'none';
-    
-    if (isVisible) {
-      detailsPanel.style.display = 'none';
-    } else {
-      detailsPanel.style.display = 'block';
-      if (!detailsPanel.dataset.loaded) {
-        detailsPanel.innerHTML = '<span class="no-changes">Loading...</span>';
-        const oid = historyItem.dataset.oid;
-        const changedFiles = await this.gitClient.getChangedFiles(oid);
-        
-        const author = historyItem.dataset.author;
-        const date = historyItem.dataset.date;
-        const filesHTML = changedFiles.map(file => {
-          const path = typeof file === 'string' ? file : file.path;
-          return `<div class="history-file-path" data-path="${path}">${path.substring(1)}</div>`;
-        }).join('');
-        
-        detailsPanel.innerHTML = `
-          <div class="commit-meta">
-            <div><strong>Author:</strong> ${author}</div>
-            <div><strong>Date:</strong> ${date}</div>
-          </div>
-          <div class="history-file-list">${filesHTML || '<span class="no-changes">No files changed.</span>'}</div>
-        `;
-        detailsPanel.dataset.loaded = 'true';
-      }
-    }
-  }
-
-  async _handleHistoryFileClick(target) {
-    const viewContainer = this.contentContainer.querySelector('.git-view-container');
-    viewContainer.querySelectorAll('.history-file-path.active').forEach(el => el.classList.remove('active'));
-    target.classList.add('active');
-
-    const historyItemForFile = target.closest('.git-history-item');
-    const filepath = target.dataset.path;
-    const oid = historyItemForFile.dataset.oid;
-    const parentOid = historyItemForFile.dataset.parentOid;
-    
-    await this.editor.previewHistoricalFile(filepath, oid, parentOid);
-  }
-
-  async _handleCommitClick() {
+  async _handleCommit() {
     const commitButton = this.contentContainer.querySelector('#git-commit-button');
     const messageInput = this.contentContainer.querySelector('#git-commit-message');
     const message = messageInput.value.trim();
@@ -191,10 +124,97 @@ export class GitEvents {
         messageInput.value = '';
         await this.sidebar.refresh();
     } catch (err) {
-        console.error('Commit failed:', err);
-        await this.sidebar.showAlert({ title: 'Commit Failed', message: 'The commit failed. Please see the console for more details.' });
-        this.sidebar.updateCommitButtonState();
+        await this.sidebar.showAlert({ title: 'Commit Failed', message: 'See console for details.' });
+    } finally {
         commitButton.textContent = 'Commit';
+        this.sidebar.updateCommitButtonState();
+    }
+  }
+  
+  async _handleFileItemClick(target, fileItem) {
+    const filepath = fileItem.dataset.filepath;
+    
+    if (target.matches('.git-file-path')) {
+        await this.editor.loadFile(filepath);
+        this.editor.showDiff(await this.gitClient.readBlob(filepath));
+    } else if (target.matches('.discard')) {
+        const confirmed = await this.sidebar.showConfirm({
+            title: 'Discard Changes',
+            message: `Are you sure you want to discard all changes to "${filepath}"?`,
+            okText: 'Discard',
+            destructive: true
+        });
+        if (confirmed) {
+            await this.gitClient.discard(filepath);
+            if (this.editor.filePath === filepath) await this.editor.forceReloadFile(filepath);
+            await this.sidebar.refresh();
+        }
+    } else if (target.matches('.stage')) {
+        await this.gitClient.stage(filepath);
+        await this.sidebar.renderGitView();
+    } else if (target.matches('.unstage')) {
+        await this.gitClient.unstage(filepath);
+        await this.sidebar.renderGitView();
+    }
+  }
+
+  async _handleHistoryItemClick(historyItem) {
+    this.contentContainer.querySelectorAll('.git-history-item.active').forEach(el => el.classList.remove('active'));
+    historyItem.classList.add('active');
+
+    const oid = historyItem.dataset.oid;
+    const parentOid = historyItem.dataset.parentOid;
+    const detailsPanel = this.contentContainer.querySelector('#git-commit-details .git-panel-content');
+    detailsPanel.innerHTML = '<span class="no-changes">Loading...</span>';
+
+    const changedFiles = await this.gitClient.getChangedFiles(oid);
+    
+    const filesHTML = changedFiles.map(path => {
+      return `<li class="git-file-item" data-path="${path}" data-oid="${oid}" data-parent-oid="${parentOid}">
+                <span class="git-file-path">${path.substring(1)}</span>
+              </li>`;
+    }).join('');
+
+    detailsPanel.innerHTML = `<ul class="git-file-list">${filesHTML || '<li class="no-changes">No files in commit.</li>'}</ul>`;
+    
+    detailsPanel.querySelectorAll('.git-file-item').forEach(item => {
+        item.addEventListener('click', async () => {
+            const path = item.dataset.path;
+            const itemOid = item.dataset.oid;
+            const itemParentOid = item.dataset.parentOid;
+            detailsPanel.querySelectorAll('.git-file-item.active').forEach(el => el.classList.remove('active'));
+            item.classList.add('active');
+            await this.editor.previewHistoricalFile(path, itemOid, itemParentOid);
+        });
+    });
+  }
+  
+  async _handleNewBranch() {
+    const branchName = await Modal.prompt({ title: 'Create New Branch', label: 'Enter branch name:' });
+    if (!branchName || !branchName.trim()) return;
+    try {
+        await this.gitClient.branch(branchName.trim());
+        await this.gitClient.checkout(branchName.trim());
+        await this.sidebar.refresh();
+    } catch (e) {
+        await this.sidebar.showAlert({ title: 'Error', message: `Could not create branch: ${e.message}`});
+    }
+  }
+  
+  async _handleBranchItemClick(branchItem) {
+    const branchName = branchItem.dataset.branchName;
+    if (branchItem.classList.contains('active')) return;
+    try {
+      await this.gitClient.checkout(branchName);
+      await this.sidebar.refresh();
+      // Reload all open files in all panes to reflect the new branch state
+      for (const pane of window.thoughtform.workspace.panes.values()) {
+        if (pane.editor.gitClient.gardenName === this.gitClient.gardenName) {
+            await pane.editor.forceReloadFile(pane.editor.filePath);
+        }
+      }
+    } catch (e) {
+      await this.sidebar.showAlert({ title: 'Error', message: `Could not switch to branch: ${e.message}` });
     }
   }
 }

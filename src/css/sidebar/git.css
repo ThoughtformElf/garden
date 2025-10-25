@@ -191,3 +191,177 @@
   white-space: pre-wrap;
   word-wrap: break-word;
 }
+
+
+
+/* ---------------- */
+
+/* --- NEW GIT UI STYLES --- */
+.git-main-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.git-left-column, .git-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.git-panel {
+  background-color: var(--color-background-secondary);
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.git-panel-header {
+  font-size: 0.9em;
+  font-weight: bold;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+  margin: 0;
+}
+
+.git-panel-content {
+  padding: 10px;
+  overflow-y: auto;
+}
+
+/* Specific Panel Adjustments */
+.git-history-panel {
+  flex-grow: 1; /* Allow history to take up space */
+}
+#git-commit-details {
+  min-height: 150px;
+}
+.git-history-list, .git-file-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+.git-panel-content .git-file-list {
+  padding: 0; /* Remove padding when inside a panel content */
+}
+
+/* Remote Panel */
+.git-remote-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.git-remote-actions button {
+  flex-grow: 1;
+}
+.git-remote-log {
+  margin-top: 8px;
+  font-size: 0.8em;
+  color: var(--color-text-secondary);
+  height: 1.2em;
+  line-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* File & History Items */
+.git-file-item, .git-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+.git-file-item:hover, .git-history-item:hover {
+  background-color: var(--color-background-hover);
+}
+.git-file-item.active, .git-history-item.active {
+  background-color: var(--base-accent-action);
+  color: var(--color-text-bright);
+}
+.git-file-path {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.git-action-button {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  width: 22px;
+  height: 22px;
+  margin-left: 5px;
+  padding: 0;
+  line-height: 20px;
+  text-align: center;
+}
+.git-action-button:hover {
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+/* History Item Details */
+.git-history-item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.commit-message {
+  font-weight: bold;
+}
+.commit-meta {
+  font-size: 0.9em;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.commit-author {
+  flex-grow: 1;
+}
+.git-history-item.active .commit-meta,
+.git-history-item.active .commit-author {
+  color: var(--color-text-bright);
+}
+
+/* General & Utility */
+.full-width {
+  width: 100%;
+}
+.no-changes {
+  font-style: italic;
+  color: var(--color-text-secondary);
+  padding: 5px;
+}
+
+/* --- NEW GIT BRANCH PANEL STYLES --- */
+.git-branch-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.git-branch-item {
+  padding: 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+.git-branch-item:hover {
+  background-color: var(--color-background-hover);
+}
+.git-branch-item.active {
+  background-color: var(--base-accent-info);
+  color: var(--color-text-bright);
+  font-weight: bold;
+}

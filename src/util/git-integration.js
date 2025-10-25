@@ -37,8 +37,6 @@ export class Git {
         defaultBranch: 'main'
       });
 
-      // For brand new, user-created gardens, create a placeholder file.
-      // Core gardens like 'Settings' will be populated by the seeder, overwriting this if necessary.
       const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
       await this.pfs.writeFile('/home', defaultContent, 'utf8');
 
@@ -75,7 +73,7 @@ export class Git {
             await this.pfs.unlink(path);
         }
     } catch (e) {
-        if (e.code !== 'ENOENT') { // Ignore if file/dir doesn't exist
+        if (e.code !== 'ENOENT') { 
             console.error(`Error during rmrf for ${path}:`, e);
             throw e;
         }
@@ -185,21 +183,25 @@ export class Git {
     return sha;
   }
   
-  async push(url, token, onProgress) {
+  async push(url, token, onProgress, force = false) {
+    // Reverted to safe default: force is an OPTION, not the default.
     return await git.push({
       fs: this.fs, http, dir: '/', url: url,
+      force: force,
       onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
       onAuth: () => ({ username: token }),
     });
   }
 
-  async pull(url, token, onProgress) {
+  async pull(url, token, onProgress, force = false) {
     return await git.pull({
       fs: this.fs, http, dir: '/', url: url,
+      ref: 'main',
+      singleBranch: true,
+      force: force,
       onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
       onAuth: () => ({ username: token }),
       author: { name: 'User', email: 'user@thoughtform.garden' },
-      singleBranch: true, fastForward: true,
     });
   }
 
@@ -307,5 +309,24 @@ export class Git {
 
   async getStatuses() {
     return git.statusMatrix({ fs: this.fs, dir: '/' });
+  }
+  
+  async listBranches() {
+    try {
+      const branches = await git.listBranches({ fs: this.fs, dir: '/' });
+      const currentBranch = await git.currentBranch({ fs: this.fs, dir: '/', fullname: false });
+      return { branches, currentBranch };
+    } catch (e) {
+      console.error("Error listing branches:", e);
+      return { branches: [], currentBranch: null };
+    }
+  }
+
+  async branch(branchName) {
+    return git.branch({ fs: this.fs, dir: '/', ref: branchName });
+  }
+
+  async checkout(branchName) {
+    return git.checkout({ fs: this.fs, dir: '/', ref: branchName });
   }
 }

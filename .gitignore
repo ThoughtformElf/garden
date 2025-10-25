@@ -2,3 +2,4 @@ node_modules
 test/
 backups/
 src/gardens/home
+src/workspace/bundles/*.json

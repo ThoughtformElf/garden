@@ -256,36 +256,3 @@ export async function deleteGardens(gardensToDelete, log) {
     }
   }, 2000);
 }
-
-/**
- * DESTRUCTIVELY resets the 'Settings' garden. It deletes the existing garden
- * and allows the seeder to re-create it from the submodule on the next page load.
- * @param {function(string)} log - A logging callback for progress.
- */
-export async function resetDefaultSettings(log) {
-  log('Starting to reset default settings...');
-  log('This will PERMANENTLY DELETE your current "Settings" garden.');
-  
-  try {
-    // 1. Delete the 'Settings' garden entirely.
-    await deleteGardens(['Settings'], log);
-
-    // 2. Remove 'Settings' from the list of already-seeded gardens.
-    const seededGardensRaw = localStorage.getItem('thoughtform_seeded_gardens');
-    if (seededGardensRaw) {
-      const seededGardens = new Set(JSON.parse(seededGardensRaw));
-      seededGardens.delete('Settings');
-      localStorage.setItem('thoughtform_seeded_gardens', JSON.stringify(Array.from(seededGardens)));
-      log('Removed "Settings" from the seeded list.');
-    }
-
-    log('The "Settings" garden has been deleted.');
-    log('It will be restored from the default source on the next page load.');
-    log('Reloading now...');
-    
-    setTimeout(() => window.location.reload(), 2500);
-  } catch (error) {
-    log(`ERROR: Could not reset settings: ${error.message}`);
-    log('Please check the console for more details.');
-  }
-}
