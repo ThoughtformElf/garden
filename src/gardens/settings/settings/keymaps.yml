@@ -1,0 +1,85 @@
+# Thoughtform.Garden Keymap Settings
+#
+# This file maps keyboard shortcuts to executable script files.
+# The 'run' path is the literal path from the root of the garden where this file resides.
+
+- key: "Mod-["
+  run: "settings/keymaps/toggle-sidebar.js"
+
+- key: "Mod-Enter"
+  run: "settings/keymaps/navigate-or-prompt.js"
+
+- key: "Mod-Shift-Enter"
+  run: "settings/keymaps/navigate-in-new-pane.js"
+
+# --- NEW KEYBINDING ---
+- key: "Alt-Enter"
+  run: "settings/keymaps/open-in-window.js"
+
+- key: "Mod-`"
+  run: "settings/keymaps/toggle-devtools.js"
+
+- key: "Mod-p"
+  run: "settings/keymaps/search-files.js"
+
+- key: "Mod-Shift-p"
+  run: "settings/keymaps/execute-command.js"
+
+- key: "Mod-Shift-f"
+  run: "settings/keymaps/global-search.js"
+
+- key: "Mod-Shift-d"
+  run: "settings/keymaps/duplicate-current-file.js"
+
+- key: "Mod-Alt-d"
+  run: "settings/keymaps/duplicate-current-garden.js"
+
+- key: "Mod-Alt-n"
+  run: "settings/keymaps/new-file.js"
+
+- key: "Mod-Shift-g"
+  run: "settings/keymaps/new-garden.js"
+
+- key: "Mod-r"
+  run: "settings/keymaps/rename-current-file.js"
+
+- key: "Mod-c"
+  run: "internal:cancel-agent"
+
+- key: "Alt-ArrowLeft"
+  run: "settings/keymaps/browser-back.js"
+
+- key: "Alt-ArrowRight"
+  run: "settings/keymaps/browser-forward.js"
+
+- key: "Mod-\\"
+  run: "settings/keymaps/split-pane-vertical.js"
+
+- key: "Mod-Shift-\\"
+  run: "settings/keymaps/split-pane-horizontal.js"
+
+- key: "Alt-Shift-ArrowRight"
+  run: "settings/keymaps/select-next-pane.js"
+- key: "Alt-l"
+  run: "settings/keymaps/select-next-pane.js"
+
+- key: "Alt-Shift-ArrowLeft"
+  run: "settings/keymaps/select-prev-pane.js"
+- key: "Alt-h"
+  run: "settings/keymaps/select-prev-pane.js"
+
+- key: "Alt-Shift-ArrowDown"
+  run: "settings/keymaps/move-pane-down.js"
+- key: "Alt-j"
+  run: "settings/keymaps/move-pane-down.js"
+
+- key: "Alt-Shift-ArrowUp"
+  run: "settings/keymaps/move-pane-up.js"
+- key: "Alt-k"
+  run: "settings/keymaps/move-pane-up.js"
+
+- key: "Alt-x"
+  run: "settings/keymaps/close-pane.js"
+
+- key: "Alt-z"
+  run: "settings/keymaps/toggle-maximize-pane.js"
