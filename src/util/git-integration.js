@@ -1,7 +1,6 @@
 import FS from '@isomorphic-git/lightning-fs';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
-import { defaultFiles } from '../settings/defaults.js';
 
 /**
  * @class Git
@@ -38,32 +37,15 @@ export class Git {
         defaultBranch: 'main'
       });
 
-      if (this.gardenName === 'Settings') {
-        await this.populateDefaultSettings();
-      } else {
-        const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
-        await this.pfs.writeFile('/home', defaultContent, 'utf8');
-      }
+      // For brand new, user-created gardens, create a placeholder file.
+      // Core gardens like 'Settings' will be populated by the seeder, overwriting this if necessary.
+      const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
+      await this.pfs.writeFile('/home', defaultContent, 'utf8');
 
       this.registerNewGarden();
       console.log('New garden initialized successfully.');
     } catch (e) {
       console.error('Error initializing repository:', e);
-    }
-  }
-  
-  async populateDefaultSettings() {
-    console.log('[Git] Populating "Settings" garden with default files...');
-    // The writeFile method now handles creating directories automatically,
-    // so explicit ensureDir calls here were redundant and a source of bugs.
-    // They have been removed for simplicity and correctness.
-    
-    for (const [path, content] of defaultFiles) {
-      try {
-        await this.writeFile(path, content, 'utf8');
-      } catch (error) {
-        console.error(`[Git] Failed to write default setting file: ${path}`, error);
-      }
     }
   }
 

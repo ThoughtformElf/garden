@@ -1,7 +1,6 @@
 import JSZip from 'jszip';
 import { Git } from '../../util/git-integration.js';
 import { Modal } from '../../util/modal.js';
-import { defaultFiles } from '../../settings/defaults.js';
 
 async function listAllFiles(gitClient, dir) {
   const pfs = gitClient.pfs;
@@ -259,29 +258,34 @@ export async function deleteGardens(gardensToDelete, log) {
 }
 
 /**
- * Overwrites the default setting and hook files in the 'Settings' garden
- * with the latest hardcoded versions from the application source.
+ * DESTRUCTIVELY resets the 'Settings' garden. It deletes the existing garden
+ * and allows the seeder to re-create it from the submodule on the next page load.
  * @param {function(string)} log - A logging callback for progress.
  */
 export async function resetDefaultSettings(log) {
   log('Starting to reset default settings...');
+  log('This will PERMANENTLY DELETE your current "Settings" garden.');
+  
+  try {
+    // 1. Delete the 'Settings' garden entirely.
+    await deleteGardens(['Settings'], log);
 
-  const settingsGit = new Git('Settings');
-  await settingsGit.initRepo();
-
-  // THIS IS THE FIX: The incorrect, explicit directory creation calls have been removed.
-  // The writeFile method below is now the single source of truth for creating
-  // the correct directory structure (e.g., /settings/keymaps) as needed.
-
-  for (const [path, content] of defaultFiles) {
-    try {
-      log(`Restoring: ${path}`);
-      await settingsGit.writeFile(path, content);
-    } catch (error) {
-      log(`ERROR: Failed to restore ${path}: ${error.message}`);
+    // 2. Remove 'Settings' from the list of already-seeded gardens.
+    const seededGardensRaw = localStorage.getItem('thoughtform_seeded_gardens');
+    if (seededGardensRaw) {
+      const seededGardens = new Set(JSON.parse(seededGardensRaw));
+      seededGardens.delete('Settings');
+      localStorage.setItem('thoughtform_seeded_gardens', JSON.stringify(Array.from(seededGardens)));
+      log('Removed "Settings" from the seeded list.');
     }
-  }
 
-  log('Default settings restored. Reloading to apply changes...');
-  setTimeout(() => window.location.reload(), 2000);
+    log('The "Settings" garden has been deleted.');
+    log('It will be restored from the default source on the next page load.');
+    log('Reloading now...');
+    
+    setTimeout(() => window.location.reload(), 2500);
+  } catch (error) {
+    log(`ERROR: Could not reset settings: ${error.message}`);
+    log('Please check the console for more details.');
+  }
 }

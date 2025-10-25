@@ -9,11 +9,10 @@ import { Sidebar } from '../sidebar/sidebar.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
 import { getLanguageExtension } from './languages.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
-import { KeymapService } from '../workspace/keymaps.js';
+import { KeymapService } from '../workspace/keymaps.js'; // Back to the simpler class
 import { createEditorExtensions } from './extensions.js';
 import { statusBarPlugin } from './status-bar.js';
 
-// Import the new action handlers
 import { EditorFiles } from './files.js';
 import { EditorGit } from './git.js';
 import { EditorState } from './state.js';
@@ -35,8 +34,8 @@ export class Editor {
     this.sidebar = null;
     this.filePath = initialFile || '/home';
     this.isReady = false;
-    this.keymapService = null;
-    this.aiOverrides = {}; // Property to hold session-specific AI settings
+    this.keymapService = new KeymapService(this); // Editor owns its keymap service again
+    this.aiOverrides = {};
 
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();
@@ -47,7 +46,6 @@ export class Editor {
     
     this.programmaticChange = Annotation.define();
 
-    // Instantiate helper classes
     this._files = new EditorFiles(this);
     this._git = new EditorGit(this);
     this._state = new EditorState(this);
@@ -75,7 +73,6 @@ export class Editor {
       });
       await this.sidebar.init();
 
-      // Use a global flag to ensure this only runs once for the whole app.
       if (!window.thoughtform._dragDropInitialized) {
         initializeDragAndDrop(this.sidebar);
         window.thoughtform._dragDropInitialized = true;
@@ -104,11 +101,6 @@ export class Editor {
         this.debouncedStateSave();
       }
     });
-    
-    const tempState = CodeMirrorEditorState.create({ doc: initialContent });
-    const tempView = new EditorView({ state: tempState });
-    this.keymapService = new KeymapService(tempView);
-    const dynamicKeymapExtension = this.keymapService.getCompartment();
 
     const extensions = createEditorExtensions({
       appContext: appContextField.init(() => ({
@@ -116,7 +108,7 @@ export class Editor {
         sidebar: this.sidebar,
         editor: this,
       })),
-      dynamicKeymapExtension,
+      keymapCompartment: this.keymapService.keymapCompartment, // Pass the compartment
       vimCompartment: this.vimCompartment,
       defaultKeymapCompartment: this.defaultKeymapCompartment,
       languageCompartment: this.languageCompartment,
@@ -132,9 +124,6 @@ export class Editor {
       parent: this.targetElement,
     });
     
-    this.keymapService.editorView = this.editorView;
-    tempView.destroy();
-
     Editor.editors.push(this);
     this.isReady = true;
 
@@ -149,18 +138,19 @@ export class Editor {
       this.editorView.dispatch({
         effects: [
           this.vimCompartment.reconfigure(vim()),
-          this.defaultKeymapCompartment.reconfigure([]) // Disable default keymap in VIM mode
+          this.defaultKeymapCompartment.reconfigure([])
         ]
       });
     } else {
        this.editorView.dispatch({
         effects: [
           this.vimCompartment.reconfigure([]),
-          this.defaultKeymapCompartment.reconfigure(keymap.of(defaultKeymap)) // Enable default keymap
+          this.defaultKeymapCompartment.reconfigure(keymap.of(defaultKeymap))
         ]
       });
     }
     
+    // This is the crucial change: trigger the keymap update AFTER all other settings are applied.
     if (this.keymapService) {
       await this.keymapService.updateKeymaps();
     }
@@ -208,8 +198,6 @@ export class Editor {
       }
     }
   }
-
-  // --- API Methods (Delegating to helper classes) ---
 
   getFilePath(hash) { return this._files.getFilePath(hash); }
   loadFileContent(filepath) { return this._files.loadFileContent(filepath); }

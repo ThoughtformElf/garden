@@ -16,7 +16,7 @@ import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'
  * Creates the complete array of CodeMirror extensions for the editor.
  * @param {object} options - Configuration options for the extensions.
  * @param {object} options.appContext - The application context.
- * @param {object} options.dynamicKeymapExtension - The keymap compartment.
+ * @param {object} options.keymapCompartment - The keymap compartment for this editor.
  * @param {object} options.vimCompartment - The vim compartment.
  * @param {object} options.defaultKeymapCompartment - The compartment for the default keymap.
  * @param {object} options.languageCompartment - The language compartment.
@@ -28,7 +28,7 @@ import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'
  */
 export function createEditorExtensions({
   appContext,
-  dynamicKeymapExtension,
+  keymapCompartment,
   vimCompartment,
   defaultKeymapCompartment,
   languageCompartment,
@@ -39,9 +39,9 @@ export function createEditorExtensions({
 }) {
   return [
     appContextCompartment.of(appContext),
-    dynamicKeymapExtension, // Highest priority for user-configurable keys
-    vimCompartment.of([]), // For VIM mode, managed in editor.js
-    defaultKeymapCompartment.of(keymap.of(defaultKeymap)), // For default mode, managed in editor.js
+    keymapCompartment.of(keymap.of([])), // Start with an empty keymap
+    vimCompartment.of([]),
+    defaultKeymapCompartment.of(keymap.of(defaultKeymap)),
     keymap.of([indentWithTab]),
     lineNumbers(),
     highlightActiveLineGutter(),
@@ -60,7 +60,6 @@ export function createEditorExtensions({
     highlightActiveLine(),
     highlightSelectionMatches(),
     keymap.of([
-      // The defaultKeymap is now in its own compartment and is no longer here.
       ...closeBracketsKeymap,
       ...searchKeymap,
       ...historyKeymap,

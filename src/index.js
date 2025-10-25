@@ -18,15 +18,13 @@ import { registerSW } from 'virtual:pwa-register';
 import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace/index.js';
 import { initializeQueryLoader } from './workspace/query-loader.js';
+import { seedCoreGardens } from './workspace/core-gardens.js';
+// Keymap service is no longer initialized here.
 
 function initializeNavigationListener() {
     const handleNav = async () => {
-        // --- THIS IS THE FIX (Part 2) ---
-        // At the beginning of any navigation, update the session state from the URL.
         window.thoughtform.workspace.updateSessionFromUrl();
-        // Now run the autoloaders based on the newly synced session state.
         await initializeQueryLoader();
-        // --- END OF FIX (Part 2) ---
 
         const fullPath = new URL(import.meta.url).pathname;
         const srcIndex = fullPath.lastIndexOf('/src/');
@@ -58,6 +56,8 @@ function initializeNavigationListener() {
 
 // --- Main Application Logic ---
 async function main() {
+  await seedCoreGardens();
+
   const fullPath = new URL(import.meta.url).pathname;
   const srcIndex = fullPath.lastIndexOf('/src/');
   const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
@@ -82,6 +82,7 @@ async function main() {
     ai: initializeAiService(),
     config: initializeConfigService(),
     events: initializeEventBus(),
+    // Keymap service is no longer on the global object.
   };
   
   window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
@@ -94,8 +95,6 @@ async function main() {
         okText: 'Reload'
       }).then(confirmed => {
         if (confirmed) {
-          // This will message the service worker to skip waiting and activate the new version.
-          // The 'autoUpdate' strategy in vite.config.js will then handle the reload.
           const registration = window.pwaRegistration;
           if (registration && registration.waiting) {
             registration.waiting.postMessage({ type: 'SKIP_WAITING' });
@@ -146,11 +145,8 @@ async function main() {
   
   const handleInitialNav = initializeNavigationListener();
   
-  // This initial call will now correctly set up the session state
-  // BEFORE any content is loaded.
   await handleInitialNav(); 
 
-  // Now that all initial loading is complete, we can enable URL updates.
   window.thoughtform.workspace.isInitialized = true;
 
   window.thoughtform.events.publish('app:load');

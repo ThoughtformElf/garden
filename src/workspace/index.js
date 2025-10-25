@@ -107,6 +107,9 @@ export class WorkspaceManager {
         editor: editor,
       })))
     });
+    
+    // Publish an event AFTER the garden context has been switched.
+    window.thoughtform.events.publish('workspace:garden:switched', { editor });
 
     await this.openFile(gardenName, '/home');
     
@@ -142,6 +145,8 @@ export class WorkspaceManager {
                 editor: editor,
             })))
         });
+        // Also publish the event when opening a file from a different garden.
+        window.thoughtform.events.publish('workspace:garden:switched', { editor });
     }
 
     await editor.loadFile(path);

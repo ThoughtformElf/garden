@@ -6,14 +6,12 @@ import { parse } from 'yaml';
 import { appContextField } from '../editor/navigation.js';
 import { internalCommands } from '../editor/keymaps/internal-commands.js';
 
-import defaultKeymapsYml from '../settings/keymaps.yml?raw';
-
 export class KeymapService {
-  constructor(editorView) {
-    if (!editorView) {
-      throw new Error("KeymapService requires an EditorView instance.");
+  constructor(editor) {
+    if (!editor) {
+      throw new Error("KeymapService requires an Editor instance.");
     }
-    this.editorView = editorView;
+    this.editor = editor;
     this.keymapCompartment = new Compartment();
     this.currentKeymap = keymap.of([]);
   }
@@ -23,50 +21,46 @@ export class KeymapService {
   }
 
   async updateKeymaps() {
-    const appContext = this.editorView.state.field(appContextField);
-    if (!appContext || !appContext.gitClient) {
-      console.warn('[KeymapService] Could not find gitClient in editor context. Cannot update keymaps.');
+    if (!this.editor.gitClient) {
       return;
     }
-    const currentGarden = appContext.gitClient.gardenName;
+    const currentGarden = this.editor.gitClient.gardenName;
 
     const readKeymapFile = async (gardenName) => {
       try {
         const git = new Git(gardenName);
-        await git.initRepo();
         const content = await git.pfs.readFile(`/settings/keymaps.yml`, 'utf8');
-        return parse(content);
+        return { config: parse(content), sourceGarden: gardenName };
       } catch (e) {
         return null;
       }
     };
 
-    const hardcodedConfig = parse(defaultKeymapsYml) || [];
-    const globalConfig = await readKeymapFile('Settings');
-    const gardenConfig = currentGarden !== 'Settings'
-      ? await readKeymapFile(currentGarden)
-      : null;
-
     const mergedKeymap = new Map();
-    const processConfig = (config, sourceGarden) => {
-      if (!Array.isArray(config)) return;
-      for (const binding of config) {
+
+    const processConfig = (result) => {
+      if (!result || !Array.isArray(result.config)) return;
+      for (const binding of result.config) {
         if (binding && binding.key && binding.hasOwnProperty('run')) {
-          mergedKeymap.set(binding.key, { ...binding, sourceGarden });
+          mergedKeymap.set(binding.key, { ...binding, sourceGarden: result.sourceGarden });
         }
       }
     };
 
-    processConfig(hardcodedConfig, 'Settings');
-    processConfig(globalConfig, 'Settings');
-    processConfig(gardenConfig, currentGarden);
+    const globalResult = await readKeymapFile('Settings');
+    processConfig(globalResult);
+    
+    if (currentGarden !== 'Settings') {
+      const gardenResult = await readKeymapFile(currentGarden);
+      processConfig(gardenResult);
+    }
 
     const finalConfig = Array.from(mergedKeymap.values());
     const newKeymapExtension = this._buildKeymapExtension(finalConfig);
 
-    if (this.currentKeymap !== newKeymapExtension && this.editorView && !this.editorView.isDestroyed) {
+    if (this.editor.editorView && !this.editor.editorView.isDestroyed) {
       this.currentKeymap = newKeymapExtension;
-      this.editorView.dispatch({
+      this.editor.editorView.dispatch({
         effects: this.keymapCompartment.reconfigure(this.currentKeymap),
       });
     }
@@ -74,25 +68,19 @@ export class KeymapService {
 
   _buildKeymapExtension(config) {
     const keyBindings = config.map(binding => {
-      let { key, run, sourceGarden } = binding;
+      const { key, run, sourceGarden } = binding;
+      if (!run) return null;
       
-      if (!run) {
-        return null; // A null 'run' value disables the keybinding.
-      }
-      
-      // Check for the "internal:" prefix to handle special, hardcoded commands.
       if (typeof run === 'string' && run.startsWith('internal:')) {
         const commandName = run.substring(9);
         const commandFn = internalCommands.get(commandName);
         if (commandFn) {
           return { key, run: commandFn };
         } else {
-          console.warn(`[KeymapService] Unknown internal command: "${commandName}"`);
           return null;
         }
       }
 
-      // Default behavior: treat 'run' as a path to a user script.
       const fullPath = `${sourceGarden}#${run}`;
       return {
         key: key,
@@ -101,7 +89,7 @@ export class KeymapService {
           if (appContext.editor && appContext.gitClient) {
             executeFile(fullPath, appContext.editor, appContext.gitClient);
           }
-          return true; // Assume handled.
+          return true;
         },
       };
     }).filter(Boolean);

@@ -2,9 +2,9 @@ import { getAllTools } from './manager/tool-manager.js';
 import { Traversal } from './traversal.js';
 import { Git } from '../util/git-integration.js';
 import { countTokens } from 'gpt-tokenizer';
-import selectToolPromptTemplate from '../settings/prompts/select-tool.md?raw';
-import critiqueStepPromptTemplate from '../settings/prompts/critique-step.md?raw';
-import synthesizeAnswerPromptTemplate from '../settings/prompts/synthesize-answer.md?raw';
+import selectToolPromptTemplate from '../gardens/settings/settings/prompts/select-tool.md?raw';
+import critiqueStepPromptTemplate from '../gardens/settings/settings/prompts/critique-step.md?raw';
+import synthesizeAnswerPromptTemplate from '../gardens/settings/settings/prompts/synthesize-answer.md?raw';
 
 export class TaskRunner {
     constructor({ gitClient, aiService, initialContext }) {

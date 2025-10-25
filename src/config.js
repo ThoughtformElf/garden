@@ -1,15 +1,6 @@
 import { Git } from './util/git-integration.js';
 import { parse } from 'yaml';
 
-// --- Vite Raw Imports for Hardcoded Defaults ---
-import defaultInterface from './settings/interface.yml?raw';
-import defaultKeymaps from './settings/keymaps.yml?raw';
-
-const hardcodedDefaults = {
-  'interface.yml': parse(defaultInterface),
-  'keymaps.yml': parse(defaultKeymaps)
-};
-
 class ConfigService {
   constructor() {
     this.cache = new Map();
@@ -34,24 +25,24 @@ class ConfigService {
     }
 
     if (!gardenName) {
-      console.warn('[ConfigService] Could not determine a garden context for get(). Using hardcoded defaults.');
-      return { value: this._getHardcoded(file, key), sourceGarden: null };
+      console.warn('[ConfigService] Could not determine a garden context for get().');
+      return { value: undefined, sourceGarden: null };
     }
     
     const settingsFilePath = `settings/${file}`;
 
-    // 1. Current Garden's settings folder
+    // 1. Current Garden's settings folder (The Override)
     const { value: gardenValue, sourceGarden } = await this._readAndCache(gardenName, settingsFilePath, key);
     if (gardenValue !== undefined) return { value: gardenValue, sourceGarden };
     
-    // 2. Global Settings Garden (if we didn't already check it)
+    // 2. Global Settings Garden (The Base Layer)
     if (gardenName !== 'Settings') {
         const { value: globalValue, sourceGarden: globalSource } = await this._readAndCache('Settings', settingsFilePath, key);
         if (globalValue !== undefined) return { value: globalValue, sourceGarden: globalSource };
     }
 
-    // 3. Hardcoded Default
-    return { value: this._getHardcoded(file, key), sourceGarden: null };
+    // 3. If not found anywhere, return undefined. There are no more hardcoded fallbacks.
+    return { value: undefined, sourceGarden: null };
   }
   
   /**
@@ -106,9 +97,12 @@ class ConfigService {
       const git = new Git(gardenName);
       const content = await git.readFile(fullPath);
       
+      // We must check if the file actually exists, as readFile can throw.
+      // A stat call is a reliable way to confirm existence.
       try {
         await git.pfs.stat(fullPath);
       } catch (statError) {
+        // This handles cases where readFile might succeed on a deleted but cached file.
         return { value: undefined, sourceGarden: null };
       }
       
@@ -118,14 +112,11 @@ class ConfigService {
       return { value, sourceGarden: gardenName };
 
     } catch (e) {
+      // If reading fails (e.g., file not found), cache a 'null' to prevent re-reads
+      // and return undefined.
       this.cache.set(cacheKey, null);
       return { value: undefined, sourceGarden: null };
     }
-  }
-
-  _getHardcoded(file, key) {
-    const defaultConfig = hardcodedDefaults[file];
-    return key ? defaultConfig?.[key] : defaultConfig;
   }
 
   invalidate(gardenName, filePath) {

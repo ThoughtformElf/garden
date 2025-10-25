@@ -1,13 +1,7 @@
 import { Git } from '../../util/git-integration.js';
 import { Traversal } from '../traversal.js';
-import { defaultFiles } from '../../settings/defaults.js';
 
 const toolCache = new Map();
-const hardcodedTools = new Map(
-  defaultFiles
-    .filter(([path]) => path.startsWith('/settings/tools/'))
-    .map(([path, content]) => [path, content])
-);
 
 function parseToolMetadata(code) {
   // This regex finds ALL comment blocks, both multiline (/* ... */)
@@ -46,18 +40,20 @@ async function loadTool(toolPath, contextGarden) {
   let sourceGarden = contextGarden;
 
   try {
+    // Attempt to read from the current garden first.
     const git = new Git(contextGarden);
     code = await git.readFile(toolPath);
   } catch (e) {
+    // If it fails (e.g., doesn't exist), try the global 'Settings' garden.
     if (!e.message.includes('does not exist')) throw e;
     try {
       sourceGarden = 'Settings';
       const git = new Git(sourceGarden);
       code = await git.readFile(toolPath);
     } catch (e2) {
+      // If it's not in 'Settings' either, then it truly doesn't exist.
       if (!e2.message.includes('does not exist')) throw e2;
-      code = hardcodedTools.get(toolPath);
-      sourceGarden = 'Default';
+      return null; // Return null if the tool is not found in either location.
     }
   }
 
@@ -68,8 +64,7 @@ async function loadTool(toolPath, contextGarden) {
     const name = toolPath.split('/').pop().replace('.js', '');
     const description = parseToolMetadata(code);
     
-    // --- THIS IS THE FIX ---
-    // The tool's code is now wrapped in a try...catch block.
+    // The tool's code is wrapped in a try...catch block.
     // This logs the full error for debugging but returns a simple
     // message to the agent so it can reason about the failure.
     const execute = new Function('args', 'context', `
@@ -94,7 +89,7 @@ async function loadTool(toolPath, contextGarden) {
 
 export async function getAllTools(currentGardenName) {
   const allTools = new Map();
-  const toolPaths = new Set(hardcodedTools.keys());
+  const toolPaths = new Set(); // Start with an empty set.
   const gardensToScan = Array.from(new Set([currentGardenName, 'Settings']));
 
   for (const gardenName of gardensToScan) {
@@ -107,6 +102,7 @@ export async function getAllTools(currentGardenName) {
         }
       }
     } catch (e) {
+      // It's normal for a garden not to have a tools directory.
       if (e.code !== 'ENOENT') console.warn(`[ToolManager] Could not scan tools in "${gardenName}":`, e);
     }
   }
