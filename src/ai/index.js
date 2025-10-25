@@ -1,9 +1,8 @@
 import { streamChatCompletion as streamGemini } from './models/gemini.js';
 import { streamChatCompletion as streamOpenAICompatible } from './models/openai-compatible.js';
-import { streamChatCompletion as streamWebLlm, initializeEngine as initializeWebLlm } from './models/web-llm.js';
+import { getChatCompletionGenerator as getWebLlmGenerator, initializeEngine as initializeWebLlm } from './models/web-llm.js';
 import { TaskRunner } from '../agent/runner.js';
 import { countTokens } from 'gpt-tokenizer';
-// --- THIS IS THE CORRECT IMPORT ---
 import * as webllm from "@mlc-ai/web-llm";
 
 class AiService {
@@ -40,9 +39,7 @@ class AiService {
     }
   }
 
-  // --- THIS IS THE CORRECT CACHE DELETION FUNCTION ---
   async deleteWebLlmCache(modelId) {
-    // We pass the modelId and the prebuilt app config to the correct function.
     await webllm.deleteModelAllInfoInCache(modelId, webllm.prebuiltAppConfig);
   }
 
@@ -68,7 +65,32 @@ class AiService {
           }
         }
       };
-      streamPromise = streamWebLlm(this.config.webllmModelId, prompt, signal, progressCallback);
+
+      const generatorPromise = getWebLlmGenerator(this.config.webllmModelId, prompt, signal, progressCallback);
+      
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            const generator = await generatorPromise;
+            for await (const chunk of generator) {
+              if (signal.aborted) {
+                if (typeof generator.return === 'function') await generator.return();
+                break;
+              }
+              const text = chunk.choices[0]?.delta.content;
+              if (text) controller.enqueue(text);
+            }
+          } catch (e) {
+            if (!signal.aborted) controller.error(e);
+          } finally {
+             if (!controller.desiredSize === null || controller.desiredSize > 0) {
+              controller.close();
+            }
+          }
+        }
+      });
+      streamPromise = Promise.resolve(stream);
+
     } else if (providerId === 'gemini') {
       if (!this.config.geminiApiKey) {
         throw new Error('Active provider is Gemini, but the API key is not set. Add it in DevTools > AI.');
@@ -76,23 +98,15 @@ class AiService {
       streamPromise = streamGemini(this.config.geminiApiKey, this.config.geminiModelName, prompt, signal);
     } else {
       const providerConfig = this.config.providers.find(p => p.id === providerId);
-      if (!providerConfig) {
-        throw new Error(`AI provider "${providerId}" not found. Please configure it in DevTools > AI.`);
-      }
-
+      if (!providerConfig) throw new Error(`AI provider "${providerId}" not found. Please configure it in DevTools > AI.`);
       const modelToUse = this.config.override_customModelName || providerConfig.model;
       const endpointToUse = this.config.override_customEndpointUrl || providerConfig.endpoint || 'http://localhost:11434/v1';
       const apiKeyToUse = this.config.override_customApiKey || providerConfig.apiKey;
-
-      if (!modelToUse) {
-         throw new Error(`Provider "${providerId}" has no Model Name configured. This is a required field.`);
-      }
-      
+      if (!modelToUse) throw new Error(`Provider "${providerId}" has no Model Name configured. This is a required field.`);
       streamPromise = streamOpenAICompatible(endpointToUse, apiKeyToUse, modelToUse, prompt, signal);
     }
 
     const originalStream = await streamPromise;
-
     if (!onTokenCount) return originalStream;
 
     const inputTokens = countTokens(prompt);
@@ -131,9 +145,7 @@ class AiService {
 
     try {
       const editor = window.thoughtform.workspace.getActiveEditor();
-      if (!editor || !editor.gitClient || !editor.paneId) {
-        throw new Error("Cannot find active editor, gitClient, or paneId for agent.");
-      }
+      if (!editor || !editor.gitClient || !editor.paneId) throw new Error("Cannot find active editor, gitClient, or paneId for agent.");
       editorPaneId = editor.paneId;
 
       if (this.activeAgentControllers.has(editorPaneId)) return;
@@ -145,13 +157,9 @@ class AiService {
       const currentLine = view.state.doc.lineAt(pos);
       
       let startLineNum = currentLine.number;
-      while (startLineNum > 1 && view.state.doc.line(startLineNum - 1).text.trim().startsWith('>$')) {
-        startLineNum--;
-      }
+      while (startLineNum > 1 && view.state.doc.line(startLineNum - 1).text.trim().startsWith('>$')) startLineNum--;
       let endLineNum = currentLine.number;
-      while (endLineNum < view.state.doc.lines && view.state.doc.line(endLineNum + 1).text.trim().startsWith('>$')) {
-        endLineNum++;
-      }
+      while (endLineNum < view.state.doc.lines && view.state.doc.line(endLineNum + 1).text.trim().startsWith('>$')) endLineNum++;
       const startPos = view.state.doc.line(startLineNum).from;
       const endPos = view.state.doc.line(endLineNum).to;
       let userPrompt = view.state.sliceDoc(startPos, endPos);
@@ -161,13 +169,11 @@ class AiService {
       const placeholderTransaction = { changes: { from: insertPos, insert: `\n${thinkingText}` } };
       view.dispatch(placeholderTransaction);
       thinkingMessagePosition = insertPos + '\n'.length;
-
+      
+      // --- REGULAR AGENT LOGIC (Diagnostic modes removed) ---
       const rawContext = view.state.doc.toString().replace(/<!-- Total Tokens:.*?-->/gs, '').trim();
-
       let serviceForRunner = this;
       if (editor.aiOverrides && Object.keys(editor.aiOverrides).length > 0) {
-        console.log('[AI Service] Applying session-specific AI overrides:', editor.aiOverrides);
-        
         const overrideConfig = {
             ...this.config,
             override_activeProvider: editor.aiOverrides.activeProvider,
@@ -175,17 +181,10 @@ class AiService {
             override_customEndpointUrl: editor.aiOverrides.customEndpointUrl,
             override_customApiKey: editor.aiOverrides.customApiKey,
         };
-        
         serviceForRunner = { ...this, config: overrideConfig };
       }
-
-      const runner = new TaskRunner({
-          gitClient: editor.gitClient,
-          aiService: serviceForRunner,
-          initialContext: rawContext
-      });
+      const runner = new TaskRunner({ gitClient: editor.gitClient, aiService: serviceForRunner, initialContext: rawContext });
       const stream = runner.run(userPrompt, controller.signal);
-      
       const reader = stream.getReader();
       const startTag = '\n<response>\n';
       view.dispatch({ changes: { from: thinkingMessagePosition, to: thinkingMessagePosition + thinkingText.length, insert: startTag } });
@@ -219,8 +218,10 @@ class AiService {
             }
         }
       }
+      
       const finalInsert = `\n</response>\n\n>$ `;
       view.dispatch({ changes: { from: contentEndPos, insert: finalInsert }, selection: { anchor: contentEndPos + finalInsert.length } });
+
     } catch (error) {
       if (error.name === 'AbortError') {
         if (contentStartPos !== -1) {

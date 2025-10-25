@@ -69,10 +69,8 @@ export class TaskRunner {
             }
             return { responseText, responseJson: JSON.parse(jsonMatch[0]) };
         } catch (e) {
-            // --- DEBUG LOGGING ADDED ---
-            console.error("[DEBUG] Failed to parse JSON from LLM response:", e);
-            console.error("[DEBUG] Raw LLM response that caused the error was:", `"${responseText}"`);
-            // --- END OF DEBUG LOGGING ---
+            console.error("[TaskRunner] Failed to parse JSON from LLM response:", e);
+            console.error("[TaskRunner] Raw response was:", responseText);
             throw new Error(`The AI assistant did not return a valid JSON plan. Raw response: ${responseText}`);
         }
     }
@@ -191,8 +189,11 @@ Classification:`;
 
             let responseJson;
             try {
+                // --- THIS IS THE FIX (Part 1): Send status update BEFORE the blocking call ---
+                this._sendStreamEvent(stream, 'status', `Step ${loopCount}: Generating plan... (This may take a moment for local models)`);
                 const result = await this._getJsonCompletion(selectToolPrompt, trackedAiService, signal);
                 responseJson = result.responseJson;
+
             } catch (error) {
                 if (error.name === 'AbortError') throw error;
                 const errorMessage = error.message;
@@ -201,35 +202,25 @@ Classification:`;
                 const errorType = await this._classifyError(errorMessage, trackedAiService, signal);
                 this._sendStreamEvent(stream, 'status', `Error classified as: ${errorType}`);
 
-                // --- DEBUG LOGGING ADDED ---
-                console.log(`[DEBUG] Agent planning failed. Error: "${errorMessage}"`);
-                console.log(`[DEBUG] Classified error as: "${errorType}"`);
-                // --- END OF DEBUG LOGGING ---
-
                 switch (errorType) {
                     case 'CONTEXT_OVERFLOW':
-                        console.log('[DEBUG] Handling CONTEXT_OVERFLOW...');
                         scratchpad += `\nOBSERVATION: CRITICAL API FAILURE. The context window is full. You must compress your memory to continue. Error Details: "${errorMessage}"\n---`;
                         continue;
 
                     case 'RATE_LIMIT':
-                        console.log('[DEBUG] Handling RATE_LIMIT...');
                         this._sendStreamEvent(stream, 'status', 'API rate limit reached. Waiting 5 seconds before retry...');
                         await new Promise(resolve => setTimeout(resolve, 5000));
                         continue;
 
                     case 'INVALID_JSON':
-                        console.log('[DEBUG] Handling INVALID_JSON...');
                         scratchpad += `\nOBSERVATION: My previous response was not valid JSON. I must correct my output to follow the required format exactly. Error: ${errorMessage}\n---`;
                         continue;
 
                     case 'API_KEY_ERROR':
-                        console.log('[DEBUG] Handling API_KEY_ERROR (fatal)...');
                         throw error;
 
                     case 'UNKNOWN_FAILURE':
                     default:
-                        console.log('[DEBUG] Handling UNKNOWN_FAILURE...');
                         scratchpad += `\nOBSERVATION: An unknown API error occurred. I will retry the step. Error: ${errorMessage}\n---`;
                         continue;
                 }
@@ -237,7 +228,7 @@ Classification:`;
             
             const stepInput = totalInputTokens - tokensBefore.input;
             const stepOutput = totalOutputTokens - tokensBefore.output;
-            this._sendStreamEvent(stream, 'status', `Step ${loopCount}: Planning...\n[Step: ${stepInput.toLocaleString()} in / ${stepOutput.toLocaleString()} out]\n[Total: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out]`);
+            this._sendStreamEvent(stream, 'status', `[Step: ${stepInput.toLocaleString()} in / ${stepOutput.toLocaleString()} out]\n[Total: ${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out]`);
             
             const thought = responseJson.thought;
             const toolChoice = responseJson.action;

@@ -32,6 +32,7 @@ class AiTool {
         this._$el.show();
         this._loadAndRenderProviders();
         this._renderCacheTable();
+        this._renderModelDropdown(); // Re-render dropdown to check for new cached models
       },
       hide: () => this._$el.hide(),
     });
@@ -47,21 +48,6 @@ class AiTool {
             <div class="sync-row">
                 <select id="ai-active-provider" class="eruda-select" style="width: 100%;"></select>
             </div>
-        </div>
-
-        <div class="sync-panel" style="margin-bottom: 15px;">
-          <h3>WebLLM (In-Browser)</h3>
-          <div class="sync-row" style="margin-bottom: 10px;">
-            <label for="webllm-model-select" class="sync-label">Model:</label>
-            <select id="webllm-model-select" class="eruda-select flex-grow"></select>
-          </div>
-          <div class="sync-row">
-            <button id="load-webllm-btn" class="eruda-button" style="width: 100%;">Load Model</button>
-          </div>
-          <div id="webllm-status" style="margin-top: 10px; color: var(--base-accent-info); font-size: 0.9em;">
-            Status: Not loaded.
-          </div>
-          <div id="webllm-cache-container" style="margin-top: 15px;"></div>
         </div>
 
         <div class="sync-panel">
@@ -80,6 +66,21 @@ class AiTool {
             <h3>Custom OpenAI-Compatible Providers</h3>
             <div id="custom-providers-list"></div>
             <button id="add-provider-btn" class="eruda-button" style="margin-top: 10px;">Add New Provider</button>
+        </div>
+
+        <div class="sync-panel" style="margin-bottom: 15px;margin-top: 15px;">
+          <h3>WebLLM (In-Browser)</h3>
+          <div class="sync-row" style="margin-bottom: 10px;">
+            <label for="webllm-model-select" class="sync-label">Model:</label>
+            <select id="webllm-model-select" class="eruda-select flex-grow"></select>
+          </div>
+          <div class="sync-row">
+            <button id="load-webllm-btn" class="eruda-button" style="width: 100%;">Load Model</button>
+          </div>
+          <div id="webllm-status" style="margin-top: 10px; color: var(--base-accent-info); font-size: 0.9em;">
+            Status: Not loaded.
+          </div>
+          <div id="webllm-cache-container" style="margin-top: 15px;"></div>
         </div>
 
         <div class="sync-panel" style="margin-top: 15px;">
@@ -105,7 +106,7 @@ class AiTool {
           <tr>
             <th>Model ID</th>
             <th>Size (VRAM)</th>
-            <th>Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -116,14 +117,15 @@ class AiTool {
       const isCached = await webllm.hasModelInCache(model.model_id, webllm.prebuiltAppConfig);
       if (isCached) {
         cachedCount++;
+        // --- THIS IS THE FIX (Part 1) ---
+        // Added a "Use" button to the actions column.
         tableHTML += `
           <tr>
             <td>${model.model_id}</td>
             <td>${model.vram_required_MB} MB</td>
             <td>
-              <button class="eruda-button destructive delete-cache-btn" data-model-id="${model.model_id}">
-                Delete
-              </button>
+              <button class="eruda-button select-cache-btn" data-model-id="${model.model_id}" style="margin-right: 5px;">Use</button>
+              <button class="eruda-button destructive delete-cache-btn" data-model-id="${model.model_id}">Delete</button>
             </td>
           </tr>
         `;
@@ -194,33 +196,45 @@ class AiTool {
     return el;
   }
 
+  // --- THIS IS THE FIX (Part 2) ---
+  // This new async function builds the dropdown, checking the cache for each model.
+  async _renderModelDropdown() {
+    const modelSelect = this._$el.find('#webllm-model-select')[0];
+    const f16Models = [];
+    const otherModels = [];
+
+    webllm.prebuiltAppConfig.model_list.forEach(model => {
+      model.model_id.includes('f16') ? f16Models.push(model) : otherModels.push(model);
+    });
+    
+    let f16Html = '<optgroup label="Recommended (GPU-Optimized)">';
+    for (const model of f16Models) {
+      const isCached = await webllm.hasModelInCache(model.model_id, webllm.prebuiltAppConfig);
+      const cachedIndicator = isCached ? ' [💾 Cached]' : '';
+      f16Html += `<option value="${model.model_id}">${model.model_id} (~${model.vram_required_MB} MB)${cachedIndicator}</option>`;
+    }
+    f16Html += '</optgroup>';
+    
+    let otherHtml = '';
+    if (otherModels.length > 0) {
+      otherHtml = '<optgroup label="Compatibility (Slower)">';
+      for (const model of otherModels) {
+        const isCached = await webllm.hasModelInCache(model.model_id, webllm.prebuiltAppConfig);
+        const cachedIndicator = isCached ? ' [💾 Cached]' : '';
+        otherHtml += `<option value="${model.model_id}">${model.model_id} (~${model.vram_required_MB} MB)${cachedIndicator}</option>`;
+      }
+      otherHtml += '</optgroup>';
+    }
+
+    modelSelect.innerHTML = f16Html + otherHtml;
+    modelSelect.value = localStorage.getItem('thoughtform_webllm_model_id') || 'Llama-3-8B-Instruct-q4f16_1-MLC';
+  }
+
   _bindEvents() {
     const $el = this._$el;
 
-    const modelSelect = $el.find('#webllm-model-select')[0];
-    const categorizedModels = { Llama: [], Phi: [], Gemma: [], Mistral: [], Qwen: [], Other: [] };
-
-    webllm.prebuiltAppConfig.model_list.forEach(model => {
-      const id = model.model_id.toLowerCase();
-      if (id.startsWith('llama')) categorizedModels.Llama.push(model);
-      else if (id.startsWith('phi')) categorizedModels.Phi.push(model);
-      else if (id.startsWith('gemma')) categorizedModels.Gemma.push(model);
-      else if (id.startsWith('mistral') || id.includes('hermes')) categorizedModels.Mistral.push(model);
-      else if (id.startsWith('qwen')) categorizedModels.Qwen.push(model);
-      else categorizedModels.Other.push(model);
-    });
-
-    let selectHTML = '';
-    for (const category in categorizedModels) {
-      if (categorizedModels[category].length > 0) {
-        selectHTML += `<optgroup label="${category}">`;
-        categorizedModels[category].forEach(model => {
-          selectHTML += `<option value="${model.model_id}">${model.model_id}</option>`;
-        });
-        selectHTML += `</optgroup>`;
-      }
-    }
-    modelSelect.innerHTML = selectHTML;
+    // The dropdown is now rendered asynchronously.
+    this._renderModelDropdown();
 
     $el.find('#gemini-api-key')[0].value = localStorage.getItem('thoughtform_gemini_api_key') || '';
     $el.find('#gemini-model-name')[0].value = localStorage.getItem('thoughtform_gemini_model_name') || 'gemini-2.5-flash';
@@ -266,13 +280,28 @@ class AiTool {
             e.target.textContent = 'Deleting...';
             e.target.disabled = true;
             await window.thoughtform.ai.deleteWebLlmCache(modelId);
-            this._renderCacheTable();
+            await this._renderCacheTable();
+            await this._renderModelDropdown(); // Update dropdown indicators
+        }
+        // --- THIS IS THE FIX (Part 3) ---
+        // Handle clicks on the new "Use" button.
+        if (e.target.classList.contains('select-cache-btn')) {
+            const modelId = e.target.dataset.modelId;
+            const modelSelect = this._$el.find('#webllm-model-select')[0];
+            modelSelect.value = modelId;
+            this._handleSaveConfig(); // Save the new selection
+            modelSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Add a temporary highlight for user feedback
+            modelSelect.style.transition = 'outline 0.1s ease-in-out';
+            modelSelect.style.outline = '2px solid var(--base-accent-action)';
+            setTimeout(() => { modelSelect.style.outline = 'none'; }, 1000);
         }
     });
 
     const loadBtn = $el.find('#load-webllm-btn')[0];
     const statusEl = $el.find('#webllm-status')[0];
-    modelSelect.value = localStorage.getItem('thoughtform_webllm_model_id') || 'Llama-3-8B-Instruct-q4f16_1-MLC';
+    const modelSelect = $el.find('#webllm-model-select')[0];
 
     loadBtn.addEventListener('click', () => {
         const selectedModel = modelSelect.value;
@@ -293,6 +322,7 @@ class AiTool {
                   loadBtn.disabled = false;
                   loadBtn.textContent = 'Reload Model';
                   this._renderCacheTable();
+                  this._renderModelDropdown(); // Update indicators after loading
               }
             }
         };
