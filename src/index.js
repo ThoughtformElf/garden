@@ -19,7 +19,7 @@ import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace/index.js';
 import { initializeQueryLoader } from './workspace/query-loader.js';
 import { seedCoreGardens } from './workspace/core-gardens.js';
-// Keymap service is no longer initialized here.
+// The incorrect import has been removed.
 
 function initializeNavigationListener() {
     const handleNav = async () => {
@@ -62,9 +62,6 @@ async function main() {
   const srcIndex = fullPath.lastIndexOf('/src/');
   const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
   
-  const settingsGit = new Git('Settings');
-  await settingsGit.initRepo();
-
   let gardenName = window.location.pathname.startsWith(basePath)
     ? window.location.pathname.substring(basePath.length)
     : window.location.pathname;
@@ -82,7 +79,7 @@ async function main() {
     ai: initializeAiService(),
     config: initializeConfigService(),
     events: initializeEventBus(),
-    // Keymap service is no longer on the global object.
+    // The global keymap service has been removed.
   };
   
   window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
