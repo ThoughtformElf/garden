@@ -39,8 +39,21 @@ export class Git {
       const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
       await this.pfs.writeFile('/home', defaultContent, 'utf8');
 
+      // --- THIS IS THE FIX ---
+      // Stage the initial 'home' file.
+      await git.add({ fs: this.fs, dir: '/', filepath: 'home' });
+
+      // Create the very first commit for the repository.
+      await git.commit({
+        fs: this.fs,
+        dir: '/',
+        message: 'Initial commit',
+        author: { name: 'Thoughtform Garden', email: 'system@thoughtform.garden' }
+      });
+      // --- END OF FIX ---
+
       this.registerNewGarden();
-      console.log('New garden initialized successfully.');
+      console.log('New garden initialized successfully with initial commit.');
     } catch (e) {
       console.error('Error initializing repository:', e);
     }
@@ -65,9 +78,14 @@ export class Git {
         if (stat.isDirectory()) {
             const entries = await this.pfs.readdir(path);
             for (const entry of entries) {
-                await this.rmrf(`${path}/${entry}`);
+                // Ensure correct path joining, especially for root
+                const entryPath = path === '/' ? `/${entry}` : `${path}/${entry}`;
+                await this.rmrf(entryPath);
             }
-            await this.pfs.rmdir(path);
+            // Do not attempt to remove the root directory itself.
+            if (path !== '/') {
+              await this.pfs.rmdir(path);
+            }
         } else {
             await this.pfs.unlink(path);
         }
