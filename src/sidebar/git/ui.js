@@ -9,23 +9,12 @@ export class GitUI {
     const stagedFiles = new Map();
     const unstagedFiles = new Map();
 
-    // --- DEFINITIVE FIX for status interpretation ---
-    // This logic now correctly differentiates between staged, unstaged, and unmerged files,
-    // mimicking the behavior of the standard `git status` command.
     for (const [filepath, head, workdir, stage] of statusMatrix) {
         const path = `/${filepath}`;
-
-        // The key indicator from isomorphic-git for an unmerged path (a conflict) is stage === 0.
         const isConflict = stage === 0;
-
-        // A file has STAGED changes if its index status differs from HEAD,
-        // AND it is NOT in a conflict state.
         if (head !== stage && !isConflict) {
             stagedFiles.set(path, { filepath: path, status: 'staged', isConflict: false });
         }
-
-        // A file has UNSTAGED changes if its workdir status differs from its index status.
-        // This correctly includes conflicted files (where workdir is modified and stage is 0).
         if (workdir !== stage) {
             unstagedFiles.set(path, { filepath: path, status: 'unstaged', isConflict: isConflict });
         }
@@ -35,7 +24,7 @@ export class GitUI {
       <div class="git-main-layout">
         <div class="git-left-column">
           ${this._renderRemotePanel()}
-          ${this._renderBranchPanel(branchInfo)}
+          ${this._renderBranchPanel(branchInfo, commits)}
           ${this._renderCommitPanel()}
           ${this._renderChangesPanel('Staged Changes', Array.from(stagedFiles.values()), true)}
           ${this._renderChangesPanel('Changes', Array.from(unstagedFiles.values()), false)}
@@ -59,8 +48,9 @@ export class GitUI {
       <div class="git-panel">
         <h3 class="git-panel-header">Remote</h3>
         <div class="git-panel-content">
-          <input type="text" id="git-remote-url" placeholder="Remote URL" value="${config.url}">
-          <input type="password" id="git-remote-auth" placeholder="Username or Token" value="${config.auth}">
+          <input type="text" id="git-remote-url" placeholder="Remote Git URL" value="${config.url || ''}">
+          <input type="password" id="git-remote-auth" placeholder="Username or Access Token" value="${config.auth || ''}">
+          <input type="text" id="git-cors-proxy" placeholder="CORS Proxy URL" value="${config.corsProxy || ''}">
           <div class="git-remote-actions">
             <button id="git-pull-button">Pull</button>
             <button id="git-push-button">Push</button>
@@ -71,19 +61,23 @@ export class GitUI {
     `;
   }
   
-  _renderBranchPanel({ branches, currentBranch }) {
+  _renderBranchPanel({ branches, currentBranch }, commits) {
     const branchList = branches.map(branch => `
       <li class="git-branch-item ${branch === currentBranch ? 'active' : ''}" data-branch-name="${branch}">
         <span class="branch-name">${branch}</span>
       </li>
     `).join('');
 
+    // --- THIS IS THE FIX (Part 2) ---
+    // Disable the button if there are no commits.
+    const isButtonDisabled = commits.length === 0;
+
     return `
       <div class="git-panel">
         <h3 class="git-panel-header">Branches</h3>
         <div class="git-panel-content">
           <ul class="git-branch-list">${branchList}</ul>
-          <button id="git-new-branch-button" class="full-width" style="margin-top: 8px;">New Branch</button>
+          <button id="git-new-branch-button" class="full-width" style="margin-top: 8px;" ${isButtonDisabled ? 'disabled' : ''}>New Branch</button>
         </div>
       </div>
     `;
