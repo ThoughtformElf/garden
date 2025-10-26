@@ -11,12 +11,10 @@ export class GitEvents {
   addListeners() {
     const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
     const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
-    const corsProxyInput = this.contentContainer.querySelector('#git-cors-proxy');
-    if (remoteUrlInput && remoteAuthInput && corsProxyInput) {
-        const updateConfig = () => this.sidebar.saveRemoteConfig(remoteUrlInput.value.trim(), remoteAuthInput.value.trim(), corsProxyInput.value.trim());
+    if (remoteUrlInput && remoteAuthInput) {
+        const updateConfig = () => this.sidebar.saveRemoteConfig(remoteUrlInput.value, remoteAuthInput.value);
         remoteUrlInput.addEventListener('input', updateConfig);
         remoteAuthInput.addEventListener('input', updateConfig);
-        corsProxyInput.addEventListener('input', updateConfig);
     }
     
     const viewContainer = this.contentContainer.querySelector('.git-main-layout');
@@ -63,16 +61,18 @@ export class GitEvents {
   }
 
   async _handleRemoteAction(action, force = false) {
+    const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
+    const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
     const pushButton = this.contentContainer.querySelector('#git-push-button');
     const pullButton = this.contentContainer.querySelector('#git-pull-button');
     const logArea = this.contentContainer.querySelector('#git-remote-log');
 
-    const { url, auth: token, corsProxy } = this.sidebar.getRemoteConfig();
-
+    const url = remoteUrlInput.value.trim();
     if (!url) {
       logArea.textContent = 'Error: Remote URL is required.';
       return;
     }
+    const token = remoteAuthInput.value.trim();
     
     pushButton.disabled = true;
     pullButton.disabled = true;
@@ -80,7 +80,7 @@ export class GitEvents {
     logArea.textContent = `${actionVerb}ing...`;
     
     try {
-      await this.gitClient[action](url, token, corsProxy, (msg) => logArea.textContent = msg, force);
+      await this.gitClient[action](url, token, (msg) => logArea.textContent = msg, force);
       logArea.textContent = `${actionVerb} complete.`;
       
       await this.sidebar.refresh();
@@ -88,8 +88,8 @@ export class GitEvents {
         await this.editor.loadFile(this.editor.filePath);
       }
     } catch (e) {
-        console.error(`Git ${action} failed:`, e);
-        logArea.textContent = `Error: ${e.message}`;
+        console.error(`Git ${action} failed:`, e); // Full error to console
+        logArea.textContent = `Error: ${e.message}`; // Clean message to UI
         
         if (e.name === 'MergeConflictError') {
             const conflictedFiles = e.data && Array.isArray(e.data.filepaths) ? e.data.filepaths : [];
@@ -153,9 +153,6 @@ export class GitEvents {
         await this.sidebar.refresh();
         
     } catch (err) {
-        // --- THIS IS THE FIX (Part 3) ---
-        // Log the actual error to the console for debugging.
-        console.error('Git commit failed:', err);
         await this.sidebar.showAlert({ title: 'Commit Failed', message: 'See console for details.' });
     } finally {
         commitButton.textContent = 'Commit';
@@ -245,6 +242,7 @@ export class GitEvents {
     try {
       await this.gitClient.checkout(branchName);
       await this.sidebar.refresh();
+      // Reload all open files in all panes to reflect the new branch state
       for (const pane of window.thoughtform.workspace.panes.values()) {
         if (pane.editor.gitClient.gardenName === this.gitClient.gardenName) {
             await pane.editor.loadFile(pane.editor.filePath);

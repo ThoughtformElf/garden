@@ -15,6 +15,7 @@ export const gitActions = {
 
       const oldMessage = this.contentContainer.querySelector('#git-commit-message')?.value || '';
       
+      // THIS IS THE FIX (Part 3)
       this.contentContainer.innerHTML = gitUI.render(statusMatrix, commits, branchInfo, conflictedFiles);
       
       const newMessageInput = this.contentContainer.querySelector('#git-commit-message');
@@ -40,22 +41,19 @@ export const gitActions = {
     try {
       const stored = localStorage.getItem(key);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed.url) return parsed;
       }
     } catch (e) {
       console.error("Could not parse remote config from localStorage", e);
     }
-    // Default configuration with the specified CORS proxy
-    return { 
-      url: '', 
-      auth: '', 
-      corsProxy: 'http://localhost:8081' 
-    };
+    // --- THE FIX: Revert to the simple URL format. ---
+    return { url: `http://localhost:8081/${this.gitClient.gardenName}`, auth: '' };
   },
 
-  saveRemoteConfig(url, auth, corsProxy) {
+  saveRemoteConfig(url, auth) {
     const key = `thoughtform_remote_config_${this.gitClient.gardenName}`;
-    const config = { url, auth, corsProxy };
+    const config = { url, auth };
     localStorage.setItem(key, JSON.stringify(config));
   },
 };

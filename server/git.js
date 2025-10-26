@@ -1,5 +1,4 @@
 const http = require('http');
-const https = require('https');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const url = require('url');
@@ -39,57 +38,18 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const parsedUrl = url.parse(req.url, true);
-  const repoUrl = parsedUrl.query.repo;
-
-  // --- REVISED PROXY LOGIC ---
-  if (repoUrl) {
-    console.log(`[GitServer] Acting as CORS Proxy for: ${repoUrl}`);
-    
-    let targetUrl;
-    try {
-      targetUrl = new URL(repoUrl);
-    } catch (e) {
-      res.writeHead(400).end('Invalid "repo" URL parameter.');
-      return;
-    }
-
-    const transport = targetUrl.protocol === 'https:' ? https : http;
-    const options = {
-      hostname: targetUrl.hostname,
-      port: targetUrl.port,
-      path: targetUrl.pathname + targetUrl.search,
-      method: req.method,
-      headers: { ...req.headers, host: targetUrl.host },
-    };
-
-    const proxyReq = transport.request(options, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
-      proxyRes.pipe(res, { end: true });
-    });
-
-    proxyReq.on('error', (e) => {
-      console.error(`[GitServer] Proxy request error: ${e.message}`);
-      res.writeHead(502).end('Bad Gateway');
-    });
-
-    req.pipe(proxyReq, { end: true });
-    return; // End execution here for proxy requests
-  }
-  // --- END REVISED PROXY LOGIC ---
-
-  // --- EXISTING LOCAL REPO LOGIC ---
+  const parsedUrl = url.parse(req.url);
   const repoName = parsedUrl.pathname.split('/')[1];
 
   if (!repoName) {
-    res.writeHead(404, { 'Content-Type': 'text-plain' }).end('Not Found: Repository name not specified.');
+    res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not Found: Repository name not specified.');
     return;
   }
 
   const repoPath = path.join(REPOS_PATH, repoName);
 
   if (!fs.existsSync(repoPath) || !repoPath.startsWith(REPOS_PATH)) {
-    res.writeHead(404, { 'Content-Type': 'text-plain' }).end(`Not Found: Repository "${repoName}" does not exist.`);
+    res.writeHead(404, { 'Content-Type': 'text/plain' }).end(`Not Found: Repository "${repoName}" does not exist.`);
     return;
   }
   
@@ -117,6 +77,7 @@ const server = http.createServer((req, res) => {
   });
 
   gitProcess.on('close', (code) => {
+    // THIS IS THE FIX: If a push was successful, auto-update the working directory.
     if (code === 0 && isPush) {
       console.log(`[GitServer] Push to '${repoName}' successful. Updating working directory...`);
       exec('git reset --hard', { cwd: repoPath }, (err, stdout, stderr) => {
@@ -164,5 +125,4 @@ const server = http.createServer((req, res) => {
 
 server.listen(8081, () => {
   console.log(`Git server running on http://localhost:8081, serving from NON-BARE repositories in ${REPOS_PATH}`);
-  console.log(`Proxy mode is active. Use ?repo=<REMOTE_URL> to proxy requests.`);
 });
