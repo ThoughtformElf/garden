@@ -60,7 +60,6 @@ export class GitUI {
         <h3 class="git-panel-header">Remote</h3>
         <div class="git-panel-content">
           <input type="text" id="git-remote-url" placeholder="Remote URL" value="${config.url}">
-          <input type="password" id="git-remote-auth" placeholder="Username or Token" value="${config.auth}">
           <div class="git-remote-actions">
             <button id="git-pull-button">Pull</button>
             <button id="git-push-button">Push</button>

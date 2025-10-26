@@ -10,11 +10,9 @@ export class GitEvents {
 
   addListeners() {
     const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
-    const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
-    if (remoteUrlInput && remoteAuthInput) {
-        const updateConfig = () => this.sidebar.saveRemoteConfig(remoteUrlInput.value, remoteAuthInput.value);
+    if (remoteUrlInput) {
+        const updateConfig = () => this.sidebar.saveRemoteConfig(remoteUrlInput.value);
         remoteUrlInput.addEventListener('input', updateConfig);
-        remoteAuthInput.addEventListener('input', updateConfig);
     }
     
     const viewContainer = this.contentContainer.querySelector('.git-main-layout');
@@ -62,7 +60,6 @@ export class GitEvents {
 
   async _handleRemoteAction(action, force = false) {
     const remoteUrlInput = this.contentContainer.querySelector('#git-remote-url');
-    const remoteAuthInput = this.contentContainer.querySelector('#git-remote-auth');
     const pushButton = this.contentContainer.querySelector('#git-push-button');
     const pullButton = this.contentContainer.querySelector('#git-pull-button');
     const logArea = this.contentContainer.querySelector('#git-remote-log');
@@ -72,7 +69,6 @@ export class GitEvents {
       logArea.textContent = 'Error: Remote URL is required.';
       return;
     }
-    const token = remoteAuthInput.value.trim();
     
     pushButton.disabled = true;
     pullButton.disabled = true;
@@ -80,7 +76,7 @@ export class GitEvents {
     logArea.textContent = `${actionVerb}ing...`;
     
     try {
-      await this.gitClient[action](url, token, (msg) => logArea.textContent = msg, force);
+      await this.gitClient[action](url, (msg) => logArea.textContent = msg, force);
       logArea.textContent = `${actionVerb} complete.`;
       
       await this.sidebar.refresh();

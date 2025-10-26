@@ -47,13 +47,12 @@ export const gitActions = {
     } catch (e) {
       console.error("Could not parse remote config from localStorage", e);
     }
-    // --- THE FIX: Revert to the simple URL format. ---
-    return { url: `http://localhost:8081/${this.gitClient.gardenName}`, auth: '' };
+    return { url: `http://localhost:8081/${this.gitClient.gardenName}` };
   },
 
-  saveRemoteConfig(url, auth) {
+  saveRemoteConfig(url) {
     const key = `thoughtform_remote_config_${this.gitClient.gardenName}`;
-    const config = { url, auth };
+    const config = { url };
     localStorage.setItem(key, JSON.stringify(config));
   },
 };

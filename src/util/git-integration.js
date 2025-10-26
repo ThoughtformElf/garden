@@ -170,38 +170,32 @@ export class Git {
     return sha;
   }
   
-  async push(url, token, onProgress, force = false) {
+  async push(url, onProgress, force = false) {
     return await git.push({
       fs: this.fs, http, dir: '/', url: url,
       force: force,
       onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
-      onAuth: () => ({ username: token }),
     });
   }
 
-  async pull(url, token, onProgress, force = false) {
+  async pull(url, onProgress, force = false) {
     const author = { name: 'User', email: 'user@thoughtform.garden' };
     
-    console.log('[PULL] Step 1: Fetching from remote...');
     onProgress('Fetching from remote...');
     const fetchResult = await git.fetch({
       fs: this.fs, http, dir: '/', url: url,
       ref: 'main',
       singleBranch: true,
       onProgress: (e) => onProgress(`Fetch: ${e.phase}`),
-      onAuth: () => ({ username: token }),
     });
     const theirOid = fetchResult.fetchHead;
-    console.log('[PULL] Step 1 Complete. Fetched OID:', theirOid);
 
     if (!theirOid) {
-        console.log('[PULL] No new commits to merge.');
         onProgress('Already up-to-date.');
         return;
     }
 
     onProgress('Merging changes...');
-    console.log(`[PULL] Step 2: Attempting to merge OID ${theirOid} into main...`);
     try {
       const mergeResult = await git.merge({
         fs: this.fs,
@@ -210,9 +204,7 @@ export class Git {
         theirs: theirOid,
         author: author,
       });
-      console.log('[PULL] Step 2 Complete: Merge was successful.', mergeResult);
     } catch (e) {
-      console.error('[PULL] Step 2 Failed: Merge attempt threw an error.', e);
       if (e.name === 'MergeConflictError') {
         onProgress('Conflict detected. Writing markers to files...');
         const conflictedFiles = e.data.filepaths;
@@ -222,13 +214,10 @@ export class Git {
         const baseOid = baseOids[0];
 
         if (!baseOid) {
-          console.error("[PULL] Could not find a common ancestor. Cannot perform 3-way merge.");
           throw new Error("Could not find a common ancestor for merging.");
         }
 
         for (const filepath of conflictedFiles) {
-          console.log(`[PULL] Generating 3-way merge for conflicted file: ${filepath}`);
-          
           const [ours, base, theirs] = await Promise.all([
             git.readBlob({ fs: this.fs, dir: '/', oid: ourOid, filepath }),
             git.readBlob({ fs: this.fs, dir: '/', oid: baseOid, filepath }),
@@ -255,7 +244,6 @@ export class Git {
           }
           const mergedText = finalLines.join('\n');
 
-          console.log(`[PULL] Writing conflict markers to /${filepath}`);
           await this.pfs.writeFile(`/${filepath}`, mergedText, 'utf8');
         }
       }
