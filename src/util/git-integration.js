@@ -39,7 +39,14 @@ export class Git {
       });
 
       const defaultContent = `# Welcome to your new garden: ${this.gardenName}\n\nStart writing your thoughts here.`;
-      await this.pfs.writeFile('/home', defaultContent, 'utf8');
+      const initialFile = '/home';
+      await this.pfs.writeFile(initialFile, defaultContent, 'utf8');
+
+      // --- THIS IS THE FIX (Part 1) ---
+      // Stage and commit the initial file to create the 'main' branch and HEAD.
+      await this.stage('home');
+      await this.commit('Initial commit');
+      // --- END OF FIX ---
 
       this.registerNewGarden();
       console.log('New garden initialized successfully.');
@@ -170,30 +177,89 @@ export class Git {
     return sha;
   }
   
-  async push(url, token, onProgress, force = false) {
+  async push(url, token, corsProxy, onProgress, force = false) {
+    let finalUrl = url;
+    if (corsProxy) {
+      const cleanProxy = corsProxy.endsWith('/') ? corsProxy.slice(0, -1) : corsProxy;
+      finalUrl = `${cleanProxy}?repo=${encodeURIComponent(url)}`;
+    }
+    
+    try { await git.deleteRemote({ fs: this.fs, dir: '/', remote: 'origin' }); } catch (e) {}
+    await git.addRemote({ fs: this.fs, dir: '/', remote: 'origin', url: url });
+
     return await git.push({
-      fs: this.fs, http, dir: '/', url: url,
-      force: force,
+      fs: this.fs,
+      http,
+      dir: '/',
+      url: finalUrl,
+      force,
       onProgress: (e) => onProgress(`${e.phase}: ${e.loaded}/${e.total}`),
-      onAuth: () => ({ username: token }),
+      onAuth: () => (token ? { headers: { 'Authorization': `Bearer ${token}` } } : {}),
     });
   }
 
-  async pull(url, token, onProgress, force = false) {
+  async pull(url, token, corsProxy, onProgress, force = false) {
     const author = { name: 'User', email: 'user@thoughtform.garden' };
     
+    let finalUrl = url;
+    if (corsProxy) {
+      const cleanProxy = corsProxy.endsWith('/') ? corsProxy.slice(0, -1) : corsProxy;
+      finalUrl = `${cleanProxy}?repo=${encodeURIComponent(url)}`;
+    }
+    
+    try { await git.deleteRemote({ fs: this.fs, dir: '/', remote: 'origin' }); } catch (e) {}
+    await git.addRemote({ fs: this.fs, dir: '/', remote: 'origin', url: url });
+
+    let isRepoEmpty = false;
+    try {
+        const commits = await git.log({ fs: this.fs, dir: '/', depth: 1 });
+        if (commits.length === 0) isRepoEmpty = true;
+    } catch (e) {
+        isRepoEmpty = true;
+    }
+
     onProgress('Fetching from remote...');
     const fetchResult = await git.fetch({
-      fs: this.fs, http, dir: '/', url: url,
+      fs: this.fs,
+      http,
+      dir: '/',
+      url: finalUrl,
       ref: 'main',
       singleBranch: true,
       onProgress: (e) => onProgress(`Fetch: ${e.phase}`),
-      onAuth: () => ({ username: token }),
+      onAuth: () => (token ? { headers: { 'Authorization': `Bearer ${token}` } } : {}),
     });
     const theirOid = fetchResult.fetchHead;
 
     if (!theirOid) {
         onProgress('Already up-to-date.');
+        return;
+    }
+
+    if (isRepoEmpty) {
+        onProgress('Repository is empty. Cloning remote branch...');
+        const remoteBranch = 'main';
+
+        await git.writeRef({
+            fs: this.fs,
+            dir: '/',
+            ref: `refs/heads/${remoteBranch}`,
+            value: theirOid,
+        });
+        await git.writeRef({
+            fs: this.fs,
+            dir: '/',
+            ref: 'HEAD',
+            value: `refs/heads/${remoteBranch}`,
+            symbolic: true,
+        });
+        await git.checkout({
+            fs: this.fs,
+            dir: '/',
+            ref: remoteBranch,
+            force: true,
+        });
+        onProgress(`Cloned and checked out remote branch '${remoteBranch}'.`);
         return;
     }
 
@@ -366,8 +432,12 @@ export class Git {
       const currentBranch = await git.currentBranch({ fs: this.fs, dir: '/', fullname: false });
       return { branches, currentBranch };
     } catch (e) {
+      if (e.name === 'NotFoundError') {
+        console.warn("Could not find HEAD, repository is likely empty.");
+        return { branches: [], currentBranch: null };
+      }
       console.error("Error listing branches:", e);
-      return { branches: [], currentBranch: null };
+      throw e;
     }
   }
 
