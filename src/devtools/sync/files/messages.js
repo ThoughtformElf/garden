@@ -67,8 +67,7 @@ export class MessageHandler {
         const transferId = crypto.randomUUID();
         instance.currentTransferId = transferId;
         instance.targetPeers = targetPeerIds;
-
-        // --- FIX: Send initiation message to each target peer individually ---
+        
         for (const peerId of targetPeerIds) {
             instance.sync.sendSyncMessage({
                 type: 'send_initiation',
@@ -268,15 +267,39 @@ export class MessageHandler {
             const zip = await JSZip.loadAsync(zipData);
             const gitClient = new Git(data.gardenName);
             await gitClient.initRepo();
+
+            // --- THIS IS THE SAFER, NON-DESTRUCTIVE FIX ---
             
-            instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Clearing existing data for ${data.gardenName}...`, type: 'info' } }));
-            
-            await gitClient.rmrf('/.git');
-            await gitClient.clearWorkdir();
-            
+            // 1. Get a set of all file paths that are in the incoming zip.
+            const zipFilePaths = new Set();
+            for (const path in zip.files) {
+                if (!zip.files[path].dir) {
+                    zipFilePaths.add(`/${path}`);
+                }
+            }
+
+            // 2. Get a list of all files currently in the local garden.
+            const localFilePaths = await this.getAllFilesIncludingGit(gitClient.pfs, '/');
+
+            // 3. (DELETION PHASE) Delete any local files that are NOT in the incoming zip.
+            let deletedCount = 0;
+            for (const localPath of localFilePaths) {
+                if (!zipFilePaths.has(localPath)) {
+                    try {
+                        await gitClient.pfs.unlink(localPath);
+                        deletedCount++;
+                    } catch (e) {
+                        console.warn(`[Sync] Could not delete obsolete file ${localPath}:`, e);
+                    }
+                }
+            }
+            if (deletedCount > 0) {
+                 instance.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: `Cleaned up ${deletedCount} obsolete file(s) in ${data.gardenName}.`, type: 'info' } }));
+            }
+
+            // 4. (WRITING PHASE) Write all files from the zip, overwriting existing ones.
             const fileEntries = Object.entries(zip.files);
             let extractedCount = 0;
-            
             for (const [path, zipEntry] of fileEntries) {
                 if (!zipEntry.dir) {
                     const content = await zipEntry.async('uint8array');
@@ -289,15 +312,13 @@ export class MessageHandler {
                     extractedCount++;
                 }
             }
+            // --- END OF FIX ---
             
-            // --- DEFINITIVE FIX ---
-            // The event now correctly includes the 'action: receive' property, which is
-            // required by the listener in sync/index.js to trigger the correct logic.
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
                 detail: { 
                     message: `Successfully extracted ${data.gardenName} (${extractedCount} files).`, 
                     type: 'complete',
-                    action: 'receive', // <-- THIS WAS THE MISSING PIECE
+                    action: 'receive',
                     gardenName: data.gardenName
                 } 
             }));

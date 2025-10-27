@@ -153,6 +153,10 @@ export class WorkspaceManager {
     const editor = this.getActiveEditor();
     if (!editor || editor.gitClient.gardenName === gardenName) return;
 
+    if (editor.isLiveSyncConnected) {
+        editor.disconnectLiveSync();
+    }
+
     const newGitClient = await this.getGitClient(gardenName);
     editor.gitClient = newGitClient;
     window.thoughtform.sidebar.gitClient = newGitClient;
@@ -173,6 +177,10 @@ export class WorkspaceManager {
         sessionStorage.setItem('sidebarActiveTab', 'Files');
     }
     await window.thoughtform.sidebar.refresh();
+
+    // --- DEFINITIVE FIX (Part 1) ---
+    // Re-activate sync after the switch is fully complete.
+    this.activateLiveSyncForCurrentFile();
   }
 
   async openFile(garden, path) {
@@ -182,9 +190,14 @@ export class WorkspaceManager {
     const { node, pane } = activePaneInfo;
     const editor = pane.editor;
 
-    if (editor.isLiveSyncConnected && editor.gitClient.gardenName === garden && editor.filePath === path) {
-        console.log(`%c[LIVESYNC-GUARD] openFile BLOCKED for "${garden}#${path}" because it is already live.`, 'color: orange; font-weight: bold;');
-        return;
+    if (editor.isLiveSyncConnected) {
+      if (editor.gitClient.gardenName === garden && editor.filePath === path) {
+        console.log(`%c[LIVESYNC-GUARD] openFile BLOCKED for "${garden}#${path}" because it is already the live file.`, 'color: orange; font-weight: bold;');
+        return; 
+      } else {
+        console.log(`%c[LIVESYNC-GUARD] Navigating away from live file. Disconnecting editor...`, 'color: orange; font-weight: bold;');
+        editor.disconnectLiveSync();
+      }
     }
 
     const existingBufferIndex = node.buffers.findIndex(b => b.garden === garden && b.path === path);
@@ -210,6 +223,10 @@ export class WorkspaceManager {
 
     await editor.loadFile(path);
     this.setActivePane(this.activePaneId);
+
+    // --- DEFINITIVE FIX (Part 2) ---
+    // After any file is loaded, always check if it needs to be synced.
+    this.activateLiveSyncForCurrentFile();
   }
 
   findEditorByFile(gardenName, filePath) {

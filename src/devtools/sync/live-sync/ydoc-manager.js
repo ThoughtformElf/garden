@@ -69,11 +69,9 @@ export class YDocManager {
       console.log(`[YDocManager] FOLLOWER requesting initial state for ${yDocKey} from host.`);
       this.sync.sendSyncMessage({ type: 'MSG_LIVESYNC_REQUEST_DOC_STATE', file: { garden, path } }, this.manager.hostId, false);
     } else {
-      // --- THIS IS THE DEFINITIVE FIX (Part 2) ---
-      // This logic is essential and was incorrectly removed. The yCollab binding does NOT
-      // automatically populate the Y.Doc on connection. The host MUST explicitly put
-      // its current content into the shared document so that new clients have something
-      // to sync with.
+      // --- THIS IS THE DEFINITIVE FIX (Restored Logic) ---
+      // This is essential. The host MUST populate the Y.Doc with its current
+      // content so that new clients have a baseline to sync with.
       console.log(`[YDocManager] HOST is populating initial Y.Doc content for ${yDocKey} from its file system.`);
       try {
         const git = await this.sync.workspace.getGitClient(garden);

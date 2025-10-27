@@ -159,11 +159,6 @@ export class Editor {
     
     const yCollabExtension = yCollab(ytext, null, { undoManager: this.yUndoManager });
 
-    // --- THIS IS THE FIX ---
-    // The destructive `changes` transaction has been removed.
-    // The editor's content is already correct from the bootstrap file sync.
-    // We now ONLY apply the necessary extensions in a non-destructive way,
-    // which preserves the content and correctly binds it to the live session.
     this.editorView.dispatch({
         effects: [
             this.yjsCompartment.reconfigure(yCollabExtension),

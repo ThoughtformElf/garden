@@ -59,6 +59,7 @@ export async function executeFile(path, editor, git, event = null, params = null
     
     // If the script wasn't found in either garden, just exit silently.
     if (fileContent === null) {
+        console.warn(`[Executor] Could not find script to execute for path: "${path}"`);
         return;
     }
 

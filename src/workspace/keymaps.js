@@ -26,14 +26,11 @@ export class KeymapService {
     }
     const currentGarden = this.editor.gitClient.gardenName;
 
+    // Use the centralized config service to read configs
     const readKeymapFile = async (gardenName) => {
-      try {
-        const git = new Git(gardenName);
-        const content = await git.pfs.readFile(`/settings/keymaps.yml`, 'utf8');
-        return { config: parse(content), sourceGarden: gardenName };
-      } catch (e) {
-        return null;
-      }
+      // The get() method without a key returns the whole parsed file
+      const { value, sourceGarden } = await window.thoughtform.config.get('keymaps.yml', null, gardenName);
+      return value ? { config: value, sourceGarden: sourceGarden } : null;
     };
 
     const mergedKeymap = new Map();
@@ -42,14 +39,17 @@ export class KeymapService {
       if (!result || !Array.isArray(result.config)) return;
       for (const binding of result.config) {
         if (binding && binding.key && binding.hasOwnProperty('run')) {
+          // Add the source garden to the binding object for the executor
           mergedKeymap.set(binding.key, { ...binding, sourceGarden: result.sourceGarden });
         }
       }
     };
 
+    // 1. Load base configuration from Settings garden
     const globalResult = await readKeymapFile('Settings');
     processConfig(globalResult);
     
+    // 2. Load and merge (override) with the current garden's configuration
     if (currentGarden !== 'Settings') {
       const gardenResult = await readKeymapFile(currentGarden);
       processConfig(gardenResult);
@@ -81,6 +81,7 @@ export class KeymapService {
         }
       }
 
+      // The full path is now correctly determined by where the config file was found
       const fullPath = `${sourceGarden}#${run}`;
       return {
         key: key,
