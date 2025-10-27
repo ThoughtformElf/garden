@@ -339,7 +339,8 @@ export const fileActions = {
 
     if (confirmed) {
       try {
-        // CORRECTED: Publish the gardenName with the event
+        // --- THIS IS THE FIX ---
+        // The event now correctly includes the gardenName from the gitClient context.
         window.thoughtform.events.publish('file:delete', { path: path, isDirectory: stat.isDirectory(), gardenName: gitClient.gardenName });
         await gitClient.rmrf(path);
         await this.refresh();

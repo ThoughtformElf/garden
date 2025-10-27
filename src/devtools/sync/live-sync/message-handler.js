@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { Git } from '../../../util/git-integration.js';
 
 export class LiveSyncMessageHandler {
   constructor(manager) {
@@ -11,6 +12,38 @@ export class LiveSyncMessageHandler {
     console.log(`[LiveSync] Handling message: ${payload.type} from peer ${fromPeerId ? fromPeerId.substring(0, 4) : 'N/A'}`);
 
     switch (payload.type) {
+      // --- THIS IS THE FIX (Part 2) ---
+      // Handle file system operations broadcasted by other peers.
+      case 'MSG_LIVESYNC_FILE_CREATE': {
+        const { gardenName, path, content } = payload.payload;
+        console.log(`[LiveSync] Received file creation event for: ${gardenName}#${path}`);
+        const git = new Git(gardenName);
+        await git.writeFile(path, content);
+        if (window.thoughtform.sidebar) {
+          window.thoughtform.sidebar.refresh();
+        }
+        break;
+      }
+      case 'MSG_LIVESYNC_FILE_DELETE': {
+        const { gardenName, path, isDirectory } = payload.payload;
+        console.log(`[LiveSync] Received file deletion event for: ${gardenName}#${path}`);
+        const git = new Git(gardenName);
+        await git.rmrf(path);
+
+        // Check if the deleted file is open in any pane and close it.
+        for (const pane of this.sync.workspace.panes.values()) {
+            if (pane.editor && pane.editor.gitClient.gardenName === gardenName && pane.editor.filePath === path) {
+                // Navigate to a safe default to avoid a blank screen
+                await this.sync.workspace.openFile(gardenName, '/home');
+            }
+        }
+        if (window.thoughtform.sidebar) {
+          window.thoughtform.sidebar.refresh();
+        }
+        break;
+      }
+      // --- END OF FIX ---
+      
       case 'MSG_LIVESYNC_REELECT':
         this.manager.session.triggerReElection();
         break;
@@ -82,15 +115,11 @@ export class LiveSyncMessageHandler {
           if (yDoc) {
             Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
 
-            // --- THIS IS THE FIX ---
-            // Find the editor corresponding to this file.
             const editor = this.sync.workspace.findEditorByFile(payload.file.garden, payload.file.path);
-            if (editor) {
+            if (editor && editor.isLiveSyncConnected) {
               const yContent = yDoc.getText('codemirror').toString();
               const editorContent = editor.editorView.state.doc.toString();
               
-              // If the editor's view is out of sync with the data model, FORCE it to update.
-              // This is the final step that guarantees the client sees the host's content.
               if (yContent !== editorContent) {
                 console.log('%c[LiveSyncMessageHandler] Forcing editor view update to match received Y.Doc state.', 'color: #12ffbc');
                 editor.editorView.dispatch({

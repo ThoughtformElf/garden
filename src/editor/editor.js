@@ -246,16 +246,43 @@ export class Editor {
 
   async handleUpdate(newContent) {
     if (!this.isReady || this.isLiveSyncConnected) return;
+
+    // --- THIS IS THE DEFINITIVE FIX ---
+    let isCreation = false;
+    try {
+        await this.gitClient.pfs.stat(this.filePath);
+    } catch (e) {
+        if (e.code === 'ENOENT') {
+            isCreation = true; // File doesn't exist yet, so this write is a creation.
+        }
+    }
+
     await this.gitClient.writeFile(this.filePath, newContent);
-    
-    window.thoughtform.events.publish('file:update', {
+
+    const eventData = {
         gardenName: this.gitClient.gardenName,
         path: this.filePath,
         content: newContent
-    });
+    };
+
+    // Publish the correct event based on whether the file was new.
+    if (isCreation) {
+        window.thoughtform.events.publish('file:create', eventData);
+    } else {
+        window.thoughtform.events.publish('file:update', eventData);
+    }
     
     window.thoughtform.workspace.notifyFileUpdate(this.gitClient.gardenName, this.filePath, this.paneId);
     if (this.sidebar) await this.sidebar.refresh();
+
+    // Retroactively activate sync for the newly created file.
+    const liveSync = window.thoughtform.sync.liveSync;
+    if (isCreation && !this.isLiveSyncConnected && 
+        (liveSync.state === 'host' || liveSync.state === 'active') &&
+        liveSync.syncableGardens.includes(this.gitClient.gardenName)) {
+        console.log(`[Editor/handleUpdate] Retroactively activating live sync for new file: ${this.filePath}`);
+        window.thoughtform.workspace.activateLiveSyncForCurrentFile();
+    }
   }
 
   refreshStatusBar() {

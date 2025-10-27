@@ -29,11 +29,26 @@ export class LiveSyncManager {
         this.state = 'active'; 
         this.sync.addMessage('Initial sync complete. Live collaboration is active.');
         
-        // --- THIS IS THE FINAL FIX ---
-        // This is the single, authoritative call that re-establishes the connection
-        // AFTER the editor's content has been forcefully reloaded. This is the
-        // correct and final step in the sequence.
         this.sync.workspace.activateLiveSyncForCurrentFile();
+      }
+    });
+
+    // --- THIS IS THE DEFINITIVE FIX (Part 1) ---
+    // Listen for file system changes and broadcast them with their full payload.
+    window.thoughtform.events.subscribe('file:create', (data) => {
+      if (this.state !== 'disabled' && this.syncableGardens.includes(data.gardenName)) {
+        this.sync.sendSyncMessage({ 
+            type: 'MSG_LIVESYNC_FILE_CREATE', 
+            payload: data // data includes { gardenName, path, content }
+        });
+      }
+    });
+    window.thoughtform.events.subscribe('file:delete', (data) => {
+      if (this.state !== 'disabled' && this.syncableGardens.includes(data.gardenName)) {
+        this.sync.sendSyncMessage({ 
+            type: 'MSG_LIVESYNC_FILE_DELETE', 
+            payload: data // data includes { gardenName, path, isDirectory }
+        });
       }
     });
   }
@@ -57,6 +72,12 @@ export class LiveSyncManager {
 
     console.log(`[LiveSync] Activating doc for editor. Current state: ${this.state}`);
     
+    if (editor.editorView.state.doc.toString().startsWith('// "')) {
+        console.log(`[LiveSync] Activation blocked for new, unsaved file: ${editor.filePath}`);
+        editor.disconnectLiveSync();
+        return;
+    }
+
     const validStates = ['host', 'follower', 'bootstrapping', 'active'];
     if (this.state === 'disabled') {
         editor.disconnectLiveSync();
