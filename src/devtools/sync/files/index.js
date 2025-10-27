@@ -105,9 +105,14 @@ export class SyncFiles extends EventEmitterMixin {
             return;
         }
 
+        // --- THIS IS THE DEFINITIVE FIX ---
+        // The hardcoded reload is removed. The hot-reload logic in `messages.js`
+        // is now the single source of truth for updating the UI.
         if (this.isSyncCompleteMessageReceived && this.pendingWriteCount === 0 && this.activeTransfers.size === 0) {
-            this.dispatchEvent(new CustomEvent('syncProgress', { detail: { message: 'All files received and written. Reloading...', type: 'complete', action: 'receive' } }));
-            setTimeout(() => window.location.reload(), 1500);
+            this.dispatchEvent(new CustomEvent('syncProgress', { 
+                detail: { message: 'All files received and written. Sync complete.', type: 'complete', action: 'receive' } 
+            }));
+            // REMOVED: setTimeout(() => window.location.reload(), 1500);
         }
     }
 

@@ -23,6 +23,9 @@ export class Modal {
     this.container.appendChild(this.footer);
     this.overlay.appendChild(this.container);
     document.body.appendChild(this.overlay);
+
+    this.id = `modal-${crypto.randomUUID()}`;
+    this.container.dataset.modalId = this.id;
   }
 
   show() {
@@ -150,27 +153,19 @@ export class Modal {
       document.addEventListener('keydown', handleKeyDown);
       
       modal.show();
+
+      return modal;
     });
   }
 
-  /**
-   * Shows a modal for selecting items grouped by a category (e.g., peers).
-   * @param {Object} options
-   * @param {string} options.title - The title for the modal.
-   * @param {Map<string, {id: string, gardens: string[]}>} options.peerData - A map of peers and their data.
-   * @param {string} options.okText - The text for the confirmation button.
-   * @returns {Promise<Object|null>} A promise that resolves with the selection object or null if cancelled.
-   *                                 Example selection: { 'peerId-123': ['gardenA'], 'peerId-456': ['gardenB'] }
-   */
   static selection({ title, peerData, okText = 'Request' }) {
     return new Promise((resolve) => {
       if (peerData.size === 0) {
-        // Show a simple info modal if there are no peers.
         const infoModal = new Modal({ title: 'No Peers Found' });
         infoModal.updateContent('<p>There are no other peers currently connected to this sync session.</p>');
         infoModal.addFooterButton('OK', () => {
             infoModal.destroy();
-            resolve(null); // Resolve with null as there's nothing to select
+            resolve(null);
         });
         infoModal.show();
         return;
@@ -285,6 +280,54 @@ export class Modal {
         } else {
           resolve(null);
         }
+        modal.destroy();
+      };
+      
+      const cancel = () => {
+        resolve(null);
+        modal.destroy();
+      };
+
+      modal.addFooterButton(okText, submit);
+      modal.addFooterButton('Cancel', cancel);
+      modal.show();
+    });
+  }
+
+  // --- THIS IS THE NEW, CORRECTED FUNCTION ---
+  static gardenSelection({ title, gardenData, okText = 'Start Session' }) {
+    return new Promise((resolve) => {
+      const modal = new Modal({ title });
+
+      const createChecklistUI = (groupTitle, items) => {
+        const itemCheckboxes = items.map(item => `
+          <label>
+            <input type="checkbox" class="modal-select-checkbox" value="${item}">
+            <span>${item}</span>
+          </label>
+        `).join('');
+
+        return `
+          <div class="modal-selection-group">
+            <strong>${groupTitle}</strong>
+            <div class="modal-selection-controls">
+              <button type="button" class="select-all-btn">Select All</button>
+              <button type="button" class="select-none-btn">Deselect All</button>
+            </div>
+            <div class="modal-selection-list">${itemCheckboxes}</div>
+          </div>
+        `;
+      };
+
+      modal.updateContent(createChecklistUI('Gardens to Sync', gardenData));
+
+      const group = modal.content.querySelector('.modal-selection-group');
+      group.querySelector('.select-all-btn').onclick = () => group.querySelectorAll('.modal-select-checkbox').forEach(cb => cb.checked = true);
+      group.querySelector('.select-none-btn').onclick = () => group.querySelectorAll('.modal-select-checkbox').forEach(cb => cb.checked = false);
+      
+      const submit = () => {
+        const selectedGardens = Array.from(modal.content.querySelectorAll('.modal-select-checkbox:checked')).map(cb => cb.value);
+        resolve(selectedGardens);
         modal.destroy();
       };
       

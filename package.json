@@ -55,7 +55,9 @@
     "util": "^0.12.5",
     "vite-plugin-pwa": "^1.0.3",
     "ws": "^8.18.3",
-    "yaml": "^2.8.1"
+    "y-codemirror.next": "^0.3.5",
+    "yaml": "^2.8.1",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10",

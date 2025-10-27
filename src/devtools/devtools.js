@@ -1,7 +1,7 @@
 import eruda from 'eruda';
-import { Sync } from './sync/index.js';
 import { addDataTool } from './data/index.js';
 import { addAiTool } from './ai.js';
+// The incorrect import of 'Sync' has been removed.
 
 export function initializeDevTools() {
   const el = document.getElementById('eruda-container');
@@ -60,16 +60,23 @@ export function initializeDevTools() {
   addDataTool(eruda);
   addAiTool(eruda);
 
-  // The Sync tool is already well-encapsulated, so we initialize it directly
+  // --- THIS IS THE DEFINITIVE FIX ---
+  // The Sync tool now uses the single, authoritative instance from window.thoughtform
+  // instead of creating its own broken instance.
   eruda.add({
     name: 'Sync',
     init($el) {
-      this.sync = new Sync();
-      this.sync.init($el.get(0));
+      // Do not create a new Sync(). Use the one that was already created and configured.
+      this.sync = window.thoughtform.sync; 
+      if (this.sync) {
+        this.sync.init($el.get(0));
+      } else {
+        console.error("FATAL: Sync service not found on window.thoughtform during DevTools initialization.");
+      }
     },
-    show() { this.sync.show(); },
-    hide() { this.sync.hide(); },
-    destroy() { this.sync.destroy(); }
+    show() { this.sync?.show(); },
+    hide() { this.sync?.hide(); },
+    destroy() { this.sync?.destroy(); }
   });
 
   return eruda;

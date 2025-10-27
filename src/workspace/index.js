@@ -29,24 +29,19 @@ export class WorkspaceManager {
     this._stateManager = new WorkspaceStateManager(this);
     this._urlManager = new UrlManager();
 
-    const isWindowed = this._urlManager.getSessionParams().has('windowed');
     const savedState = this._stateManager.loadState();
+    const isWindowed = this._urlManager.getSessionParams().has('windowed');
 
-    if (isWindowed) {
+    if (isWindowed || !savedState || !savedState.paneTree || !savedState.activePaneId) {
         this.paneTree = this._createInitialPaneTree();
         this.activePaneId = 'pane-1';
         this.initialEditorStates = {};
         this._paneManager.isMaximized = false;
-    } else if (savedState) {
+    } else {
         this.paneTree = savedState.paneTree;
         this.activePaneId = savedState.activePaneId;
         this.initialEditorStates = savedState.editorStates || {};
         this._paneManager.isMaximized = savedState.isMaximized || false;
-    } else {
-        this.paneTree = this._createInitialPaneTree();
-        this.activePaneId = 'pane-1';
-        this.initialEditorStates = {};
-        this._paneManager.isMaximized = false;
     }
   }
 
@@ -63,6 +58,44 @@ export class WorkspaceManager {
   
   updateSessionFromUrl() {
     this._urlManager.updateFromUrl();
+  }
+
+  activateLiveSyncForCurrentFile() {
+      const editor = this.getActiveEditor();
+      if (editor) {
+          window.thoughtform.sync.liveSync.activateDocForEditor(editor);
+      }
+  }
+  
+  async hotReloadGarden(gardenName) {
+      console.log(`[Workspace] Hot-reloading garden: "${gardenName}"`);
+      const newGitClient = new Git(gardenName);
+      await newGitClient.initRepo();
+      this.gitClients.set(gardenName, newGitClient);
+
+      for (const pane of this.panes.values()) {
+          if (pane.editor && pane.editor.gitClient.gardenName === gardenName) {
+              pane.editor.gitClient = newGitClient;
+              await pane.editor.forceReloadFile(pane.editor.filePath);
+          }
+      }
+
+      if (window.thoughtform.sidebar && window.thoughtform.sidebar.gitClient.gardenName === gardenName) {
+          window.thoughtform.sidebar.gitClient = newGitClient;
+          await window.thoughtform.sidebar.refresh();
+      }
+      console.log(`[Workspace] Hot-reload complete for "${gardenName}".`);
+  }
+
+  async resetAndSwitchToHome() {
+      this.gitClients.clear();
+      const homeGitClient = await this.getGitClient('home');
+      this.initialGitClient = homeGitClient;
+      this.paneTree = this._createInitialPaneTree();
+      this.activePaneId = 'pane-1';
+      this.initialEditorStates = {};
+      await this.render();
+      await window.thoughtform.sidebar.refresh();
   }
   
   async getGitClient(gardenName) {
@@ -84,7 +117,6 @@ export class WorkspaceManager {
     });
     
     const activePane = this.panes.get(paneId);
-
     setTimeout(() => activePane?.editor?.editorView.focus(), 50);
     
     this._updateURL();
@@ -108,9 +140,7 @@ export class WorkspaceManager {
       })))
     });
     
-    // Publish an event AFTER the garden context has been switched.
     window.thoughtform.events.publish('workspace:garden:switched', { editor });
-
     await this.openFile(gardenName, '/home');
     
     if (window.thoughtform.sidebar) {
@@ -145,11 +175,14 @@ export class WorkspaceManager {
                 editor: editor,
             })))
         });
-        // Also publish the event when opening a file from a different garden.
         window.thoughtform.events.publish('workspace:garden:switched', { editor });
     }
 
     await editor.loadFile(path);
+    // --- THIS IS THE FIX ---
+    // Every time a file is opened, we tell the sync manager to check if it
+    // should be connected to a live Y.js document.
+    this.activateLiveSyncForCurrentFile();
     this.setActivePane(this.activePaneId);
   }
 

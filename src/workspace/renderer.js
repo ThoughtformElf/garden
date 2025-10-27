@@ -55,6 +55,8 @@ export class WorkspaceRenderer {
   }
 
   async _renderNode(node, parentElement) {
+    if (!node) return; // --- THIS IS THE FIX for the rendering crash ---
+
     if (node.type === 'leaf') {
       const paneElement = document.createElement('div');
       paneElement.className = 'pane';
@@ -86,8 +88,9 @@ export class WorkspaceRenderer {
 
         this.workspace.panes.set(node.id, { element: paneElement, editor: editor });
         
-        if (this.workspace.initialEditorStates[node.id]) {
-            editor.restoreState(this.workspace.initialEditorStates[node.id]);
+        const savedState = this.workspace.initialEditorStates[node.id];
+        if (savedState) {
+            editor.restoreState(savedState);
         }
       }
 

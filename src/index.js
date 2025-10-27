@@ -4,7 +4,6 @@ import { Buffer } from 'buffer';
 window.Buffer = Buffer;
 window.process = { env: {} };
 
-import { Editor } from './editor/editor.js';
 import { Git } from './util/git-integration.js';
 import { initializeAppInteractions } from './sidebar/ui-interactions.js';
 import { initializeDevTools } from './devtools/devtools.js';
@@ -19,7 +18,7 @@ import { Modal } from './util/modal.js';
 import { initializeWorkspaceManager } from './workspace/index.js';
 import { initializeQueryLoader } from './workspace/query-loader.js';
 import { seedCoreGardens } from './workspace/core-gardens.js';
-// The incorrect import has been removed.
+import { Sync } from './devtools/sync/index.js';
 
 function initializeNavigationListener() {
     const handleNav = async () => {
@@ -58,32 +57,24 @@ function initializeNavigationListener() {
 async function main() {
   await seedCoreGardens();
 
-  const fullPath = new URL(import.meta.url).pathname;
-  const srcIndex = fullPath.lastIndexOf('/src/');
-  const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
-  
-  let gardenName = window.location.pathname.startsWith(basePath)
-    ? window.location.pathname.substring(basePath.length)
-    : window.location.pathname;
-
-  gardenName = gardenName.replace(/^\/|\/$/g, '') || 'home';
-  gardenName = decodeURIComponent(gardenName);
-
-  console.log(`Base Path: "${basePath}"`);
-  console.log(`Loading garden: "${gardenName}"`);
-
-  const gitClient = new Git(gardenName);
-
+  // --- 1. Initialize Core Services (No Dependencies) ---
   window.thoughtform = {
     ui: {},
     ai: initializeAiService(),
     config: initializeConfigService(),
     events: initializeEventBus(),
-    // The global keymap service has been removed.
   };
-  
-  window.thoughtform.workspace = initializeWorkspaceManager(gitClient);
 
+  // --- 2. Initialize Workspace and Sync, Linking Them Correctly ---
+  const initialGitClient = new Git('home'); // This will be updated by the navigation handler.
+  const workspaceManager = initializeWorkspaceManager(initialGitClient);
+  const syncService = new Sync(workspaceManager); // Pass workspace to Sync
+  
+  // Assign the singletons to the global object.
+  window.thoughtform.workspace = workspaceManager;
+  window.thoughtform.sync = syncService;
+
+  // --- 3. Initialize UI Components That Depend on Core Services ---
   registerSW({
     onNeedRefresh() {
       Modal.confirm({
@@ -105,7 +96,7 @@ async function main() {
   });
 
   initializeAppInteractions();
-  initializeDevTools();
+  initializeDevTools(); // This now correctly finds window.thoughtform.sync and initializes its UI.
   window.thoughtform.runMigration = runMigration;
   
   const isPreview = (window.location.hash || '').includes('?windowed=true');
@@ -120,12 +111,10 @@ async function main() {
     if (!isPreview) window.thoughtform.ui.toggleDevtools?.(true, 'console');
   };
 
-  const editorShim = { gitClient }; 
-  window.thoughtform.editor = editorShim;
-
   const commandPalette = new CommandPalette();
   window.thoughtform.commandPalette = commandPalette;
 
+  // --- 4. Render the UI for the first time ---
   await window.thoughtform.workspace.render();
   
   const editor = window.thoughtform.workspace.getActiveEditor();
@@ -133,19 +122,19 @@ async function main() {
       console.error("FATAL: Workspace manager failed to create an initial editor.");
       return;
   }
-  
   window.thoughtform.editor = editor;
   
+  // --- 5. Initialize Post-Render Services ---
   const hookRunner = new HookRunner(window.thoughtform.events);
   hookRunner.initialize();
   window.thoughtform.hooks = hookRunner;
   
   const handleInitialNav = initializeNavigationListener();
   
+  // --- 6. Perform Initial Navigation and Load Content ---
   await handleInitialNav(); 
 
   window.thoughtform.workspace.isInitialized = true;
-
   window.thoughtform.events.publish('app:load');
 }
 

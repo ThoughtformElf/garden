@@ -3,13 +3,16 @@ import { EditorState as CodeMirrorEditorState, Compartment, Annotation } from '@
 import { vim, Vim } from '@replit/codemirror-vim';
 import debounce from 'lodash/debounce';
 import { keymap } from '@codemirror/view';
-import { defaultKeymap } from '@codemirror/commands';
+import { history, defaultKeymap } from '@codemirror/commands';
+
+import * as Y from 'yjs';
+import { yCollab } from 'y-codemirror.next';
 
 import { Sidebar } from '../sidebar/sidebar.js';
 import { initializeDragAndDrop } from '../util/drag-drop.js';
 import { getLanguageExtension } from './languages.js';
 import { appContextField, findFileCaseInsensitive } from './navigation.js';
-import { KeymapService } from '../workspace/keymaps.js'; // Back to the simpler class
+import { KeymapService } from '../workspace/keymaps.js';
 import { createEditorExtensions } from './extensions.js';
 import { statusBarPlugin } from './status-bar.js';
 
@@ -34,17 +37,22 @@ export class Editor {
     this.sidebar = null;
     this.filePath = initialFile || '/home';
     this.isReady = false;
-    this.keymapService = new KeymapService(this); // Editor owns its keymap service again
+    this.keymapService = new KeymapService(this);
     this.aiOverrides = {};
 
     this.languageCompartment = new Compartment();
     this.vimCompartment = new Compartment();
     this.defaultKeymapCompartment = new Compartment();
     this.appContextCompartment = new Compartment();
+    this.yjsCompartment = new Compartment();
     this.mediaViewerElement = null;
     this.currentMediaObjectUrl = null;
     
     this.programmaticChange = Annotation.define();
+
+    this.yDoc = null;
+    this.yUndoManager = null;
+    this.isLiveSyncConnected = false;
 
     this._files = new EditorFiles(this);
     this._git = new EditorGit(this);
@@ -94,6 +102,7 @@ export class Editor {
     this.targetElement.appendChild(this.mediaViewerElement);
 
     const updateListener = EditorView.updateListener.of((update) => {
+      if (this.isLiveSyncConnected) return;
       if (update.docChanged && !update.transactions.some(t => t.annotation(this.programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
@@ -108,11 +117,12 @@ export class Editor {
         sidebar: this.sidebar,
         editor: this,
       })),
-      keymapCompartment: this.keymapService.keymapCompartment, // Pass the compartment
+      keymapCompartment: this.keymapService.keymapCompartment,
       vimCompartment: this.vimCompartment,
       defaultKeymapCompartment: this.defaultKeymapCompartment,
       languageCompartment: this.languageCompartment,
       appContextCompartment: this.appContextCompartment,
+      yjsCompartment: this.yjsCompartment,
       updateListener,
       filePath: this.filePath,
       getLanguageExtension,
@@ -130,6 +140,47 @@ export class Editor {
     await this.loadFile(this.filePath);
   }
 
+  connectLiveSync(yDoc, isHost, peerId) {
+    if (this.isLiveSyncConnected) this.disconnectLiveSync();
+    console.log(`[Editor] Connecting to Live Sync for file: ${this.gitClient.gardenName}#${this.filePath}. Is Host: ${isHost}`);
+
+    this.yDoc = yDoc;
+    const ytext = this.yDoc.getText('codemirror');
+    this.yUndoManager = new Y.UndoManager(ytext);
+
+    if (isHost && ytext.length === 0) {
+      console.log("[Editor] Host is populating initial Y.Doc content.");
+      ytext.insert(0, this.editorView.state.doc.toString());
+    }
+
+    const yCollabExtension = yCollab(ytext, null, { undoManager: this.yUndoManager });
+
+    this.editorView.dispatch({
+      effects: [
+        this.yjsCompartment.reconfigure(yCollabExtension),
+        this.defaultKeymapCompartment.reconfigure(keymap.of([]))
+      ]
+    });
+    
+    this.isLiveSyncConnected = true;
+  }
+
+  disconnectLiveSync() {
+    if (!this.isLiveSyncConnected) return;
+    console.log(`[Editor] Disconnecting from Live Sync for file: ${this.gitClient.gardenName}#${this.filePath}`);
+
+    this.editorView.dispatch({
+      effects: [
+        this.yjsCompartment.reconfigure([]),
+        this.defaultKeymapCompartment.reconfigure(keymap.of(defaultKeymap))
+      ]
+    });
+    
+    this.yDoc = null;
+    this.yUndoManager = null;
+    this.isLiveSyncConnected = false;
+  }
+
   async _applyUserSettings() {
     const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode', this);
     
@@ -141,7 +192,7 @@ export class Editor {
           this.defaultKeymapCompartment.reconfigure([])
         ]
       });
-    } else {
+    } else if (!this.isLiveSyncConnected) {
        this.editorView.dispatch({
         effects: [
           this.vimCompartment.reconfigure([]),
@@ -150,7 +201,6 @@ export class Editor {
       });
     }
     
-    // This is the crucial change: trigger the keymap update AFTER all other settings are applied.
     if (this.keymapService) {
       await this.keymapService.updateKeymaps();
     }
@@ -177,7 +227,7 @@ export class Editor {
   }
 
   async handleUpdate(newContent) {
-    if (!this.isReady) return;
+    if (!this.isReady || this.isLiveSyncConnected) return;
     await this.gitClient.writeFile(this.filePath, newContent);
     
     window.thoughtform.events.publish('file:update', {

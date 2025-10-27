@@ -1,19 +1,12 @@
-import debug from '../../util/debug.js';
-import { Modal } from '../../util/modal.js';
+import { EventBinder } from './ui/event-binder.js';
+import { ModalHandler } from './ui/modal-handler.js';
 
 export class SyncUI {
   constructor(syncInstance) {
     this.sync = syncInstance;
+    this.eventBinder = new EventBinder(syncInstance);
+    this.modalHandler = new ModalHandler(syncInstance);
     this.syncMethodIndicatorEl = null;
-    this.syncProgressModal = null;
-    this.syncProgressLogArea = null;
-    this.syncProgressFinalMessageArea = null;
-    this.syncProgressActionButton = null;
-    
-    this.connectBtn = null;
-    this.nameInput = null;
-    this.peerPrefixInput = null;
-    this.autoConnectCheckbox = null;
   }
   
   render() {
@@ -41,6 +34,13 @@ export class SyncUI {
               </div>
               <div class="sync-row space-between">
                 <label class="flex-center">
+                  <input type="checkbox" id="live-sync-toggle-checkbox">
+                  <span style="margin-left: 5px;">Enable Live Sync (beta)</span>
+                </label>
+                <button id="live-sync-reelect-btn" class="eruda-button" style="display: none;">Re-elect Host</button>
+              </div>
+              <div class="sync-row space-between">
+                <label class="flex-center">
                   <input type="checkbox" id="sync-autoconnect-checkbox">
                   <span>Auto-connect on startup</span>
                 </label>
@@ -50,6 +50,7 @@ export class SyncUI {
                 <div class="sync-status-grid">
                     <strong>Status:</strong> <span id="sync-status">Disconnected</span>
                     <strong>Method:</strong> <span id="sync-method-indicator">None</span>
+                    <strong>Live Sync:</strong> <span id="live-sync-status">Disabled</span>
                     <strong>Peers:</strong> <span id="sync-peer-count">0</span>
                     <strong>Peer ID:</strong> <span id="sync-peer-id-display" style="word-break: break-all;">Not Connected</span>
                 </div>
@@ -68,111 +69,43 @@ export class SyncUI {
         </div>
       `;
       this.syncMethodIndicatorEl = this.sync._container.querySelector('#sync-method-indicator');
-      this.connectBtn = this.sync._container.querySelector('#sync-connect-btn');
-      this.nameInput = this.sync._container.querySelector('#sync-name-input');
-      this.peerPrefixInput = this.sync._container.querySelector('#sync-peer-prefix-input');
-      this.autoConnectCheckbox = this.sync._container.querySelector('#sync-autoconnect-checkbox');
     }
   }
-  
+
   bindEvents() {
-    if (!this.sync._container) {
-      debug.error("SyncUI.bindEvents: Container not set");
-      return;
-    }
-    
-    this.nameInput.value = localStorage.getItem('thoughtform_sync_name') || '';
-    this.peerPrefixInput.value = localStorage.getItem('thoughtform_peer_prefix') || '';
-    this.autoConnectCheckbox.checked = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
+    this.eventBinder.bind();
+  }
+  
+  updateLiveSyncUI() {
+    const container = this.sync._container;
+    if (!container) return;
 
-    this.peerPrefixInput.addEventListener('input', () => {
-        if (this.sync.connectionState === 'disconnected' || this.sync.connectionState === 'error') {
-            const peerIdEl = this.sync._container.querySelector('#sync-peer-id-display');
-            if (peerIdEl) {
-                const prefix = this.peerPrefixInput.value.trim();
-                if (prefix) {
-                    peerIdEl.textContent = `${prefix}-<random_id>`;
-                } else {
-                    peerIdEl.textContent = 'Not Connected';
-                }
-            }
-        }
-    });
-    
-    this.connectBtn.addEventListener('click', () => {
-      const currentState = this.sync.connectionState;
-      if (currentState === 'disconnected' || currentState === 'error') {
-        const syncName = this.nameInput.value.trim();
-        const peerPrefix = this.peerPrefixInput.value.trim();
-        const autoConnect = this.autoConnectCheckbox.checked;
-        if (!syncName) {
-          this.addMessage("Please enter a Sync Name.");
-          return;
-        }
-        localStorage.setItem('thoughtform_sync_name', syncName);
-        localStorage.setItem('thoughtform_peer_prefix', peerPrefix);
-        localStorage.setItem('thoughtform_sync_auto_connect', autoConnect);
-        this.sync.connect(syncName, peerPrefix);
-      } else {
-        this.sync.disconnect();
-      }
-    });
-    
-    const saveConfigBtn = this.sync._container.querySelector('#save-signaling-config');
-    if (saveConfigBtn) {
-      saveConfigBtn.addEventListener('click', () => {
-        const urlInput = this.sync._container.querySelector('#signaling-server-url');
-        const newUrl = urlInput ? urlInput.value.trim() : '';
-        if (newUrl) {
-          this.sync.signaling.updateSignalingServerUrl(newUrl);
-          this.addMessage(`Signaling server updated to: ${newUrl}`);
-        } else {
-          this.addMessage('Please enter a valid signaling server URL.');
-        }
-      });
-    }
-    
-    const sendToPeersBtn = this.sync._container.querySelector('#send-to-peers-btn');
-    const requestAllBtn = this.sync._container.querySelector('#request-all-files-btn');
-    
-    if (sendToPeersBtn) {
-      sendToPeersBtn.addEventListener('click', async () => {
-        const gardensRaw = localStorage.getItem('thoughtform_gardens');
-        const gardenData = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
-        const peerData = this.sync.connectedPeers;
+    const statusEl = container.querySelector('#live-sync-status');
+    const checkbox = container.querySelector('#live-sync-toggle-checkbox');
+    const reelectBtn = container.querySelector('#live-sync-reelect-btn');
 
-        const selection = await Modal.sendSelection({
-            title: 'Send Gardens to Peers',
-            peerData: peerData,
-            gardenData: gardenData
-        });
-        
-        if (selection) {
-            debug.log('User initiated send:', selection);
-            this.showSyncProgressModal();
-            this.sync.fileSync.sendGardensToPeers(selection); 
-        } else {
-            debug.log('Garden send cancelled by user.');
-        }
-      });
-    }
-    
-    if (requestAllBtn) {
-      requestAllBtn.addEventListener('click', async () => {
-        const selection = await Modal.selection({
-          title: 'Request Gardens from Peers',
-          peerData: this.sync.connectedPeers
-        });
+    if (!statusEl || !checkbox || !reelectBtn) return;
 
-        if (selection) {
-          debug.log('User made selection:', selection);
-          this.showSyncProgressModal();
-          this.sync.fileSync.requestSpecificGardens(selection);
-        } else {
-          debug.log('Garden request cancelled by user.');
-        }
-      });
+    const state = this.sync.liveSync.state;
+    checkbox.disabled = this.sync.connectionState === 'connecting';
+    checkbox.checked = localStorage.getItem('thoughtform_live_sync_enabled') === 'true';
+    
+    const isSessionActive = state === 'host' || state === 'follower';
+    reelectBtn.style.display = isSessionActive ? 'block' : 'none';
+
+    let statusText = 'Disabled';
+    switch(state) {
+        case 'pending': statusText = 'Pending Selection...'; break;
+        case 'host':
+            const hostName = this.sync.liveSync.hostId === this.sync.getPeerId() ? ' (You)' : ` (${this.sync.liveSync.activePeers.get(this.sync.liveSync.hostId)?.name || '...'})`;
+            statusText = `Host${hostName}`;
+            break;
+        case 'follower':
+            const leaderName = ` (${this.sync.liveSync.activePeers.get(this.sync.liveSync.hostId)?.name || '...'})`;
+            statusText = `Follower${leaderName}`;
+            break;
     }
+    statusEl.textContent = statusText;
   }
   
   updateStatus(message) {
@@ -184,19 +117,22 @@ export class SyncUI {
   }
   
   updateControls(state) {
+    const container = this.sync._container;
+    if (!container) return;
     const isDisconnected = (state === 'disconnected' || state === 'error');
     const isConnecting = (state === 'connecting');
-    if (this.connectBtn) {
-      this.connectBtn.disabled = isConnecting;
-      if (isDisconnected) this.connectBtn.textContent = 'Connect';
-      else if (isConnecting) this.connectBtn.textContent = 'Connecting...';
-      else this.connectBtn.textContent = 'Disconnect';
+
+    const connectBtn = container.querySelector('#sync-connect-btn');
+    if (connectBtn) {
+      connectBtn.disabled = isConnecting;
+      connectBtn.textContent = isDisconnected ? 'Connect' : (isConnecting ? 'Connecting...' : 'Disconnect');
     }
-    if (this.nameInput) this.nameInput.disabled = !isDisconnected;
-    if (this.peerPrefixInput) this.peerPrefixInput.disabled = !isDisconnected;
-    if (this.autoConnectCheckbox) this.autoConnectCheckbox.disabled = !isDisconnected;
-    const shouldEnableFileSync = (state === 'connected-p2p' || state === 'connected-signal');
-    this.sync._container.querySelectorAll('.sync-actions button').forEach(btn => btn.disabled = !shouldEnableFileSync);
+    
+    container.querySelector('#sync-name-input').disabled = !isDisconnected;
+    container.querySelector('#sync-peer-prefix-input').disabled = !isDisconnected;
+    container.querySelectorAll('.sync-actions button').forEach(btn => btn.disabled = state !== 'connected-p2p');
+    
+    this.updateLiveSyncUI();
   }
   
   updateConnectionIndicator(state) {
@@ -206,26 +142,10 @@ export class SyncUI {
       let methodText = 'None';
       let methodColor = 'var(--color-text-secondary)';
       switch (state) {
-        case 'connecting':
-          tabEl.classList.add('sync-status-connecting');
-          methodText = 'Connecting...';
-          methodColor = 'var(--base-accent-warning)';
-          break;
-        case 'connected-signal':
-          tabEl.classList.add('sync-status-signal');
-          methodText = 'WebSocket (Fallback)';
-          methodColor = 'var(--base-accent-warning)';
-          break;
-        case 'connected-p2p':
-          tabEl.classList.add('sync-status-p2p');
-          methodText = 'WebRTC (P2P)';
-          methodColor = 'var(--base-accent-action)';
-          break;
-        case 'error':
-          tabEl.classList.add('sync-status-error');
-          methodText = 'Error';
-          methodColor = 'var(--base-accent-destructive)';
-          break;
+        case 'connecting': tabEl.classList.add('sync-status-connecting'); methodText = 'Connecting...'; methodColor = 'var(--base-accent-warning)'; break;
+        case 'connected-signal': tabEl.classList.add('sync-status-signal'); methodText = 'WebSocket (Fallback)'; methodColor = 'var(--base-accent-warning)'; break;
+        case 'connected-p2p': tabEl.classList.add('sync-status-p2p'); methodText = 'WebRTC (P2P)'; methodColor = 'var(--base-accent-action)'; break;
+        case 'error': tabEl.classList.add('sync-status-error'); methodText = 'Error'; methodColor = 'var(--base-accent-destructive)'; break;
       }
       if (this.syncMethodIndicatorEl) {
         this.syncMethodIndicatorEl.textContent = methodText;
@@ -243,78 +163,8 @@ export class SyncUI {
       messagesList.scrollTop = messagesList.scrollHeight;
     }
   }
-  
-  showMessages() {
-    const messagesDiv = this.sync._container.querySelector('#eruda-sync-messages');
-    if (messagesDiv) messagesDiv.style.display = 'block';
-  }
-  
-  hideMessages() {
-    const messagesDiv = this.sync._container.querySelector('#eruda-sync-messages');
-    if (messagesDiv) messagesDiv.style.display = 'none';
-  }
-  
-  showSyncProgressModal() {
-    if (this.syncProgressModal) this.syncProgressModal.destroy();
-    this.syncProgressModal = new Modal({ title: 'File Sync Progress' });
-    const progressContent = `
-      <div id="sync-progress-log" style="height: 300px; overflow-y: auto; border: 1px solid var(--color-border-primary); padding: 1rem; background-color: var(--base-dark); margin-bottom: 1rem;"></div>
-      <div id="sync-progress-final-message" style="font-weight: bold; padding: 5px; min-height: 20px;"></div>
-    `;
-    this.syncProgressModal.updateContent(progressContent);
-    this.syncProgressLogArea = this.syncProgressModal.content.querySelector('#sync-progress-log');
-    this.syncProgressFinalMessageArea = this.syncProgressModal.content.querySelector('#sync-progress-final-message');
-    this.syncProgressActionButton = null; 
 
-    this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Cancel', () => {
-        this.sync.fileSync.cancelSync();
-    });
-
-    this.syncProgressModal.show();
-  }
-  
-  updateSyncProgress(event) {
-    const { message = 'No message', type = 'info', action = 'receive' } = event.detail;
-
-    if (!this.syncProgressModal) {
-      this.showSyncProgressModal();
-    }
-    
-    if (!this.syncProgressLogArea) return;
-
-    const logEntry = document.createElement('div');
-    const timestamp = new Date().toLocaleTimeString();
-    logEntry.textContent = `[${timestamp}] ${message}`;
-    logEntry.style.marginBottom = '5px';
-    switch (type) {
-      case 'error': logEntry.style.color = 'var(--base-accent-destructive)'; break;
-      case 'complete': logEntry.style.color = 'var(--base-accent-action)'; break;
-      case 'cancelled': logEntry.style.color = 'var(--base-accent-warning)'; break;
-      default: logEntry.style.color = 'var(--color-text-primary)'; break;
-    }
-    this.syncProgressLogArea.appendChild(logEntry);
-    this.syncProgressLogArea.scrollTop = this.syncProgressLogArea.scrollHeight;
-
-    if (['complete', 'error', 'cancelled'].includes(type)) {
-      if (this.syncProgressFinalMessageArea) {
-        this.syncProgressFinalMessageArea.textContent = message;
-        this.syncProgressFinalMessageArea.style.color = logEntry.style.color;
-      }
-      
-      if (this.syncProgressActionButton) {
-        this.syncProgressActionButton.remove();
-      }
-      
-      this.syncProgressActionButton = this.syncProgressModal.addFooterButton('Close', () => this.hideSyncProgressModal());
-      if (type === 'error') this.syncProgressActionButton.classList.add('destructive');
-    }
-  }
-  
-  hideSyncProgressModal() {
-    if (this.syncProgressModal) {
-      this.sync.fileSync.resetFullSyncState(); // THIS IS THE FIX
-      this.syncProgressModal.destroy();
-      this.syncProgressModal = null;
-    }
-  }
+  showSyncProgressModal() { this.modalHandler.show(); }
+  updateSyncProgress(event) { this.modalHandler.update(event); }
+  hideSyncProgressModal() { this.modalHandler.hide(); }
 }

@@ -21,6 +21,7 @@ import { statusBarCompartment, createStatusBarExtension } from './status-bar.js'
  * @param {object} options.defaultKeymapCompartment - The compartment for the default keymap.
  * @param {object} options.languageCompartment - The language compartment.
  * @param {object} options.appContextCompartment - The app context compartment.
+ * @param {object} options.yjsCompartment - The compartment for Y.js plugins.
  * @param {Function} options.updateListener - The update listener.
  * @param {string} options.filePath - The initial file path.
  * @param {Function} options.getLanguageExtension - The function to get language extensions.
@@ -33,6 +34,7 @@ export function createEditorExtensions({
   defaultKeymapCompartment,
   languageCompartment,
   appContextCompartment,
+  yjsCompartment,
   updateListener,
   filePath,
   getLanguageExtension,
@@ -75,6 +77,7 @@ export function createEditorExtensions({
     ...allHighlightPlugins,
     diffCompartment.of([]),
     statusBarCompartment.of(createStatusBarExtension()),
+    yjsCompartment.of([]), // Initialize Y.js compartment as empty
     
     EditorView.domEventHandlers({
       drop(event, view) {

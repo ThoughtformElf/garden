@@ -2,12 +2,14 @@ import { SyncSignaling } from './signaling/index.js';
 import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';
 import debug from '../../util/debug.js';
+import { LiveSyncManager } from './live-sync-manager.js';
 
 const MAX_PEER_CONNECTIONS = 5;
 
 export class Sync {
-  constructor() {
+  constructor(workspaceManager) {
     this.name = 'sync';
+    this.workspace = workspaceManager; // Correctly establish the reference
     this._container = null;
     this.peerConnections = new Map();
     this.isConnected = false;
@@ -18,6 +20,7 @@ export class Sync {
     this.signaling = new SyncSignaling(this);
     this.fileSync = new SyncFiles(this);
     this.ui = new SyncUI(this);
+    this.liveSync = new LiveSyncManager(this);
   }
 
   init(dom) {
@@ -32,13 +35,13 @@ export class Sync {
         this.fileSync.addEventListener('syncProgress', this.ui.updateSyncProgress.bind(this.ui));
     }
     const autoConnect = localStorage.getItem('thoughtform_sync_auto_connect') === 'true';
-    const savedSyncName = localStorage.getItem('thoughtform_sync_name');
-    const savedPeerPrefix = localStorage.getItem('thoughtform_peer_prefix') || '';
-    if (autoConnect && savedSyncName) {
-        this.connect(savedSyncName, savedPeerPrefix);
+    if (autoConnect) {
+        const savedSyncName = localStorage.getItem('thoughtform_sync_name');
+        const savedPeerPrefix = localStorage.getItem('thoughtform_peer_prefix') || '';
+        if (savedSyncName) {
+            this.connect(savedSyncName, savedPeerPrefix);
+        }
     }
-    // Expose this instance on the global thoughtform object
-    if (window.thoughtform) window.thoughtform.sync = this;
   }
 
   async connect(syncName, peerNamePrefix) {
@@ -49,6 +52,7 @@ export class Sync {
   }
 
   disconnect() {
+      this.disableLiveSync();
       this.signaling.destroy();
       this.peerConnections.forEach(pc => pc.close());
       this.peerConnections.clear();
@@ -58,39 +62,36 @@ export class Sync {
       this.updateConnectionState('disconnected', 'Disconnected');
   }
 
+  enableLiveSync() { this.liveSync.enable(); }
+  disableLiveSync() { this.liveSync.disable(); }
+  triggerReElection() { this.liveSync.triggerReElection(); }
+
   createPeerConnection(peerId, isInitiator = false) {
-    if (this.peerConnections.has(peerId)) {
-        return this.peerConnections.get(peerId);
-    }
-    if (this.peerConnections.size >= MAX_PEER_CONNECTIONS) {
-        console.warn(`[SYNC-PC] Max connections (${MAX_PEER_CONNECTIONS}) reached. Not connecting to ${peerId.substring(0,8)}...`);
-        return null;
-    }
+    if (this.peerConnections.has(peerId)) return this.peerConnections.get(peerId);
+    if (this.peerConnections.size >= MAX_PEER_CONNECTIONS) return null;
     
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     this.peerConnections.set(peerId, pc);
 
     pc.onicecandidate = (event) => {
-        if (event.candidate) {
-            this.signaling.sendSignal({ type: 'candidate', candidate: event.candidate }, peerId);
-        }
+        if (event.candidate) this.signaling.sendSignal({ type: 'candidate', candidate: event.candidate }, peerId);
     };
 
     pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
         if (state === 'connected') {
-            this.updateConnectionState('connected-p2p', `P2P Connected (${this.peerConnections.size} peers)`);
+            this.updateConnectionState('connected-p2p', `P2P Connected (${this.connectedPeers.size + 1} total)`);
+            if (localStorage.getItem('thoughtform_live_sync_enabled') === 'true' && this.liveSync.state === 'disabled') {
+                this.enableLiveSync();
+            }
         } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
             this.handlePeerLeft(peerId);
         }
     };
     
     if (!isInitiator) {
-        pc.ondatachannel = (event) => {
-            this.setupDataChannel(peerId, event.channel);
-        };
+        pc.ondatachannel = (event) => this.setupDataChannel(peerId, event.channel);
     }
-
     return pc;
   }
   
@@ -100,46 +101,39 @@ export class Sync {
       pc.dataChannel = channel;
       channel.onopen = () => {
           this._announcePresence(peerId);
+          if (localStorage.getItem('thoughtform_live_sync_enabled') === 'true' && this.liveSync.state === 'disabled') {
+              this.enableLiveSync();
+          } else if (this.liveSync.state !== 'disabled') {
+              const myPeerId = this.getPeerId();
+              const myPeerName = localStorage.getItem('thoughtform_peer_prefix') || myPeerId.substring(0, 8);
+              this.sendSyncMessage({ type: 'MSG_LIVESYNC_ANNOUNCE', peerInfo: { id: myPeerId, name: myPeerName } }, peerId);
+          }
       };
       channel.onmessage = async (e) => {
           try {
-              const msgData = JSON.parse(e.data);
-              await this._handleIncomingSyncMessage(msgData, `P2P-${peerId.substring(0,4)}`);
+              await this._handleIncomingSyncMessage(JSON.parse(e.data), `P2P-${peerId.substring(0,4)}`);
           } catch (error) {
               console.error('Error parsing sync message from DataChannel:', error);
           }
       };
       channel.onclose = () => this.handlePeerLeft(peerId);
-      channel.onerror = (event) => {
-          const error = event.error;
-          if (error && error.name === 'OperationError' && error.message.includes('User-Initiated Abort')) {
-              debug.log(`Data channel for peer ${peerId.substring(0,8)} closed intentionally.`);
-          } else {
-              console.error(`Data channel error with ${peerId.substring(0,8)}...:`, event);
-          }
-      };
+      channel.onerror = (e) => debug.error(`Data channel error with ${peerId.substring(0,8)}...:`, e);
   }
 
   updatePeerIdDisplay() {
     const peerIdEl = this._container?.querySelector('#sync-peer-id-display');
     if (peerIdEl) {
         const peerId = this.getPeerId();
-        if (peerId) {
-            peerIdEl.textContent = peerId;
-        } else if (this.connectionState === 'disconnected' || this.connectionState === 'error') {
-            peerIdEl.textContent = 'Not Connected';
-        } else {
-            peerIdEl.textContent = 'Connecting...';
-        }
+        if (peerId) peerIdEl.textContent = peerId;
+        else if (this.connectionState === 'disconnected' || this.connectionState === 'error') peerIdEl.textContent = 'Not Connected';
+        else peerIdEl.textContent = 'Connecting...';
     }
   }
 
   updateConnectionState(newState, statusMessage) {
       this.connectionState = newState;
       this.isConnected = (newState === 'connected-p2p' || newState === 'connected-signal');
-      
       this.updatePeerIdDisplay();
-      
       if (this.ui) {
           if (statusMessage) this.ui.updateStatus(statusMessage);
           this.ui.updateConnectionIndicator(newState);
@@ -147,57 +141,53 @@ export class Sync {
       }
   }
 
-  _handleIncomingSyncMessage(data, transport) {
+  async _handleIncomingSyncMessage(data, transport) {
+      const payload = data.payload || {};
+      if (payload.type && payload.type.startsWith('MSG_LIVESYNC_')) {
+          this.liveSync.handleMessage(payload);
+          return;
+      }
+      payload.fromPeerId = payload.fromPeerId || this.getPeerId();
       this.signaling.handleIncomingMessage(data, transport);
   }
   
   _announcePresence(targetPeerId = null) {
       if (!this.signaling.peerId) return;
-      const gardensRaw = localStorage.getItem('thoughtform_gardens');
-      const gardens = gardensRaw ? JSON.parse(gardensRaw) : ['home'];
-      this.sendSyncMessage({
-          type: 'peer_introduction',
-          peerId: this.signaling.peerId,
-          gardens: gardens
-      }, targetPeerId);
+      const gardens = JSON.parse(localStorage.getItem('thoughtform_gardens') || '["home"]');
+      const myPeerName = localStorage.getItem('thoughtform_peer_prefix') || this.signaling.peerId.substring(0, 8);
+      this.sendSyncMessage({ type: 'peer_introduction', peerId: this.signaling.peerId, peerName: myPeerName, gardens }, targetPeerId);
   }
 
   handlePeerIntroduction(payload) {
       if (!payload.peerId || payload.peerId === this.signaling.peerId) return;
       const isNewPeer = !this.connectedPeers.has(payload.peerId);
-      this.connectedPeers.set(payload.peerId, { id: payload.peerId, gardens: payload.gardens });
-      if (isNewPeer) {
-        this.addMessage(`Peer ${payload.peerId} discovered.`);
-      }
+      const peerName = payload.peerName || payload.peerId.substring(0, 8);
+      this.connectedPeers.set(payload.peerId, { id: peerName, gardens: payload.gardens });
+      if (isNewPeer) this.addMessage(`Peer ${peerName} discovered.`);
       if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} peer${this.connectedPeers.size === 1 ? '' : 's'})`);
   }
   
   handlePeerLeft(peerId) {
       if (this.connectedPeers.has(peerId)) {
-          const peerInfo = this.connectedPeers.get(peerId);
+          const peerName = this.connectedPeers.get(peerId).id;
           this.connectedPeers.delete(peerId);
-          this.addMessage(`Peer ${peerInfo.id} disconnected.`);
+          this.addMessage(`Peer ${peerName} disconnected.`);
       }
       
       const pc = this.peerConnections.get(peerId);
-      if (pc && pc.signalingState !== 'closed') {
-          pc.close();
-          this.peerConnections.delete(peerId);
-      } else if (this.peerConnections.has(peerId)) {
-          this.peerConnections.delete(peerId);
-      }
+      if (pc) { pc.close(); this.peerConnections.delete(peerId); }
+      
+      this.liveSync.handlePeerLeft(peerId);
+      this.ui.updateLiveSyncUI();
       
       if (this.peerConnections.size === 0 && this.connectionState === 'connected-p2p') {
           this.updateConnectionState('connected-signal', 'Connected to tracker, waiting for peers...');
-      } else {
-          if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} total)`);
+      } else if (this.ui) {
+          this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} total)`);
       }
   }
   
-  getPeerId() {
-    return this.signaling.peerId;
-  }
-
+  getPeerId() { return this.signaling.peerId; }
   setGitClient(gitClient) { this.gitClient = gitClient; this.fileSync.setGitClient(gitClient); }
   addMessage(text) { if(this.ui) this.ui.addMessage(text); }
   sendSyncMessage(data, targetPeerId = null, messageId = null) { this.signaling.sendSyncMessage(data, targetPeerId, messageId); }
