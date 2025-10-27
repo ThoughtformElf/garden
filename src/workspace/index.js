@@ -84,6 +84,11 @@ export class WorkspaceManager {
           window.thoughtform.sidebar.gitClient = newGitClient;
           await window.thoughtform.sidebar.refresh();
       }
+      
+      // --- THIS IS THE FIX ---
+      // Publish an event so other modules know the reload is complete.
+      window.thoughtform.events.publish('workspace:garden:reloaded', { gardenName });
+      
       console.log(`[Workspace] Hot-reload complete for "${gardenName}".`);
   }
 
@@ -179,9 +184,6 @@ export class WorkspaceManager {
     }
 
     await editor.loadFile(path);
-    // --- THIS IS THE FIX ---
-    // Every time a file is opened, we tell the sync manager to check if it
-    // should be connected to a live Y.js document.
     this.activateLiveSyncForCurrentFile();
     this.setActivePane(this.activePaneId);
   }

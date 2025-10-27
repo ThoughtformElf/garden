@@ -9,90 +9,69 @@ export class SyncMessageRouter {
         this.seenMessages = new Set();
     }
 
-    /**
-     * Handles an incoming message from any transport (P2P or WebSocket).
-     * This is the core of the gossip protocol.
-     */
     handleIncomingMessage(data, transport) {
-        // All messages must have a payload and a messageId
         if (!data.payload || !data.messageId) {
             debug.warn("Received a message without a payload or messageId, cannot process.", data);
             return;
         }
         
-        // --- Loop Prevention ---
         if (this.seenMessages.has(data.messageId)) {
-            return; // We have already processed this message.
+            return; 
         }
         this.seenMessages.add(data.messageId);
-        // Prune the cache to prevent memory leaks over long sessions
         if (this.seenMessages.size > MESSAGE_CACHE_MAX_SIZE) {
             const oldestMessage = this.seenMessages.values().next().value;
             this.seenMessages.delete(oldestMessage);
         }
         
-        // --- THIS IS THE FIX (Part 1): Check if this message should be gossiped ---
-        // If the `noGossip` flag is true, we skip the forwarding block entirely.
-        if (!data.noGossip) {
-            // --- Forward the message to all other peers (GOSSIP) ---
-            this.sendSyncMessage(data.payload, null, data.messageId);
+        // --- THIS IS THE FIX: Only forward if the message is flagged for gossip ---
+        if (data.useGossip) {
+            this.sendSyncMessage(data.payload, null, data.messageId, true);
         }
 
-        // --- Process the message locally ---
         const payload = data.payload;
+        // Add fromPeerId if it's not already there for context
+        if (data.fromPeerId) {
+            payload.fromPeerId = data.fromPeerId;
+        }
+
         switch (payload.type) {
             case 'peer_introduction':
                 this.sync.handlePeerIntroduction(payload);
                 break;
-            default: // Assumed to be a file sync message
-                if (this.sync.fileSync) {
+            // --- THIS IS THE FIX: Route live sync messages to the correct manager ---
+            default:
+                if (payload.type && payload.type.startsWith('MSG_LIVESYNC_')) {
+                    this.sync.liveSync.handleMessage(payload);
+                } else {
                     this.sync.fileSync.handleSyncMessage(payload);
                 }
                 break;
         }
     }
 
-    /**
-     * Sends a message to the swarm.
-     * @param {object} payload - The actual data to send (e.g., file_update).
-     * @param {string|null} targetPeerId - If specified, sends only to this peer. Otherwise, broadcasts.
-     * @param {string|null} messageId - If provided, re-uses an existing ID for forwarding. If null, creates a new one.
-     */
-    sendSyncMessage(payload, targetPeerId = null, messageId = null) {
+    sendSyncMessage(payload, targetPeerId = null, messageId = null, useGossip = false) {
         const id = messageId || crypto.randomUUID();
         
-        // --- THIS IS THE FIX (Part 2): Add the `noGossip` flag for direct messages ---
         const wrapper = { 
             messageId: id, 
             payload: payload,
-            noGossip: !!targetPeerId // Set `noGossip: true` if it's a direct message
+            useGossip: useGossip, // Pass the flag
+            fromPeerId: this.sync.getPeerId(), // Always stamp the origin
         };
         const message = JSON.stringify(wrapper);
         
-        // Add to seen cache immediately to prevent receiving our own gossip.
         this.seenMessages.add(id);
 
         if (targetPeerId) {
-            // Direct message to a single peer
             const pc = this.sync.peerConnections.get(targetPeerId);
             if (pc && pc.dataChannel && pc.dataChannel.readyState === 'open') {
-                try {
-                    pc.dataChannel.send(message);
-                } catch (error) {
-                    console.error(`Error sending direct message to ${targetPeerId.substring(0,8)}...:`, error);
-                    // This is where the original 'send queue is full' error could still happen,
-                    // but it's now much less likely because the receiver isn't also trying to send.
-                }
+                try { pc.dataChannel.send(message); } catch (e) { console.error(`Error sending direct message to ${targetPeerId.substring(0,8)}...:`, e); }
             }
         } else {
-            // Broadcast to all connected peers
             this.sync.peerConnections.forEach((pc, peerId) => {
                 if (pc.dataChannel && pc.dataChannel.readyState === 'open') {
-                    try {
-                        pc.dataChannel.send(message);
-                    } catch (error) {
-                        console.error(`Error gossiping message to ${peerId.substring(0,8)}...:`, error);
-                    }
+                    try { pc.dataChannel.send(message); } catch (e) { console.error(`Error gossiping message to ${peerId.substring(0,8)}...:`, e); }
                 }
             });
         }

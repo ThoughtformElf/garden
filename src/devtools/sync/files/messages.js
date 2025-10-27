@@ -289,8 +289,14 @@ export class MessageHandler {
                 }
             }
             
+            // --- THIS IS THE FIX ---
+            // The 'complete' event now includes the name of the garden that was received.
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
-                detail: { message: `Successfully extracted ${data.gardenName} (${extractedCount} files).`, type: 'complete' } 
+                detail: { 
+                    message: `Successfully extracted ${data.gardenName} (${extractedCount} files).`, 
+                    type: 'complete',
+                    gardenName: data.gardenName // <-- ADDED
+                } 
             }));
             
             instance.activeTransfers.delete(transferKey);

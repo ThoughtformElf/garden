@@ -140,19 +140,17 @@ export class Editor {
     await this.loadFile(this.filePath);
   }
 
-  connectLiveSync(yDoc, isHost, peerId) {
+  connectLiveSync(yDoc, isHost) {
     if (this.isLiveSyncConnected) this.disconnectLiveSync();
     console.log(`[Editor] Connecting to Live Sync for file: ${this.gitClient.gardenName}#${this.filePath}. Is Host: ${isHost}`);
 
     this.yDoc = yDoc;
     const ytext = this.yDoc.getText('codemirror');
     this.yUndoManager = new Y.UndoManager(ytext);
-
-    if (isHost && ytext.length === 0) {
-      console.log("[Editor] Host is populating initial Y.Doc content.");
-      ytext.insert(0, this.editorView.state.doc.toString());
-    }
-
+    
+    // --- THIS IS THE FIX (Part 3) ---
+    // The YDoc manager is now the single source of truth for populating initial content.
+    // This method simply connects the editor to the already-prepared YDoc.
     const yCollabExtension = yCollab(ytext, null, { undoManager: this.yUndoManager });
 
     this.editorView.dispatch({
