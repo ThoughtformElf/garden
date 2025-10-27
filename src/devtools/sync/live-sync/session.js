@@ -61,7 +61,7 @@ export class LiveSyncSession {
       this.hostSelectionModal.destroy();
       this.hostSelectionModal = null;
     }
-    
+
     if (sync.workspace && sync.workspace.panes) {
         sync.workspace.panes.forEach(pane => {
             pane.editor?.disconnectLiveSync();
@@ -157,10 +157,12 @@ export class LiveSyncSession {
       sessionStorage.setItem('thoughtform_live_sync_gardens', JSON.stringify(manager.syncableGardens));
       sync.addMessage(`Session started. Syncing gardens: ${manager.syncableGardens.join(', ')}.`);
       sync.sendSyncMessage({ type: 'MSG_LIVESYNC_SESSION_START', syncableGardens: manager.syncableGardens });
-      // --- THIS IS THE FIX ---
-      // The premature call that caused the crash has been removed.
-      // The host should not activate a doc until a follower requests it.
-      // REMOVED: sync.workspace.activateLiveSyncForCurrentFile();
+      
+      // --- THIS IS THE DEFINITIVE FIX ---
+      // This line was correctly intended but removed to fix a crash that no longer exists.
+      // Restoring it ensures the host's own editor connects to the session,
+      // allowing it to see real-time updates from peers.
+      sync.workspace.activateLiveSyncForCurrentFile();
     } else {
       sync.addMessage('No gardens selected. Live sync cancelled.');
       this.disable();
