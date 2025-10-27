@@ -1,5 +1,3 @@
-import debug from '../../../util/debug.js';
-
 export class SignalingMessageHandler {
     constructor(signalingInstance) {
         this.signaling = signalingInstance;
@@ -10,7 +8,7 @@ export class SignalingMessageHandler {
         switch (data.type) {
             case 'welcome':
                 // The server has acknowledged our connection. We can now join a session.
-                debug.log("Received welcome from signaling server.");
+                console.log("Received welcome from signaling server.");
                 break;
             
             case 'session_joined':

@@ -1,4 +1,3 @@
-import debug from '../../../util/debug.js';
 import { FileOperations } from './operations.js';
 import { Git } from '../../../util/git-integration.js';
 import JSZip from 'jszip';
@@ -29,7 +28,7 @@ export class MessageHandler {
                 instance.markSyncStreamAsComplete();
                 break;
             default:
-                debug.log('Unknown sync message type:', data.type);
+                console.log('Unknown sync message type:', data.type);
         }
     }
     
@@ -197,11 +196,11 @@ export class MessageHandler {
                         fileList.push(path);
                     }
                 } catch (e) {
-                    debug.warn(`Could not stat ${path}, skipping.`, e);
+                    console.warn(`Could not stat ${path}, skipping.`, e);
                 }
             }
         } catch (e) {
-            debug.log(`Directory not readable: ${dir}`, e);
+            console.log(`Directory not readable: ${dir}`, e);
         }
         return fileList;
     }

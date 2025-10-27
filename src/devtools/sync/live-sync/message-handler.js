@@ -59,7 +59,7 @@ export class LiveSyncMessageHandler {
 
       case 'MSG_LIVESYNC_REQUEST_DOC_STATE':
         if (this.manager.state === 'host' && payload.file) {
-          const yDoc = await this.manager.yDocManager.getYDoc(payload.file.garden, payload.file.path, true);
+          const yDoc = await this.manager.yDocManager.getYDoc(payload.file.garden, payload.file.path);
           if (yDoc) {
             const fullState = Y.encodeStateAsUpdate(yDoc);
             this.sync.sendSyncMessage({ type: 'MSG_LIVESYNC_DOC_STATE', file: payload.file, update: Array.from(fullState) }, fromPeerId, false);
@@ -69,14 +69,16 @@ export class LiveSyncMessageHandler {
 
       case 'MSG_LIVESYNC_DOC_STATE':
         if (payload.file) {
-          const yDoc = await this.manager.yDocManager.getYDoc(payload.file.garden, payload.file.path, false);
+          const yDoc = await this.manager.yDocManager.getYDoc(payload.file.garden, payload.file.path);
           if (yDoc) Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
         }
         break;
 
       case 'MSG_LIVESYNC_YJS_UPDATE':
         if (payload.garden && payload.path) {
-          const yDoc = await this.manager.yDocManager.getYDoc(payload.garden, payload.path, false);
+          // --- THIS IS THE FIX (Part 3) ---
+          // Call the corrected function without the `isHost` parameter.
+          const yDoc = await this.manager.yDocManager.getYDoc(payload.garden, payload.path);
           if (yDoc) {
             Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
           }

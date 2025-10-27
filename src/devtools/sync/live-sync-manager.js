@@ -12,7 +12,6 @@ export class LiveSyncManager {
     this.syncableGardens = [];
     this.pendingPeers = new Map();
     this.activePeers = new Map();
-    this.isBootstrapping = false; 
 
     // Delegate responsibilities to helper classes
     this.session = new LiveSyncSession(this);
@@ -53,7 +52,7 @@ export class LiveSyncManager {
     if (!editor) return;
 
     console.log(`[LiveSync] Activating doc for editor. Current state: ${this.state}`);
-    if (this.state === 'disabled' || this.state === 'pending' || this.state === 'bootstrapping') {
+    if (this.state !== 'active' && this.state !== 'host') {
       editor.disconnectLiveSync();
       return;
     }
@@ -64,15 +63,13 @@ export class LiveSyncManager {
     if (this.syncableGardens.includes(gardenName)) {
       console.log(`[LiveSync] File ${gardenName}#${filePath} is in a syncable garden. Setting up Y.Doc.`);
       
-      // --- THIS IS THE FIX ---
-      // 1. Await the Y.Doc from the manager.
-      const yDoc = await this.yDocManager.getYDoc(gardenName, filePath, this.state === 'host');
+      // --- THIS IS THE FIX (Part 2) ---
+      // Call the corrected function without the `isHost` parameter.
+      const yDoc = await this.yDocManager.getYDoc(gardenName, filePath);
       
-      // 2. Explicitly connect the editor to this Y.Doc. This was the missing step.
       if (editor.isReady && yDoc) {
         editor.connectLiveSync(yDoc, this.state === 'host');
       }
-      // --- END OF FIX ---
 
     } else {
       console.log(`[LiveSync] File ${gardenName}#${filePath} is NOT in a syncable garden. Disconnecting editor.`);

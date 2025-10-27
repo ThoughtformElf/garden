@@ -21,13 +21,15 @@ export class YDocManager {
     this.debouncedSavers = new Map();
   }
 
-  async getYDoc(garden, path, isHost) {
+  async getYDoc(garden, path) {
     const yDocKey = `${garden}#${path}`;
     if (this.yDocs.has(yDocKey)) {
       return this.yDocs.get(yDocKey);
     }
 
-    console.log(`[LiveSync-YDoc] Creating new Y.Doc for ${yDocKey}`);
+    const isHost = this.manager.state === 'host';
+
+    console.log(`[YDocManager] Creating new Y.Doc for ${yDocKey}. Is Host: ${isHost}`);
     const yDoc = new Y.Doc();
     this.yDocs.set(yDocKey, yDoc);
 
@@ -36,29 +38,41 @@ export class YDocManager {
         const content = yDoc.getText('codemirror').toString();
         const gitClient = await this.sync.workspace.getGitClient(garden);
         
-        console.log(`[LiveSync-YDoc] Debounced save triggered for ${yDocKey}. Writing to IndexedDB.`);
+        console.log(`[YDocManager/debouncedSave] Saving content for ${yDocKey} to IndexedDB.`);
         await gitClient.writeFile(path, content);
         
         this.sync.workspace.notifyFileUpdate(garden, path, 'live-sync');
 
       } catch (e) {
-          console.error(`[LiveSync-YDoc] Failed to save debounced content for ${yDocKey}:`, e);
+          console.error(`[YDocManager/debouncedSave] FAILED to save content for ${yDocKey}:`, e);
       }
     }, 1000);
     this.debouncedSavers.set(yDocKey, debouncedSave);
 
     yDoc.on('update', (update, origin) => {
+      console.log(`[YDocManager/onUpdate] EVENT FIRED FOR ${yDocKey}. Origin: "${origin}"`);
       if (origin !== 'remote-sync') {
-        this.sync.sendSyncMessage({
+        const payload = {
           type: 'MSG_LIVESYNC_YJS_UPDATE',
-          garden: garden, path: path, update: Array.from(update)
-        }, null, false); // useGossip = false
+          garden: garden, 
+          path: path, 
+          update: Array.from(update)
+        };
+        console.log(`[YDocManager/onUpdate] LOCAL CHANGE DETECTED. CALLING sync.sendSyncMessage.`);
+        
+        // --- THIS IS THE FUCKING FIX ---
+        // Calling the correct, simplified function signature. This WILL send the message.
+        this.sync.sendSyncMessage(payload, null, false); 
+        // --- END OF FIX ---
       }
       debouncedSave();
     });
 
-    if (isHost) {
-      console.log(`[LiveSync-YDoc] Host is populating initial Y.Doc content for ${yDocKey}`);
+    if (!isHost) {
+      console.log(`[YDocManager] FOLLOWER requesting initial state for ${yDocKey} from host.`);
+      this.sync.sendSyncMessage({ type: 'MSG_LIVESYNC_REQUEST_DOC_STATE', file: { garden, path } }, this.manager.hostId, false);
+    } else {
+      console.log(`[YDocManager] HOST is populating initial Y.Doc content for ${yDocKey} from its file system.`);
       try {
         const git = await this.sync.workspace.getGitClient(garden);
         const content = await git.readFile(path);
@@ -66,11 +80,8 @@ export class YDocManager {
           yDoc.getText('codemirror').insert(0, content);
         }
       } catch (err) {
-        console.error(`[LiveSync-YDoc] Host failed to load initial content for ${yDocKey}:`, err);
+        console.error(`[YDocManager] Host FAILED to load initial content for ${yDocKey}:`, err);
       }
-    } else {
-      console.log(`[LiveSync] Follower requesting initial state for ${yDocKey} from host.`);
-      this.sync.sendSyncMessage({ type: 'MSG_LIVESYNC_REQUEST_DOC_STATE', file: { garden, path } }, this.manager.hostId, false); // useGossip = false
     }
     
     return yDoc;

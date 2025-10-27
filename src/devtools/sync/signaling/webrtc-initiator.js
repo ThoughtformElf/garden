@@ -1,5 +1,3 @@
-import debug from '../../../util/debug.js';
-
 export class WebRtcInitiator {
     constructor(signalingInstance) {
         this.signaling = signalingInstance;
@@ -37,7 +35,7 @@ export class WebRtcInitiator {
             dataChannel.onclose = () => {
             };
             dataChannel.onerror = (error) => {
-                debug.error(`Data channel error for peer ${peerId.substring(0,8)}...:`, error);
+                console.error(`Data channel error for peer ${peerId.substring(0,8)}...:`, error);
             };
 
             const offer = await pc.createOffer();
@@ -46,7 +44,7 @@ export class WebRtcInitiator {
             this.signaling.sendSignal({ type: 'offer', sdp: offer.sdp }, peerId);
 
         } catch (error) {
-            debug.error(`Error initiating connection to peer ${peerId}:`, error);
+            console.error(`Error initiating connection to peer ${peerId}:`, error);
             syncInstance.updateConnectionState('error', `Error creating P2P offer: ${error.message}`);
         }
     }

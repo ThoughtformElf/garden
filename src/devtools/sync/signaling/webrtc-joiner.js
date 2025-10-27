@@ -1,5 +1,3 @@
-import debug from '../../../util/debug.js';
-
 export class WebRtcJoiner {
     constructor(signalingInstance) {
         this.signaling = signalingInstance;
@@ -33,7 +31,7 @@ export class WebRtcJoiner {
             syncInstance.updateConnectionState('connected-signal', 'Joined session. Waiting for host offer...');
 
         } catch (error) {
-            debug.error('Error joining session:', error);
+            console.error('Error joining session:', error);
             syncInstance.updateConnectionState('error', `Error joining session: ${error.message}`);
         }
     }

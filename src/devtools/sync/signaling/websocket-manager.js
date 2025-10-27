@@ -1,5 +1,3 @@
-import debug from '../../../util/debug.js';
-
 export class WebSocketManager {
     constructor(signalingInstance) {
         this.signaling = signalingInstance;
@@ -16,17 +14,17 @@ export class WebSocketManager {
             this.signaling.ws = new WebSocket(serverUrl);
 
             this.signaling.ws.onopen = () => {
-                debug.log(`Connected to signaling server at ${serverUrl}`);
+                console.log(`Connected to signaling server at ${serverUrl}`);
                 resolve();
             };
 
             this.signaling.ws.onclose = () => {
-                debug.log('Disconnected from signaling server');
+                console.log('Disconnected from signaling server');
                 this.signaling.sync.disconnect();
             };
 
             this.signaling.ws.onerror = (error) => {
-                debug.error('WebSocket error:', error);
+                console.error('WebSocket error:', error);
                 this.signaling.sync.updateConnectionState('error', 'Signaling server connection error.');
                 reject(new Error(`Failed to connect to signaling server at ${serverUrl}`));
             };
@@ -38,7 +36,7 @@ export class WebSocketManager {
                          this.signaling._signalingMessageHandler.handleSignalingMessage(data);
                     }
                 } catch (error) {
-                    debug.error('Error parsing signaling message:', error);
+                    console.error('Error parsing signaling message:', error);
                 }
             };
         });
@@ -56,7 +54,7 @@ export class WebSocketManager {
             }
             ws.send(JSON.stringify(payload));
         } else {
-            debug.error("Cannot send join session request, WebSocket is not open.");
+            console.error("Cannot send join session request, WebSocket is not open.");
         }
     }
 

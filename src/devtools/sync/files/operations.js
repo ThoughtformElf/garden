@@ -1,4 +1,3 @@
-import debug from '../../../util/debug.js';
 import { Git } from '../../../util/git-integration.js';
 
 export class FileOperations {
@@ -18,9 +17,9 @@ export class FileOperations {
                     } else {
                         fileList.push(path);
                     }
-                } catch (e) { debug.warn(`Could not stat ${path}, skipping.`, e); }
+                } catch (e) { console.warn(`Could not stat ${path}, skipping.`, e); }
             }
-        } catch (e) { debug.log(`Directory not readable: ${dir}`, e); }
+        } catch (e) { console.log(`Directory not readable: ${dir}`, e); }
         return fileList;
     }
 

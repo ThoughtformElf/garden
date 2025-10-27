@@ -1,5 +1,4 @@
 import { Modal } from '../../../util/modal.js';
-import debug from '../../../util/debug.js';
 import { FileOperations } from './operations.js';
 import { MessageHandler } from './messages.js';
 

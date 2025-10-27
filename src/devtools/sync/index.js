@@ -1,15 +1,15 @@
 import { SyncSignaling } from './signaling/index.js';
 import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';
-import debug from '../../util/debug.js';
 import { LiveSyncManager } from './live-sync-manager.js';
+import { SyncMessageRouter } from './sync-message-router.js';
 
 const MAX_PEER_CONNECTIONS = 5;
 
 export class Sync {
   constructor(workspaceManager) {
     this.name = 'sync';
-    this.workspace = workspaceManager; // Correctly establish the reference
+    this.workspace = workspaceManager;
     this._container = null;
     this.peerConnections = new Map();
     this.isConnected = false;
@@ -21,6 +21,7 @@ export class Sync {
     this.fileSync = new SyncFiles(this);
     this.ui = new SyncUI(this);
     this.liveSync = new LiveSyncManager(this);
+    this.messageRouter = new SyncMessageRouter(this);
   }
 
   init(dom) {
@@ -116,16 +117,19 @@ export class Sync {
               this.sendSyncMessage({ type: 'MSG_LIVESYNC_ANNOUNCE', peerInfo: { id: myPeerId, name: myPeerName } }, peerId, false);
           }
       };
+      
       channel.onmessage = async (e) => {
           try {
+              console.log(`[Sync/onmessage] Raw message received from P2P channel with ${peerId.substring(0,4)}`);
               const data = JSON.parse(e.data);
-              this.signaling.handleIncomingMessage(data, `P2P-${peerId.substring(0,4)}`);
+              this.messageRouter.handleIncomingMessage(data, `P2P-${peerId.substring(0,4)}`);
           } catch (error) {
-              console.error('Error parsing sync message from DataChannel:', error);
+              console.error('[Sync/onmessage] Error parsing sync message from DataChannel:', error, 'Raw data:', e.data);
           }
       };
+      
       channel.onclose = () => this.handlePeerLeft(peerId);
-      channel.onerror = (e) => debug.error(`Data channel error with ${peerId.substring(0,8)}...:`, e);
+      channel.onerror = (e) => console.error(`[Sync/onerror] Data channel error with ${peerId.substring(0,8)}...:`, e);
   }
 
   updatePeerIdDisplay() {
@@ -151,6 +155,7 @@ export class Sync {
   
   _announcePresence(targetPeerId = null) {
       if (!this.signaling.peerId) return;
+      console.log('[Sync/_announcePresence] Announcing presence.');
       const gardens = JSON.parse(localStorage.getItem('thoughtform_gardens') || '["home"]');
       const myPeerName = localStorage.getItem('thoughtform_peer_prefix') || this.signaling.peerId.substring(0, 8);
       this.sendSyncMessage({ type: 'peer_introduction', peerId: this.signaling.peerId, peerName: myPeerName, gardens }, targetPeerId, true);
@@ -158,8 +163,8 @@ export class Sync {
 
   handlePeerIntroduction(payload) {
       if (!payload.peerId || payload.peerId === this.signaling.peerId) return;
-      const isNewPeer = !this.connectedPeers.has(payload.peerId);
       const peerName = payload.peerName || payload.peerId.substring(0, 8);
+      const isNewPeer = !this.connectedPeers.has(payload.peerId);
       this.connectedPeers.set(payload.peerId, { id: peerName, gardens: payload.gardens });
       if (isNewPeer) this.addMessage(`Peer ${peerName} discovered.`);
       if (this.ui) this.ui.updateStatus(`P2P Connected (${this.connectedPeers.size} peer${this.connectedPeers.size === 1 ? '' : 's'})`);
@@ -188,8 +193,16 @@ export class Sync {
   getPeerId() { return this.signaling.peerId; }
   setGitClient(gitClient) { this.gitClient = gitClient; this.fileSync.setGitClient(gitClient); }
   addMessage(text) { if(this.ui) this.ui.addMessage(text); }
-  sendSyncMessage(data, targetPeerId = null, useGossip = false) { this.signaling.sendSyncMessage(data, targetPeerId, null, useGossip); }
+  
+  // --- THIS IS THE FUCKING FIX ---
+  // The signature is now simple and correct. The router handles complexity.
+  sendSyncMessage(data, targetPeerId = null, useGossip = false) {
+    console.log(`[Sync/sendSyncMessage] Preparing to send message of type ${data.type}. Target: ${targetPeerId ? targetPeerId.substring(0,4) : 'Broadcast'}, Gossip: ${useGossip}`);
+    this.messageRouter.sendSyncMessage(data, targetPeerId, useGossip);
+  }
+  // --- END OF FIX ---
+
   show() { if(this._container) this._container.style.display = 'block'; }
   hide() { if(this._container) this._container.style.display = 'none'; }
-  destroy() { this.disconnect(); if (this.fileSync) this.fileSync.destroy(); }
+  destroy() { this.disconnect(); this.fileSync.destroy(); this.messageRouter.destroy(); }
 }

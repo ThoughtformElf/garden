@@ -1,7 +1,5 @@
-import debug from '../../../util/debug.js';
 import { WebSocketManager } from './websocket-manager.js';
 import { SignalingMessageHandler } from './signaling-message-handler.js';
-import { SyncMessageRouter } from './sync-message-router.js';
 
 class WebRtcInitiator {
     constructor(signalingInstance) {
@@ -22,7 +20,7 @@ class WebRtcInitiator {
             
             this.signaling.sendSignal({ type: 'offer', sdp: offer.sdp }, peerId);
         } catch (error) {
-            debug.error(`Failed to initiate connection to ${peerId}:`, error);
+            console.error(`Failed to initiate connection to ${peerId}:`, error);
         }
     }
 }
@@ -37,16 +35,12 @@ export class SyncSignaling {
         this._webSocketManager = new WebSocketManager(this);
         this._signalingMessageHandler = new SignalingMessageHandler(this);
         this._webrtcInitiator = new WebRtcInitiator(this);
-        this._syncMessageRouter = new SyncMessageRouter(this);
     }
     
-    // --- THIS IS THE FIX ---
-    // This function was removed during a refactor and is now restored.
     updateSignalingServerUrl(url) {
         this.signalingServerUrl = url;
         localStorage.setItem('thoughtform_signaling_server', url);
     }
-    // --- END OF FIX ---
     
     async joinSession(syncName, peerNamePrefix) {
         try {
@@ -61,8 +55,6 @@ export class SyncSignaling {
         if (peerId === this.peerId) return;
         if (this.peerId > peerId) {
             this._webrtcInitiator.connectToPeer(peerId);
-        } else {
-            // console.log(`[SYNC-GLARE] My ID (${this.peerId.substring(0,4)}...) is less than ${peerId.substring(0,4)}... I will wait for their offer.`);
         }
     }
     
@@ -83,7 +75,7 @@ export class SyncSignaling {
                         return;
                     }
                 } else {
-                     debug.warn(`[SYNC-SIGNAL] Received signal from unknown peer ${fromPeerId.substring(0,8)} before an offer. Discarding.`);
+                     console.warn(`[SYNC-SIGNAL] Received signal from unknown peer ${fromPeerId.substring(0,8)} before an offer. Discarding.`);
                      return;
                 }
             }
@@ -99,15 +91,8 @@ export class SyncSignaling {
                 await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
             }
         } catch (error) {
-            debug.error(`Error handling signal from ${fromPeerId}:`, error);
+            console.error(`Error handling signal from ${fromPeerId}:`, error);
         }
-    }
-
-    sendSyncMessage(data, targetPeerId, messageId) {
-        this._syncMessageRouter.sendSyncMessage(data, targetPeerId, messageId);
-    }
-    handleIncomingMessage(data, transport) {
-        this._syncMessageRouter.handleIncomingMessage(data, transport);
     }
 
     destroy() {
@@ -115,6 +100,5 @@ export class SyncSignaling {
             this.ws.close();
             this.ws = null;
         }
-        this._syncMessageRouter.destroy();
     }
 }

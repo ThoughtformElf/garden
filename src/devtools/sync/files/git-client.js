@@ -1,5 +1,3 @@
-import debug from '../../../util/debug.js';
-
 // Helper class/module for gitClient logic
 export class GitClientHelper {
     // --- Helper to get gitClient by exhaustively searching window.thoughtform ---
@@ -22,28 +20,28 @@ export class GitClientHelper {
                 if (window.thoughtform[key] && typeof window.thoughtform[key] === 'object') {
                     if (window.thoughtform[key].hasOwnProperty('readFile') && window.thoughtform[key].hasOwnProperty('writeFile')) {
                         // This looks like a gitClient-like object
-                        debug.log(`DEBUG: Found potential gitClient-like object at window.thoughtform.${key}`);
+                        console.log(`Found potential gitClient-like object at window.thoughtform.${key}`);
                         return window.thoughtform[key];
                     }
                     // Check if it has a gitClient property
                     if (window.thoughtform[key].gitClient) {
-                        debug.log(`DEBUG: Found gitClient at window.thoughtform.${key}.gitClient`);
+                        console.log(`Found gitClient at window.thoughtform.${key}.gitClient`);
                         return window.thoughtform[key].gitClient;
                     }
                 }
             }
             // Specific common paths
             if (window.thoughtform.gitClient) {
-                debug.log(`DEBUG: Found gitClient at window.thoughtform.gitClient`);
+                console.log(`Found gitClient at window.thoughtform.gitClient`);
                 return window.thoughtform.gitClient;
             }
             if (window.thoughtform.editor && window.thoughtform.editor.gitClient) {
-                debug.log(`DEBUG: Found gitClient at window.thoughtform.editor.gitClient`);
+                console.log(`Found gitClient at window.thoughtform.editor.gitClient`);
                 return window.thoughtform.editor.gitClient;
             }
         }
 
-        debug.log("DEBUG: _getGitClient: No gitClient found in standard locations or window.thoughtform");
+        console.log("_getGitClient: No gitClient found in standard locations or window.thoughtform");
         return null;
     }
     // --- End Helper ---
