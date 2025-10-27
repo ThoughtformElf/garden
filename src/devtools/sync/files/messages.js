@@ -68,12 +68,14 @@ export class MessageHandler {
         instance.currentTransferId = transferId;
         instance.targetPeers = targetPeerIds;
 
-        // --- IMMEDIATE INITIATION MESSAGE ---
-        instance.sync.sendSyncMessage({
-            type: 'send_initiation',
-            gardens: gardens,
-            transferId: transferId,
-        });
+        // --- FIX: Send initiation message to each target peer individually ---
+        for (const peerId of targetPeerIds) {
+            instance.sync.sendSyncMessage({
+                type: 'send_initiation',
+                gardens: gardens,
+                transferId: transferId,
+            }, peerId);
+        }
         
         const CHUNK_SIZE = 64 * 1024;
         const HIGH_WATER_MARK = 10 * 1024 * 1024;
@@ -288,14 +290,14 @@ export class MessageHandler {
                 }
             }
             
-            // --- THIS IS THE DEFINITIVE FIX ---
+            // --- DEFINITIVE FIX ---
             // The event now correctly includes the 'action: receive' property, which is
             // required by the listener in sync/index.js to trigger the correct logic.
             instance.dispatchEvent(new CustomEvent('syncProgress', { 
                 detail: { 
                     message: `Successfully extracted ${data.gardenName} (${extractedCount} files).`, 
                     type: 'complete',
-                    action: 'receive', // <-- THIS WAS THE MISSING PIECE OF THE PUZZLE
+                    action: 'receive', // <-- THIS WAS THE MISSING PIECE
                     gardenName: data.gardenName
                 } 
             }));

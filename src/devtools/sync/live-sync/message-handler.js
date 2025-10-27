@@ -82,10 +82,10 @@ export class LiveSyncMessageHandler {
           if (yDoc) {
             Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
 
-            // --- THIS IS THE FIX (Part 2) ---
+            // --- THIS IS THE FIX ---
             // Find the editor corresponding to this file.
             const editor = this.sync.workspace.findEditorByFile(payload.file.garden, payload.file.path);
-            if (editor && editor.isLiveSyncConnected) {
+            if (editor) {
               const yContent = yDoc.getText('codemirror').toString();
               const editorContent = editor.editorView.state.doc.toString();
               
