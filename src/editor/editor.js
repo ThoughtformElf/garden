@@ -102,7 +102,16 @@ export class Editor {
     this.targetElement.appendChild(this.mediaViewerElement);
 
     const updateListener = EditorView.updateListener.of((update) => {
-      if (this.isLiveSyncConnected) return;
+      if (update.docChanged) {
+          const isProgrammatic = update.transactions.some(t => t.annotation(this.programmaticChange));
+          const isRemote = update.transactions.some(tr => tr.annotation('y-codemirror.next$remote'));
+          console.log(`[Editor Update Listener] Document changed. LiveSync: ${this.isLiveSyncConnected}, Programmatic: ${isProgrammatic}, Remote: ${isRemote}`);
+      }
+
+      if (this.isLiveSyncConnected) {
+        return;
+      }
+      
       if (update.docChanged && !update.transactions.some(t => t.annotation(this.programmaticChange))) {
         this.debouncedHandleUpdate(update.state.doc.toString());
       }
@@ -141,18 +150,28 @@ export class Editor {
   }
 
   connectLiveSync(yDoc, isHost) {
+    console.log(`%c[LIVESYNC-LIFECYCLE] connectLiveSync CALLED for ${this.filePath}. Is Host: ${isHost}. Current connection state: ${this.isLiveSyncConnected}`, 'color: green; font-weight: bold;');
     if (this.isLiveSyncConnected) this.disconnectLiveSync();
-    console.log(`[Editor] Connecting to Live Sync for file: ${this.gitClient.gardenName}#${this.filePath}. Is Host: ${isHost}`);
 
     this.yDoc = yDoc;
     const ytext = this.yDoc.getText('codemirror');
     this.yUndoManager = new Y.UndoManager(ytext);
     
-    // --- THIS IS THE FIX (Part 3) ---
-    // The YDoc manager is now the single source of truth for populating initial content.
-    // This method simply connects the editor to the already-prepared YDoc.
     const yCollabExtension = yCollab(ytext, null, { undoManager: this.yUndoManager });
 
+    // --- THIS IS THE DEFINITIVE FIX ---
+    // For a follower, we first dispatch a transaction to clear the document.
+    // This prevents syncing stale local content TO the host.
+    if (!isHost) {
+        this.editorView.dispatch({
+            changes: { from: 0, to: this.editorView.state.doc.length, insert: '' },
+            annotations: this.programmaticChange.of(true)
+        });
+    }
+
+    // THEN, for both host and follower, we dispatch a single, non-destructive
+    // transaction to reconfigure the editor with the live sync extensions.
+    // This correctly binds the Y.js model to the editor view without replacing it.
     this.editorView.dispatch({
       effects: [
         this.yjsCompartment.reconfigure(yCollabExtension),
@@ -164,19 +183,34 @@ export class Editor {
   }
 
   disconnectLiveSync() {
+    console.log(`%c[LIVESYNC-LIFECYCLE] disconnectLiveSync CALLED for ${this.filePath}. Current connection state: ${this.isLiveSyncConnected}`, 'color: red; font-weight: bold;');
     if (!this.isLiveSyncConnected) return;
-    console.log(`[Editor] Disconnecting from Live Sync for file: ${this.gitClient.gardenName}#${this.filePath}`);
 
-    this.editorView.dispatch({
-      effects: [
-        this.yjsCompartment.reconfigure([]),
-        this.defaultKeymapCompartment.reconfigure(keymap.of(defaultKeymap))
-      ]
-    });
+    // Only dispatch if the view still exists
+    if (this.editorView && !this.editorView.isDestroyed) {
+        this.editorView.dispatch({
+          effects: [
+            this.yjsCompartment.reconfigure([]),
+            this.defaultKeymapCompartment.reconfigure(keymap.of(defaultKeymap))
+          ]
+        });
+    }
     
     this.yDoc = null;
     this.yUndoManager = null;
     this.isLiveSyncConnected = false;
+  }
+
+  destroy() {
+    console.log(`%c[LIVESYNC-LIFECYCLE] editor.destroy() CALLED for ${this.filePath}`, 'color: red; font-weight: bold;');
+    this.disconnectLiveSync();
+    if (this.editorView) {
+        this.editorView.destroy();
+    }
+    const index = Editor.editors.indexOf(this);
+    if (index > -1) {
+        Editor.editors.splice(index, 1);
+    }
   }
 
   async _applyUserSettings() {

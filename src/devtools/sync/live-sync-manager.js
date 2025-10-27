@@ -24,12 +24,10 @@ export class LiveSyncManager {
   listenForWorkspaceEvents() {
     window.thoughtform.events.subscribe('workspace:garden:reloaded', (data) => {
       if (this.state === 'bootstrapping' && this.syncableGardens.includes(data.gardenName)) {
-        console.log(`[LiveSync] Bootstrap for garden "${data.gardenName}" complete. Activating live updates.`);
+        console.log(`[LiveSync] Bootstrap for garden "${data.gardenName}" complete. Finalizing session.`);
         
         this.state = 'active'; // Transition from bootstrapping to fully active
         this.sync.addMessage('Initial sync complete. Live collaboration is active.');
-        
-        this.sync.workspace.activateLiveSyncForCurrentFile();
       }
     });
   }
@@ -52,9 +50,15 @@ export class LiveSyncManager {
     if (!editor) return;
 
     console.log(`[LiveSync] Activating doc for editor. Current state: ${this.state}`);
-    if (this.state !== 'active' && this.state !== 'host') {
-      editor.disconnectLiveSync();
-      return;
+    
+    // --- THIS IS THE FIX (Part 1) ---
+    // The previous check was too strict. A peer is in a valid 'follower' state
+    // just before it begins bootstrapping. We must allow the connection to proceed.
+    // This new check correctly prevents disconnects unless the session is truly disabled or pending.
+    const validStates = ['host', 'follower', 'bootstrapping', 'active'];
+    if (!validStates.includes(this.state)) {
+        editor.disconnectLiveSync();
+        return;
     }
 
     const { gitClient, filePath } = editor;
@@ -63,8 +67,6 @@ export class LiveSyncManager {
     if (this.syncableGardens.includes(gardenName)) {
       console.log(`[LiveSync] File ${gardenName}#${filePath} is in a syncable garden. Setting up Y.Doc.`);
       
-      // --- THIS IS THE FIX (Part 2) ---
-      // Call the corrected function without the `isHost` parameter.
       const yDoc = await this.yDocManager.getYDoc(gardenName, filePath);
       
       if (editor.isReady && yDoc) {

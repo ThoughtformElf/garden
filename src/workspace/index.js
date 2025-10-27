@@ -4,6 +4,7 @@ import { WorkspaceRenderer } from './renderer.js';
 import { PaneManager } from './manager/pane.js';
 import { WorkspaceStateManager } from './manager/state.js';
 import { UrlManager } from './manager/url.js';
+import { Editor } from '../editor/editor.js';
 
 /**
  * Manages the state of the entire application's UI, including panes,
@@ -68,15 +69,38 @@ export class WorkspaceManager {
   }
   
   async hotReloadGarden(gardenName) {
-      console.log(`[Workspace] Hot-reloading garden: "${gardenName}"`);
+      const liveSyncState = window.thoughtform.sync.liveSync.state;
+      if (liveSyncState === 'bootstrapping' || liveSyncState === 'active') {
+          console.log(`%c[LIVESYNC-GUARD] hotReloadGarden BLOCKED for garden "${gardenName}" to preserve active live sync session.`, 'color: orange; font-weight: bold;');
+          return;
+      }
+      console.log(`%c[Workspace] hotReloadGarden TRIGGERED for "${gardenName}"`, 'color: red; font-weight: bold;');
+
       const newGitClient = new Git(gardenName);
       await newGitClient.initRepo();
       this.gitClients.set(gardenName, newGitClient);
 
-      for (const pane of this.panes.values()) {
+      for (const [paneId, pane] of this.panes.entries()) {
           if (pane.editor && pane.editor.gitClient.gardenName === gardenName) {
-              pane.editor.gitClient = newGitClient;
-              await pane.editor.forceReloadFile(pane.editor.filePath);
+              const targetElement = pane.element;
+              const currentPath = pane.editor.filePath;
+
+              // This now correctly calls the new method that handles cleanup.
+              pane.editor.destroy();
+
+              const newEditor = new Editor({
+                  target: targetElement,
+                  gitClient: newGitClient,
+                  commandPalette: window.thoughtform.commandPalette,
+                  initialFile: currentPath,
+                  paneId: paneId
+              });
+              
+              await new Promise(resolve => {
+                  const check = setInterval(() => { if (newEditor.isReady) { clearInterval(check); resolve(); } }, 50);
+              });
+              
+              this.panes.set(paneId, { element: targetElement, editor: newEditor });
           }
       }
 
@@ -85,10 +109,7 @@ export class WorkspaceManager {
           await window.thoughtform.sidebar.refresh();
       }
       
-      // --- THIS IS THE FIX ---
-      // Publish an event so other modules know the reload is complete.
       window.thoughtform.events.publish('workspace:garden:reloaded', { gardenName });
-      
       console.log(`[Workspace] Hot-reload complete for "${gardenName}".`);
   }
 
@@ -161,6 +182,11 @@ export class WorkspaceManager {
     
     const { node, pane } = activePaneInfo;
     const editor = pane.editor;
+
+    if (editor.isLiveSyncConnected && editor.gitClient.gardenName === garden && editor.filePath === path) {
+        console.log(`%c[LIVESYNC-GUARD] openFile BLOCKED for "${garden}#${path}" because it is already live.`, 'color: orange; font-weight: bold;');
+        return;
+    }
 
     const existingBufferIndex = node.buffers.findIndex(b => b.garden === garden && b.path === path);
 

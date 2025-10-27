@@ -8,7 +8,7 @@ export class LiveSyncSession {
     this.electionTimeout = null;
   }
 
-  enable() {
+  enable(forceFresh = false) {
     const { manager, sync } = this;
     if (manager.state !== 'disabled' || (sync.connectionState !== 'connected-p2p' && sync.connectionState !== 'connected-signal')) {
       if (localStorage.getItem('thoughtform_live_sync_enabled') === 'true') {
@@ -23,24 +23,16 @@ export class LiveSyncSession {
     const myPeerName = localStorage.getItem('thoughtform_peer_prefix') || myPeerId.substring(0, 8);
     const stickyHostId = sessionStorage.getItem('thoughtform_live_sync_host_id');
 
-    if (stickyHostId) {
-      manager.hostId = stickyHostId;
-      manager.syncableGardens = JSON.parse(sessionStorage.getItem('thoughtform_live_sync_gardens') || '[]');
-      console.log('[LiveSync] Found sticky session host:', manager.hostId);
-
-      if (stickyHostId === myPeerId) {
-        manager.state = 'host';
-        manager.activePeers.set(myPeerId, { id: myPeerId, name: myPeerName });
-        sync.addMessage('Re-established session as host.');
-        sync.sendSyncMessage({ type: 'MSG_LIVESYNC_ANNOUNCE', peerInfo: { id: myPeerId, name: myPeerName } });
-      } else {
-        manager.state = 'follower';
-        sync.addMessage(`Found active session. Joining as follower...`);
-      }
-      sync.ui.updateLiveSyncUI();
-      sync.workspace.activateLiveSyncForCurrentFile();
+    // --- THIS IS THE DEFINITIVE FIX ---
+    // The `forceFresh` flag is passed by the re-election logic to bypass this block.
+    // This prevents the infinite loop by ensuring that a re-election always starts
+    // with a clean slate, rather than immediately re-triggering itself.
+    if (stickyHostId && !forceFresh) {
+      console.log('[LiveSync] Found sticky session. Forcing re-election to ensure consistency.');
+      this._performReElectionReset();
       return;
     }
+    // --- END OF FIX ---
 
     manager.state = 'pending';
     manager.pendingPeers.set(myPeerId, { id: myPeerId, name: myPeerName });
@@ -99,7 +91,8 @@ export class LiveSyncSession {
   _performReElectionReset() {
     this.sync.addMessage('Resetting session for re-election...');
     this.disable();
-    setTimeout(() => this.enable(), 500);
+    // Pass `true` to force a fresh start and break the loop.
+    setTimeout(() => this.enable(true), 500);
   }
 
   showHostSelectionModalIfNeeded() {

@@ -37,6 +37,19 @@ export class Sync {
         this.fileSync.addEventListener('syncProgress', (event) => {
           this.ui.updateSyncProgress(event);
           if (event.detail.type === 'complete' && event.detail.action === 'receive' && event.detail.gardenName) {
+            
+            if (this.liveSync.state === 'bootstrapping') {
+                console.log('[Sync] Bootstrap file sync complete. Preserving editor state and finalizing live session.');
+                // --- THIS IS THE DEFINITIVE FIX ---
+                // The crash was caused by calling `this.workspace.events.publish`.
+                // The event bus is on the global `window.thoughtform` object.
+                // This correction prevents the crash and allows the logic to complete,
+                // which in turn prevents the destructive hotReloadGarden from running.
+                window.thoughtform.events.publish('workspace:garden:reloaded', { gardenName: event.detail.gardenName });
+                return;
+            }
+            // --- END OF FIX ---
+
             this.workspace.hotReloadGarden(event.detail.gardenName);
           }
         });
@@ -194,13 +207,10 @@ export class Sync {
   setGitClient(gitClient) { this.gitClient = gitClient; this.fileSync.setGitClient(gitClient); }
   addMessage(text) { if(this.ui) this.ui.addMessage(text); }
   
-  // --- THIS IS THE FUCKING FIX ---
-  // The signature is now simple and correct. The router handles complexity.
   sendSyncMessage(data, targetPeerId = null, useGossip = false) {
     console.log(`[Sync/sendSyncMessage] Preparing to send message of type ${data.type}. Target: ${targetPeerId ? targetPeerId.substring(0,4) : 'Broadcast'}, Gossip: ${useGossip}`);
-    this.messageRouter.sendSyncMessage(data, targetPeerId, useGossip);
+    this.messageRouter.sendSyncMessage(data, targetPeerId, null, useGossip);
   }
-  // --- END OF FIX ---
 
   show() { if(this._container) this._container.style.display = 'block'; }
   hide() { if(this._container) this._container.style.display = 'none'; }

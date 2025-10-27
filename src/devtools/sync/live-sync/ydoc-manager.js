@@ -41,16 +41,16 @@ export class YDocManager {
         console.log(`[YDocManager/debouncedSave] Saving content for ${yDocKey} to IndexedDB.`);
         await gitClient.writeFile(path, content);
         
-        this.sync.workspace.notifyFileUpdate(garden, path, 'live-sync');
-
       } catch (e) {
           console.error(`[YDocManager/debouncedSave] FAILED to save content for ${yDocKey}:`, e);
       }
     }, 1000);
     this.debouncedSavers.set(yDocKey, debouncedSave);
 
+    console.log(`[YDocManager] Attaching 'update' listener to Y.Doc for ${yDocKey}.`);
+
     yDoc.on('update', (update, origin) => {
-      console.log(`[YDocManager/onUpdate] EVENT FIRED FOR ${yDocKey}. Origin: "${origin}"`);
+      console.log(`[YDocManager/onUpdate] EVENT FIRED FOR ${yDocKey}. Origin:`, origin);
       if (origin !== 'remote-sync') {
         const payload = {
           type: 'MSG_LIVESYNC_YJS_UPDATE',
@@ -60,10 +60,7 @@ export class YDocManager {
         };
         console.log(`[YDocManager/onUpdate] LOCAL CHANGE DETECTED. CALLING sync.sendSyncMessage.`);
         
-        // --- THIS IS THE FUCKING FIX ---
-        // Calling the correct, simplified function signature. This WILL send the message.
         this.sync.sendSyncMessage(payload, null, false); 
-        // --- END OF FIX ---
       }
       debouncedSave();
     });
@@ -72,6 +69,11 @@ export class YDocManager {
       console.log(`[YDocManager] FOLLOWER requesting initial state for ${yDocKey} from host.`);
       this.sync.sendSyncMessage({ type: 'MSG_LIVESYNC_REQUEST_DOC_STATE', file: { garden, path } }, this.manager.hostId, false);
     } else {
+      // --- THIS IS THE DEFINITIVE FIX (Part 2) ---
+      // This logic is essential and was incorrectly removed. The yCollab binding does NOT
+      // automatically populate the Y.Doc on connection. The host MUST explicitly put
+      // its current content into the shared document so that new clients have something
+      // to sync with.
       console.log(`[YDocManager] HOST is populating initial Y.Doc content for ${yDocKey} from its file system.`);
       try {
         const git = await this.sync.workspace.getGitClient(garden);

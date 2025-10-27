@@ -16,7 +16,7 @@ export class LiveSyncMessageHandler {
         break;
 
       case 'MSG_LIVESYNC_ANNOUNCE':
-        if ((this.manager.state === 'host' || this.manager.state === 'active') && payload.peerInfo) {
+        if ((this.manager.state === 'host' || this.manager.state === 'follower' || this.manager.state === 'active') && payload.peerInfo) {
           this.sync.sendSyncMessage({ type: 'MSG_LIVESYNC_SESSION_INFO', hostId: this.manager.hostId, syncableGardens: this.manager.syncableGardens }, payload.peerInfo.id, false);
         } else if (this.manager.state === 'pending' && payload.peerInfo) {
           this.manager.pendingPeers.set(payload.peerInfo.id, payload.peerInfo);
@@ -40,6 +40,13 @@ export class LiveSyncMessageHandler {
           this.manager.syncableGardens = payload.syncableGardens || [];
           sessionStorage.setItem('thoughtform_live_sync_gardens', JSON.stringify(this.manager.syncableGardens));
           this.manager.session.processHostSelection(payload.hostId);
+          
+          if (this.manager.state === 'follower' && this.manager.syncableGardens.length > 0) {
+              this.sync.addMessage(`Requesting initial sync for gardens: ${this.manager.syncableGardens.join(', ')}.`);
+              this.manager.state = 'bootstrapping';
+              this.sync.ui.showSyncProgressModal();
+              this.sync.fileSync.requestSpecificGardens({ [this.manager.hostId]: this.manager.syncableGardens });
+          }
         }
         break;
 
@@ -48,10 +55,12 @@ export class LiveSyncMessageHandler {
         break;
 
       case 'MSG_LIVESYNC_SESSION_START':
-        if (this.manager.state === 'bootstrapping') {
+        if (this.manager.state === 'follower') {
           this.manager.syncableGardens = payload.syncableGardens;
           sessionStorage.setItem('thoughtform_live_sync_gardens', JSON.stringify(this.manager.syncableGardens));
           this.sync.addMessage(`Session started. Syncing gardens: ${this.manager.syncableGardens.join(', ')}.`);
+          
+          this.manager.state = 'bootstrapping';
           this.sync.ui.showSyncProgressModal();
           this.sync.fileSync.requestSpecificGardens({ [this.manager.hostId]: this.manager.syncableGardens });
         }
@@ -76,8 +85,6 @@ export class LiveSyncMessageHandler {
 
       case 'MSG_LIVESYNC_YJS_UPDATE':
         if (payload.garden && payload.path) {
-          // --- THIS IS THE FIX (Part 3) ---
-          // Call the corrected function without the `isHost` parameter.
           const yDoc = await this.manager.yDocManager.getYDoc(payload.garden, payload.path);
           if (yDoc) {
             Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
