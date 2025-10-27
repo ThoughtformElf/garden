@@ -23,16 +23,11 @@ export class LiveSyncSession {
     const myPeerName = localStorage.getItem('thoughtform_peer_prefix') || myPeerId.substring(0, 8);
     const stickyHostId = sessionStorage.getItem('thoughtform_live_sync_host_id');
 
-    // --- THIS IS THE DEFINITIVE FIX ---
-    // The `forceFresh` flag is passed by the re-election logic to bypass this block.
-    // This prevents the infinite loop by ensuring that a re-election always starts
-    // with a clean slate, rather than immediately re-triggering itself.
     if (stickyHostId && !forceFresh) {
       console.log('[LiveSync] Found sticky session. Forcing re-election to ensure consistency.');
       this._performReElectionReset();
       return;
     }
-    // --- END OF FIX ---
 
     manager.state = 'pending';
     manager.pendingPeers.set(myPeerId, { id: myPeerId, name: myPeerName });
@@ -67,7 +62,16 @@ export class LiveSyncSession {
       this.hostSelectionModal = null;
     }
 
-    sync.workspace.getActiveEditor()?.disconnectLiveSync();
+    // --- THIS IS THE FIX (Part 1) ---
+    // The previous implementation only disconnected the ACTIVE editor.
+    // This new logic iterates through ALL open panes and ensures EVERY
+    // editor is disconnected, guaranteeing a clean state for the re-sync.
+    if (sync.workspace && sync.workspace.panes) {
+        sync.workspace.panes.forEach(pane => {
+            pane.editor?.disconnectLiveSync();
+        });
+    }
+
     manager.yDocManager.destroyAll();
 
     manager.state = 'disabled';
@@ -91,7 +95,6 @@ export class LiveSyncSession {
   _performReElectionReset() {
     this.sync.addMessage('Resetting session for re-election...');
     this.disable();
-    // Pass `true` to force a fresh start and break the loop.
     setTimeout(() => this.enable(true), 500);
   }
 

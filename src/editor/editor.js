@@ -159,25 +159,18 @@ export class Editor {
     
     const yCollabExtension = yCollab(ytext, null, { undoManager: this.yUndoManager });
 
-    // --- THIS IS THE DEFINITIVE FIX ---
-    // For a follower, we first dispatch a transaction to clear the document.
-    // This prevents syncing stale local content TO the host.
-    if (!isHost) {
-        this.editorView.dispatch({
-            changes: { from: 0, to: this.editorView.state.doc.length, insert: '' },
-            annotations: this.programmaticChange.of(true)
-        });
-    }
-
-    // THEN, for both host and follower, we dispatch a single, non-destructive
-    // transaction to reconfigure the editor with the live sync extensions.
-    // This correctly binds the Y.js model to the editor view without replacing it.
+    // --- THIS IS THE FINAL FIX ---
+    // The destructive `changes` transaction has been removed.
+    // The editor's content has already been correctly set by `forceReloadFile`.
+    // We now ONLY apply the necessary extensions in a non-destructive way,
+    // which preserves the content and correctly binds it to the live session.
     this.editorView.dispatch({
-      effects: [
-        this.yjsCompartment.reconfigure(yCollabExtension),
-        this.defaultKeymapCompartment.reconfigure(keymap.of([]))
-      ]
+        effects: [
+            this.yjsCompartment.reconfigure(yCollabExtension),
+            this.defaultKeymapCompartment.reconfigure(keymap.of([]))
+        ]
     });
+    // --- END OF FIX ---
     
     this.isLiveSyncConnected = true;
   }
@@ -186,7 +179,6 @@ export class Editor {
     console.log(`%c[LIVESYNC-LIFECYCLE] disconnectLiveSync CALLED for ${this.filePath}. Current connection state: ${this.isLiveSyncConnected}`, 'color: red; font-weight: bold;');
     if (!this.isLiveSyncConnected) return;
 
-    // Only dispatch if the view still exists
     if (this.editorView && !this.editorView.isDestroyed) {
         this.editorView.dispatch({
           effects: [

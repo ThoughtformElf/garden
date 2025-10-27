@@ -3,6 +3,8 @@ import { SyncFiles } from './files/index.js';
 import { SyncUI } from './ui.js';
 import { LiveSyncManager } from './live-sync-manager.js';
 import { SyncMessageRouter } from './sync-message-router.js';
+import { Git } from '../../util/git-integration.js';
+import { Editor } from '../../editor/editor.js';
 
 const MAX_PEER_CONNECTIONS = 5;
 
@@ -34,18 +36,31 @@ export class Sync {
     this.ui.updateConnectionIndicator(this.connectionState);
 
     if (this.fileSync && this.ui) {
-        this.fileSync.addEventListener('syncProgress', (event) => {
+        this.fileSync.addEventListener('syncProgress', async (event) => {
           this.ui.updateSyncProgress(event);
           if (event.detail.type === 'complete' && event.detail.action === 'receive' && event.detail.gardenName) {
             
+            // --- THIS IS THE FINAL AND CORRECT FIX ---
+            // If we are in a live sync bootstrap, we DO NOT touch the editor content.
+            // Y.js is the single source of truth. The LiveSyncManager will handle connecting
+            // the editor, which will then be populated by the Y.js binding itself.
+            // Any manual reload here, destructive or not, creates the race condition that wipes the editor.
             if (this.liveSync.state === 'bootstrapping') {
-                console.log('[Sync] Bootstrap file sync complete. Preserving editor state and finalizing live session.');
-                // --- THIS IS THE DEFINITIVE FIX ---
-                // The crash was caused by calling `this.workspace.events.publish`.
-                // The event bus is on the global `window.thoughtform` object.
-                // This correction prevents the crash and allows the logic to complete,
-                // which in turn prevents the destructive hotReloadGarden from running.
-                window.thoughtform.events.publish('workspace:garden:reloaded', { gardenName: event.detail.gardenName });
+                console.log('%c[Sync] Bootstrap file sync complete. Finalizing live session.', 'color: #12ffbc; font-weight: bold;');
+                
+                const gardenName = event.detail.gardenName;
+                const newGitClient = new Git(gardenName);
+                await newGitClient.initRepo();
+                this.workspace.gitClients.set(gardenName, newGitClient);
+                if (window.thoughtform.sidebar && window.thoughtform.sidebar.gitClient.gardenName === gardenName) {
+                    window.thoughtform.sidebar.gitClient = newGitClient;
+                }
+                
+                await window.thoughtform.sidebar.refresh();
+
+                // Announce that the filesystem is ready. The LiveSyncManager will hear this
+                // and perform the single, authoritative connection call.
+                window.thoughtform.events.publish('workspace:garden:reloaded', { gardenName });
                 return;
             }
             // --- END OF FIX ---

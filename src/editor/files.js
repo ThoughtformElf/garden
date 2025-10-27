@@ -30,6 +30,8 @@ export class EditorFiles {
   async loadFileContent(filepath) {
     try {
       const rawContent = await this.editor.gitClient.readFile(filepath);
+      // --- THIS IS THE CONSOLE LOG YOU DEMANDED ---
+      console.log(`%c[loadFileContent] Content for ${filepath}:`, 'font-weight: bold; color: #12ffbc;', rawContent);
       return rawContent;
     } catch (e) {
       if (e.message && e.message.includes('does not exist')) {
@@ -37,7 +39,9 @@ export class EditorFiles {
       } else {
         console.warn(`An unexpected error occurred while reading ${filepath}:`, e);
       }
-      return `// "${filepath.substring(1)}" does not exist. Start typing to create it.`;
+      const placeholder = `// "${filepath.substring(1)}" does not exist. Start typing to create it.`;
+      console.log(`%c[loadFileContent] Placeholder for ${filepath}:`, 'font-weight: bold; color: orange;', placeholder);
+      return placeholder;
     }
   }
 
@@ -169,31 +173,25 @@ export class EditorFiles {
         label: 'Enter file name (or leave blank for a scratchpad):',
       });
       
-      // If the user cancels the prompt, newName will be null.
       if (newName === null) {
-        this.editor.editorView?.focus(); // Return focus to the editor.
+        this.editor.editorView?.focus();
         return;
       }
       
       let newPath;
 
-      // Step 1: Determine the path.
       if (!newName.trim()) {
-        // If the name is blank, generate a unique scratchpad path.
         newPath = await generateUniqueScratchpadPath(this.editor.gitClient);
       } else {
-        // Otherwise, use the user-provided name.
         const finalName = newName.trim();
         newPath = `/${finalName}`;
         
-        // For named files, we must check if it already exists to prevent conflicts.
         try {
           const stat = await this.editor.gitClient.pfs.stat(newPath);
           const itemType = stat.isDirectory() ? 'folder' : 'file';
           await this.editor.sidebar.showAlert({ title: 'Creation Failed', message: `A ${itemType} named "${finalName}" already exists.` });
-          return; // Stop if there's a conflict.
+          return;
         } catch (e) {
-          // A "file not found" error is expected and good. Any other error is a problem.
           if (e.code !== 'ENOENT') {
             console.error('Error checking for file:', e);
             await this.editor.sidebar.showAlert({ title: 'Error', message: 'An unexpected error occurred.' });
@@ -202,13 +200,9 @@ export class EditorFiles {
         }
       }
 
-      // Step 2: Open the determined path as a "virtual" file.
-      // This is now the single, unified workflow. The file is NOT created on disk here.
-      // It only becomes real when the user edits the content.
       window.thoughtform.workspace.openFile(this.editor.gitClient.gardenName, newPath);
 
     } finally {
-      // Focus is automatically handled by the workspace manager on success.
     }
   }
 
@@ -237,11 +231,11 @@ export class EditorFiles {
       });
       
       if (newFilename === null) {
-          this.editor.editorView?.focus(); // Return focus to the editor on cancel.
+          this.editor.editorView?.focus();
           return;
       }
       
-      if (!newFilename.trim()) return; // Do nothing if name is empty after confirmation.
+      if (!newFilename.trim()) return;
     
       const newPath = `${directory}/${newFilename.trim()}`;
       try {
@@ -253,7 +247,6 @@ export class EditorFiles {
         await this.editor.sidebar.showAlert({ title: 'Error', message: `Failed to duplicate file: ${e.message}` });
       }
     } finally {
-      // Focus is handled by the workspace manager.
     }
   }
 }

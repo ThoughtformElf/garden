@@ -85,7 +85,6 @@ export class WorkspaceManager {
               const targetElement = pane.element;
               const currentPath = pane.editor.filePath;
 
-              // This now correctly calls the new method that handles cleanup.
               pane.editor.destroy();
 
               const newEditor = new Editor({
@@ -210,8 +209,16 @@ export class WorkspaceManager {
     }
 
     await editor.loadFile(path);
-    this.activateLiveSyncForCurrentFile();
     this.setActivePane(this.activePaneId);
+  }
+
+  findEditorByFile(gardenName, filePath) {
+    for (const pane of this.panes.values()) {
+      if (pane.editor && pane.editor.gitClient.gardenName === gardenName && pane.editor.filePath === filePath) {
+        return pane.editor;
+      }
+    }
+    return null;
   }
 
   async openInNewPane(linkContent, sourcePaneId) {

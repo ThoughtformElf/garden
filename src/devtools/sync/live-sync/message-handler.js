@@ -79,7 +79,27 @@ export class LiveSyncMessageHandler {
       case 'MSG_LIVESYNC_DOC_STATE':
         if (payload.file) {
           const yDoc = await this.manager.yDocManager.getYDoc(payload.file.garden, payload.file.path);
-          if (yDoc) Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
+          if (yDoc) {
+            Y.applyUpdate(yDoc, new Uint8Array(payload.update), 'remote-sync');
+
+            // --- THIS IS THE FIX (Part 2) ---
+            // Find the editor corresponding to this file.
+            const editor = this.sync.workspace.findEditorByFile(payload.file.garden, payload.file.path);
+            if (editor && editor.isLiveSyncConnected) {
+              const yContent = yDoc.getText('codemirror').toString();
+              const editorContent = editor.editorView.state.doc.toString();
+              
+              // If the editor's view is out of sync with the data model, FORCE it to update.
+              // This is the final step that guarantees the client sees the host's content.
+              if (yContent !== editorContent) {
+                console.log('%c[LiveSyncMessageHandler] Forcing editor view update to match received Y.Doc state.', 'color: #12ffbc');
+                editor.editorView.dispatch({
+                  changes: { from: 0, to: editorContent.length, insert: yContent },
+                  annotations: editor.programmaticChange.of(true)
+                });
+              }
+            }
+          }
         }
         break;
 
@@ -97,7 +117,7 @@ export class LiveSyncMessageHandler {
           this.manager.pendingPeers.delete(fromPeerId);
           this.manager.activePeers.delete(fromPeerId);
         }
-        if (this.manager.state === 'pending' && this.manager.session.hostSelectionModal) {
+        if (this.state === 'pending' && this.manager.session.hostSelectionModal) {
           this.manager.session.hostSelectionModal.destroy();
           this.manager.session.hostSelectionModal = null;
           this.manager.session.showHostSelectionModalIfNeeded();

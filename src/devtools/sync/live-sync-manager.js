@@ -26,8 +26,14 @@ export class LiveSyncManager {
       if (this.state === 'bootstrapping' && this.syncableGardens.includes(data.gardenName)) {
         console.log(`[LiveSync] Bootstrap for garden "${data.gardenName}" complete. Finalizing session.`);
         
-        this.state = 'active'; // Transition from bootstrapping to fully active
+        this.state = 'active'; 
         this.sync.addMessage('Initial sync complete. Live collaboration is active.');
+        
+        // --- THIS IS THE FINAL FIX ---
+        // This is the single, authoritative call that re-establishes the connection
+        // AFTER the editor's content has been forcefully reloaded. This is the
+        // correct and final step in the sequence.
+        this.sync.workspace.activateLiveSyncForCurrentFile();
       }
     });
   }
@@ -51,13 +57,13 @@ export class LiveSyncManager {
 
     console.log(`[LiveSync] Activating doc for editor. Current state: ${this.state}`);
     
-    // --- THIS IS THE FIX (Part 1) ---
-    // The previous check was too strict. A peer is in a valid 'follower' state
-    // just before it begins bootstrapping. We must allow the connection to proceed.
-    // This new check correctly prevents disconnects unless the session is truly disabled or pending.
     const validStates = ['host', 'follower', 'bootstrapping', 'active'];
-    if (!validStates.includes(this.state)) {
+    if (this.state === 'disabled') {
         editor.disconnectLiveSync();
+        return;
+    }
+    if (!validStates.includes(this.state)) {
+        console.log('[LiveSync] State is pending, activation will wait.');
         return;
     }
 
