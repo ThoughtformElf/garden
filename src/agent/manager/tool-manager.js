@@ -44,14 +44,14 @@ async function loadTool(toolPath, contextGarden) {
     const git = new Git(contextGarden);
     code = await git.readFile(toolPath);
   } catch (e) {
-    // If it fails (e.g., doesn't exist), try the global 'Settings' garden.
+    // If it fails (e.g., doesn't exist), try the global 'settings' garden.
     if (!e.message.includes('does not exist')) throw e;
     try {
-      sourceGarden = 'Settings';
+      sourceGarden = 'settings';
       const git = new Git(sourceGarden);
       code = await git.readFile(toolPath);
     } catch (e2) {
-      // If it's not in 'Settings' either, then it truly doesn't exist.
+      // If it's not in 'settings' either, then it truly doesn't exist.
       if (!e2.message.includes('does not exist')) throw e2;
       return null; // Return null if the tool is not found in either location.
     }
@@ -90,7 +90,7 @@ async function loadTool(toolPath, contextGarden) {
 export async function getAllTools(currentGardenName) {
   const allTools = new Map();
   const toolPaths = new Set(); // Start with an empty set.
-  const gardensToScan = Array.from(new Set([currentGardenName, 'Settings']));
+  const gardensToScan = Array.from(new Set([currentGardenName, 'settings']));
 
   for (const gardenName of gardensToScan) {
     const git = new Git(gardenName);

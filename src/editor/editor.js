@@ -105,7 +105,7 @@ export class Editor {
       if (update.docChanged) {
           const isProgrammatic = update.transactions.some(t => t.annotation(this.programmaticChange));
           const isRemote = update.transactions.some(tr => tr.annotation('y-codemirror.next$remote'));
-          console.log(`[Editor Update Listener] Document changed. LiveSync: ${this.isLiveSyncConnected}, Programmatic: ${isProgrammatic}, Remote: ${isRemote}`);
+          // console.log(`[Editor Update Listener] Document changed. LiveSync: ${this.isLiveSyncConnected}, Programmatic: ${isProgrammatic}, Remote: ${isRemote}`);
       }
 
       if (this.isLiveSyncConnected) {
@@ -200,6 +200,7 @@ export class Editor {
   }
 
   async _applyUserSettings() {
+    console.log(`[Editor] _applyUserSettings for editor in pane ${this.paneId}`);
     const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode', this);
     
     if (editingMode === 'vim') {
@@ -220,6 +221,7 @@ export class Editor {
     }
     
     if (this.keymapService) {
+      console.log('[Editor] Calling keymapService.updateKeymaps...');
       await this.keymapService.updateKeymaps();
     }
   }
@@ -247,7 +249,6 @@ export class Editor {
   async handleUpdate(newContent) {
     if (!this.isReady || this.isLiveSyncConnected) return;
 
-    // --- THIS IS THE DEFINITIVE FIX ---
     let isCreation = false;
     try {
         await this.gitClient.pfs.stat(this.filePath);
@@ -265,7 +266,6 @@ export class Editor {
         content: newContent
     };
 
-    // Publish the correct event based on whether the file was new.
     if (isCreation) {
         window.thoughtform.events.publish('file:create', eventData);
     } else {
@@ -275,7 +275,6 @@ export class Editor {
     window.thoughtform.workspace.notifyFileUpdate(this.gitClient.gardenName, this.filePath, this.paneId);
     if (this.sidebar) await this.sidebar.refresh();
 
-    // Retroactively activate sync for the newly created file.
     const liveSync = window.thoughtform.sync.liveSync;
     if (isCreation && !this.isLiveSyncConnected && 
         (liveSync.state === 'host' || liveSync.state === 'active') &&

@@ -21,41 +21,16 @@ export class KeymapService {
   }
 
   async updateKeymaps() {
-    if (!this.editor.gitClient) {
+    if (!this.editor.editorView || this.editor.editorView.isDestroyed) {
       return;
     }
-    const currentGarden = this.editor.gitClient.gardenName;
 
-    // Use the centralized config service to read configs
-    const readKeymapFile = async (gardenName) => {
-      // The get() method without a key returns the whole parsed file
-      const { value, sourceGarden } = await window.thoughtform.config.get('keymaps.yml', null, gardenName);
-      return value ? { config: value, sourceGarden: sourceGarden } : null;
-    };
-
-    const mergedKeymap = new Map();
-
-    const processConfig = (result) => {
-      if (!result || !Array.isArray(result.config)) return;
-      for (const binding of result.config) {
-        if (binding && binding.key && binding.hasOwnProperty('run')) {
-          // Add the source garden to the binding object for the executor
-          mergedKeymap.set(binding.key, { ...binding, sourceGarden: result.sourceGarden });
-        }
-      }
-    };
-
-    // 1. Load base configuration from Settings garden
-    const globalResult = await readKeymapFile('Settings');
-    processConfig(globalResult);
+    const { value: finalConfig } = await window.thoughtform.config.get(
+      'keymaps.yml',
+      null,
+      this.editor
+    );
     
-    // 2. Load and merge (override) with the current garden's configuration
-    if (currentGarden !== 'Settings') {
-      const gardenResult = await readKeymapFile(currentGarden);
-      processConfig(gardenResult);
-    }
-
-    const finalConfig = Array.from(mergedKeymap.values());
     const newKeymapExtension = this._buildKeymapExtension(finalConfig);
 
     if (this.editor.editorView && !this.editor.editorView.isDestroyed) {
@@ -67,21 +42,24 @@ export class KeymapService {
   }
 
   _buildKeymapExtension(config) {
+    if (!Array.isArray(config)) {
+      return keymap.of([]);
+    }
     const keyBindings = config.map(binding => {
       const { key, run, sourceGarden } = binding;
-      if (!run) return null;
+      if (!run || !sourceGarden) {
+        return null;
+      }
       
       if (typeof run === 'string' && run.startsWith('internal:')) {
         const commandName = run.substring(9);
         const commandFn = internalCommands.get(commandName);
         if (commandFn) {
           return { key, run: commandFn };
-        } else {
-          return null;
         }
+        return null;
       }
 
-      // The full path is now correctly determined by where the config file was found
       const fullPath = `${sourceGarden}#${run}`;
       return {
         key: key,
