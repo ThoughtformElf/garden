@@ -1,0 +1,6 @@
+[submodule "src/gardens/settings"]
+	path = src/gardens/settings
+	url = https://github.com/thoughtforms/settings
+[submodule "src/gardens/docs"]
+	path = src/gardens/docs
+	url = https://github.com/thoughtforms/docs

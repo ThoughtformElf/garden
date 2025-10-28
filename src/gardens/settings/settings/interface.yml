@@ -1,8 +1,0 @@
-# Thoughtform.Garden Interface Settings
-#
-# This file controls the behavior of the editor's interface.
-# You can override this file by creating 'settings/interface.yml' in your current garden.
-
-# editingMode: Set the default keybinding mode.
-# Options: 'vim', 'default'
-editingMode: 'default'
