@@ -70,8 +70,6 @@ export class LiveSyncManager {
   async activateDocForEditor(editor) {
     if (!editor) return;
 
-    console.log(`[LiveSync] Activating doc for editor. Current state: ${this.state}`);
-    
     if (editor.editorView.state.doc.toString().startsWith('// "')) {
         console.log(`[LiveSync] Activation blocked for new, unsaved file: ${editor.filePath}`);
         editor.disconnectLiveSync();

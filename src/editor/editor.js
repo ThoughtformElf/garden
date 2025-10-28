@@ -105,7 +105,6 @@ export class Editor {
       if (update.docChanged) {
           const isProgrammatic = update.transactions.some(t => t.annotation(this.programmaticChange));
           const isRemote = update.transactions.some(tr => tr.annotation('y-codemirror.next$remote'));
-          // console.log(`[Editor Update Listener] Document changed. LiveSync: ${this.isLiveSyncConnected}, Programmatic: ${isProgrammatic}, Remote: ${isRemote}`);
       }
 
       if (this.isLiveSyncConnected) {
@@ -170,7 +169,6 @@ export class Editor {
   }
 
   disconnectLiveSync() {
-    console.log(`%c[LIVESYNC-LIFECYCLE] disconnectLiveSync CALLED for ${this.filePath}. Current connection state: ${this.isLiveSyncConnected}`, 'color: red; font-weight: bold;');
     if (!this.isLiveSyncConnected) return;
 
     if (this.editorView && !this.editorView.isDestroyed) {
@@ -200,7 +198,6 @@ export class Editor {
   }
 
   async _applyUserSettings() {
-    console.log(`[Editor] _applyUserSettings for editor in pane ${this.paneId}`);
     const { value: editingMode } = await window.thoughtform.config.get('interface.yml', 'editingMode', this);
     
     if (editingMode === 'vim') {
@@ -221,7 +218,6 @@ export class Editor {
     }
     
     if (this.keymapService) {
-      console.log('[Editor] Calling keymapService.updateKeymaps...');
       await this.keymapService.updateKeymaps();
     }
   }
@@ -279,7 +275,6 @@ export class Editor {
     if (isCreation && !this.isLiveSyncConnected && 
         (liveSync.state === 'host' || liveSync.state === 'active') &&
         liveSync.syncableGardens.includes(this.gitClient.gardenName)) {
-        console.log(`[Editor/handleUpdate] Retroactively activating live sync for new file: ${this.filePath}`);
         window.thoughtform.workspace.activateLiveSyncForCurrentFile();
     }
   }

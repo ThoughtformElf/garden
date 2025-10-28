@@ -30,8 +30,6 @@ export class EditorFiles {
   async loadFileContent(filepath) {
     try {
       const rawContent = await this.editor.gitClient.readFile(filepath);
-      // --- THIS IS THE CONSOLE LOG YOU DEMANDED ---
-      console.log(`%c[loadFileContent] Content for ${filepath}:`, 'font-weight: bold; color: #12ffbc;', rawContent);
       return rawContent;
     } catch (e) {
       if (e.message && e.message.includes('does not exist')) {
@@ -40,7 +38,6 @@ export class EditorFiles {
         console.warn(`An unexpected error occurred while reading ${filepath}:`, e);
       }
       const placeholder = `// "${filepath.substring(1)}" does not exist. Start typing to create it.`;
-      console.log(`%c[loadFileContent] Placeholder for ${filepath}:`, 'font-weight: bold; color: orange;', placeholder);
       return placeholder;
     }
   }
