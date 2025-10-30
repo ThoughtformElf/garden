@@ -23,11 +23,11 @@ export const statusBarPlugin = ViewPlugin.fromClass(
       this.statusBar.appendChild(this.filePathElement);
       this.statusBar.appendChild(this.tokenCountElement);
 
-      if (view.dom.parentElement) {
-        view.dom.parentElement.appendChild(this.statusBar);
-      } else {
-        console.error("Could not find a parent element for the editor view to attach the status bar.");
-      }
+      // --- THIS IS THE FIX ---
+      // Append the status bar directly to the main editor view element (cm-editor).
+      // This ensures it moves with the editor when panes are rearranged, surviving
+      // the parent container's destruction and recreation.
+      view.dom.appendChild(this.statusBar);
       
       this.debouncedUpdate = debounce(this.updateAll.bind(this), 100);
       this.updateAll();
@@ -41,7 +41,6 @@ export const statusBarPlugin = ViewPlugin.fromClass(
       }
     }
     
-    // --- THIS IS THE FIX ---
     getDisplayPath() {
         // Read the context directly from the editor's state field.
         const appContext = this.view.state.field(appContextField);
@@ -73,7 +72,6 @@ export const statusBarPlugin = ViewPlugin.fromClass(
         this.tokenCountElement.textContent = 'Tokens: Error';
       }
     }
-    // --- END OF FIX ---
 
     destroy() {
       this.debouncedUpdate.cancel();
