@@ -82,5 +82,56 @@ export const gitRemoteActions = {
       }
       throw e;
     }
+  },
+  
+  async clone(url, gardenName, onProgress) {
+    onProgress(`Preparing to clone into garden: "${gardenName}"...`);
+  
+    const dbName = `garden-fs-${gardenName}`;
+    await new Promise((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(dbName);
+      deleteRequest.onsuccess = () => {
+        onProgress(`Cleared existing database for "${gardenName}".`);
+        resolve();
+      };
+      deleteRequest.onerror = (e) => {
+        onProgress(`Error clearing database for "${gardenName}".`);
+        reject(e.target.error);
+      };
+      deleteRequest.onblocked = () => {
+        onProgress(`Clone blocked for "${gardenName}". Please refresh and try again.`);
+        reject(new Error('Clone blocked'));
+      };
+    });
+  
+    // --- THIS IS THE FUCKING FIX ---
+    // DO NOT call initRepo() before clone. The clone command initializes the repository.
+    // Calling it beforehand creates a separate, conflicting repository history.
+    
+    const gitServerUrl = 'http://localhost:8081';
+    const finalUrl = `${gitServerUrl}/${url}`;
+
+    await git.clone({
+      fs: this.fs,
+      http,
+      dir: '/',
+      url: finalUrl,
+      onProgress: (e) => onProgress(`${e.phase}: ${e.total ? Math.round((e.loaded / e.total) * 100) + '%' : e.loaded}`),
+      singleBranch: true,
+      depth: 50,
+    });
+    
+    // After a successful clone, the .git directory is populated but the working
+    // directory is empty. We must explicitly check out the files from the HEAD.
+    onProgress('Checking out files...');
+    await git.checkout({
+      fs: this.fs,
+      dir: '/',
+      force: true,
+    });
+    // --- END OF FIX ---
+  
+    this.registerNewGarden();
+    onProgress('Clone complete!');
   }
 };

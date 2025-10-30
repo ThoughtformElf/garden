@@ -54,7 +54,14 @@ class ConfigService {
     return { value, sourceGarden: overrideSource || baseSource };
   }
   
-  async getHook(hookFileName, context) {
+  /**
+   * Finds an executable script, cascading from the current garden to the 'settings' garden.
+   * @param {string} type - The type of executable ('hook', 'keymap', 'query').
+   * @param {string} fileName - The name of the script file (e.g., 'load.js').
+   * @param {object|string} context - The editor or git client context, or a garden name string.
+   * @returns {Promise<string|null>} The full, executable path (e.g., 'garden#path') or null.
+   */
+  async getExecutable(type, fileName, context) {
     let gardenName;
     if (typeof context === 'string') {
       gardenName = context;
@@ -65,22 +72,35 @@ class ConfigService {
       gardenName = activeGitClient.gardenName;
     }
 
-    const hookPath = `settings/hooks/${hookFileName}`;
+    // --- THIS IS THE FUCKING FIX ---
+    // Handle the inconsistent pluralization of the settings directories.
+    const folderName = type === 'query' ? 'query' : `${type}s`;
+    const scriptPath = `/settings/${folderName}/${fileName}`;
+    // --- END OF FIX ---
 
+    // 1. Check in the current garden.
     const gardenGit = new Git(gardenName);
     try {
-      await gardenGit.pfs.stat(`/${hookPath}`);
-      return `${gardenName}#${hookPath}`;
-    } catch (e) { /* File does not exist, continue */ }
+      await gardenGit.pfs.stat(scriptPath);
+      return `${gardenName}#${scriptPath}`; // Found it.
+    } catch (e) {
+      // Not found, which is fine. Continue to fallback.
+      if (e.code !== 'ENOENT') console.error(`[ConfigService] Error checking for executable in ${gardenName}:`, e);
+    }
     
-    if (gardenName !== 'settings') {
+    // 2. If not in the current garden and the current garden isn't 'settings', check 'settings'.
+    if (gardenName.toLowerCase() !== 'settings') {
         const settingsGit = new Git('settings');
         try {
-          await settingsGit.pfs.stat(`/${hookPath}`);
-          return `settings#${hookPath}`;
-        } catch (e) { /* File does not exist */ }
+          await settingsGit.pfs.stat(scriptPath);
+          return `settings#${scriptPath}`; // Found it in the fallback.
+        } catch (e) {
+          // Not found in fallback either.
+          if (e.code !== 'ENOENT') console.error('[ConfigService] Error checking for executable in settings:', e);
+        }
     }
 
+    // 3. Not found anywhere.
     return null;
   }
 

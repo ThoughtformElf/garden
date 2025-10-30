@@ -63,6 +63,8 @@ async function main() {
     ai: initializeAiService(),
     config: initializeConfigService(),
     events: initializeEventBus(),
+    Modal: Modal,
+    Git: Git
   };
 
   // --- 2. Initialize Workspace and Sync, Linking Them Correctly ---

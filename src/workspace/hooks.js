@@ -39,7 +39,8 @@ export class HookRunner {
     const git = window.thoughtform.workspace.getActiveGitClient();
     if (!editor || !git) return;
 
-    const hookPath = await this.config.getHook(hookFileName, contextGarden);
+    // THIS IS THE FIX: Use the new centralized getExecutable function.
+    const hookPath = await this.config.getExecutable('hook', hookFileName, contextGarden);
     
     if (hookPath) {
       executeFile(hookPath, editor, git, eventData);

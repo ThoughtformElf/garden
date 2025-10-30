@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const url = require('url');
@@ -31,12 +32,47 @@ const GIT_HTTP_BACKEND = findGitHttpBackend();
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, accept-encoding, content-encoding');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, accept-encoding, content-encoding, user-agent, git-protocol');
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
     return;
   }
+
+  // --- THIS IS THE CORRECT PROXY LOGIC ---
+  if (req.url.startsWith('/https://') || req.url.startsWith('/http://')) {
+    const targetUrlString = req.url.substring(1); // Remove the leading '/' to get the full remote URL
+    try {
+      const targetUrl = new URL(targetUrlString);
+      
+      const options = {
+        hostname: targetUrl.hostname,
+        port: targetUrl.protocol === 'https:' ? 443 : 80,
+        path: targetUrl.pathname + targetUrl.search,
+        method: req.method,
+        headers: { ...req.headers, host: targetUrl.hostname } // Crucially, set the Host header correctly
+      };
+
+      const proxyReq = (targetUrl.protocol === 'https:' ? https : http).request(options, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res, { end: true });
+      });
+
+      proxyReq.on('error', (e) => {
+        console.error(`[GitServer-Proxy] Error: ${e.message}`);
+        if (!res.headersSent) res.writeHead(502).end('Bad Gateway');
+      });
+
+      req.pipe(proxyReq, { end: true });
+      return; // Stop processing, we are in proxy mode.
+
+    } catch (e) {
+      console.error(`[GitServer-Proxy] Invalid URL in request path: ${targetUrlString}`);
+      res.writeHead(400).end('Bad Request: Invalid URL as request path.');
+      return;
+    }
+  }
+  // --- END OF CORRECT PROXY LOGIC ---
 
   const parsedUrl = url.parse(req.url);
   const repoName = parsedUrl.pathname.split('/')[1];
@@ -61,7 +97,7 @@ const server = http.createServer((req, res) => {
     GIT_HTTP_EXPORT_ALL: '1',
     PATH_INFO: parsedUrl.pathname.substring(`/${repoName}`.length),
     REQUEST_METHOD: req.method,
-    QUERY_STRING: parsedUrl.query || '',
+    QUERY_STRING: parsedUrl.search || '',
     CONTENT_TYPE: req.headers['content-type'] || '',
     CONTENT_LENGTH: req.headers['content-length'] || '',
   };
@@ -77,7 +113,6 @@ const server = http.createServer((req, res) => {
   });
 
   gitProcess.on('close', (code) => {
-    // THIS IS THE FIX: If a push was successful, auto-update the working directory.
     if (code === 0 && isPush) {
       console.log(`[GitServer] Push to '${repoName}' successful. Updating working directory...`);
       exec('git reset --hard', { cwd: repoPath }, (err, stdout, stderr) => {
@@ -124,5 +159,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(8081, () => {
-  console.log(`Git server running on http://localhost:8081, serving from NON-BARE repositories in ${REPOS_PATH}`);
+  console.log(`Git server running on http://localhost:8081, serving from NON-BARE repositories in ${REPOS_PATH} and proxying remote git requests.`);
 });
