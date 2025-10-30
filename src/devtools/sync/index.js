@@ -24,6 +24,15 @@ export class Sync {
     this.ui = new SyncUI(this);
     this.liveSync = new LiveSyncManager(this);
     this.messageRouter = new SyncMessageRouter(this);
+
+    // --- THIS IS THE FIX (Part 1) ---
+    // Generate a unique ID for this browser session to prevent self-connection.
+    this.sessionId = sessionStorage.getItem('thoughtform_sync_session_id');
+    if (!this.sessionId) {
+      this.sessionId = crypto.randomUUID();
+      sessionStorage.setItem('thoughtform_sync_session_id', this.sessionId);
+    }
+    // --- END OF FIX ---
   }
 
   init(dom) {
@@ -186,11 +195,34 @@ export class Sync {
       console.log('[Sync/_announcePresence] Announcing presence.');
       const gardens = JSON.parse(localStorage.getItem('thoughtform_gardens') || '["home"]');
       const myPeerName = localStorage.getItem('thoughtform_peer_prefix') || this.signaling.peerId.substring(0, 8);
-      this.sendSyncMessage({ type: 'peer_introduction', peerId: this.signaling.peerId, peerName: myPeerName, gardens }, targetPeerId, true);
+      // --- THIS IS THE FIX (Part 2) ---
+      // Include the session ID in the introduction message.
+      this.sendSyncMessage({ 
+        type: 'peer_introduction', 
+        peerId: this.signaling.peerId, 
+        peerName: myPeerName, 
+        gardens,
+        sessionId: this.sessionId // Add the session ID here
+      }, targetPeerId, true);
+      // --- END OF FIX ---
   }
 
   handlePeerIntroduction(payload) {
       if (!payload.peerId || payload.peerId === this.signaling.peerId) return;
+      
+      // --- THIS IS THE FIX (Part 3) ---
+      // If the incoming peer is from the same browser session, sever the connection.
+      if (payload.sessionId === this.sessionId) {
+          console.warn(`[Sync] Detected and closing a connection to a peer from the same browser session: ${payload.peerId.substring(0, 8)}`);
+          const pc = this.peerConnections.get(payload.peerId);
+          if (pc) {
+              pc.close();
+          }
+          // The onconnectionstatechange handler will clean up the rest.
+          return;
+      }
+      // --- END OF FIX ---
+      
       const peerName = payload.peerName || payload.peerId.substring(0, 8);
       const isNewPeer = !this.connectedPeers.has(payload.peerId);
       this.connectedPeers.set(payload.peerId, { id: peerName, gardens: payload.gardens });

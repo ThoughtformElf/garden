@@ -45,14 +45,19 @@ export class WebSocketManager {
     sendJoinSessionRequest(syncName, peerNamePrefix) {
         const ws = this.signaling.ws;
         if (ws && ws.readyState === WebSocket.OPEN) {
+            // --- THIS IS THE FIX ---
+            // Include the unique browser session ID in the join request.
+            // This allows the signaling server to announce it to other peers.
             const payload = {
                 type: 'join_session',
-                sessionId: syncName 
+                sessionId: syncName,
+                browserSessionId: this.signaling.sync.sessionId
             };
             if (peerNamePrefix) {
                 payload.peerNamePrefix = peerNamePrefix;
             }
             ws.send(JSON.stringify(payload));
+            // --- END OF FIX ---
         } else {
             console.error("Cannot send join session request, WebSocket is not open.");
         }
