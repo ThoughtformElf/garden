@@ -4,3 +4,6 @@
 [submodule "src/gardens/docs"]
 	path = src/gardens/docs
 	url = https://github.com/thoughtforms/docs
+[submodule "modules/handsfree"]
+	path = modules/handsfree
+	url = https://github.com/ThoughtformElf/handsfree
