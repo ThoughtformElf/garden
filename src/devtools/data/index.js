@@ -1,4 +1,4 @@
-import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens } from './data.js';
+import { exportGardens, getGardensFromZip, importGardensFromZip, deleteGardens, nukeAllData } from './data.js';
 import { Modal } from '../../util/modal.js';
 
 function createSelectionUI(title, items, allChecked = true) {
@@ -177,23 +177,47 @@ class DataTool {
     const gardens = gardensRaw ? JSON.parse(gardensRaw) : [];
 
     const modal = new Modal({ title: 'Clear Garden Data' });
-    modal.updateContent(createSelectionUI('Select gardens to permanently delete:', gardens, false));
+    modal.updateContent(
+      createSelectionUI('Select gardens to permanently delete:', gardens, false) +
+      `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--color-border-primary);">
+         <label style="display: flex; align-items: center; color: var(--base-accent-destructive);">
+           <input type="checkbox" id="nuke-all-data-checkbox">
+           <strong style="margin-left: 8px;">Nuke EVERYTHING (Deletes all gardens & resets all settings)</strong>
+         </label>
+         <p style="font-size: 0.9em; margin-left: 25px; color: var(--base-accent-warning);">Warning: This is the ultimate reset. It clears all gardens, localStorage, and sessionStorage. The app will be in a fresh-install state after reloading.</p>
+       </div>`
+    );
     
     const contentEl = modal.content;
     contentEl.querySelector('.select-all-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = true);
     contentEl.querySelector('.select-none-btn').onclick = () => contentEl.querySelectorAll('.garden-select-checkbox').forEach(cb => cb.checked = false);
     
     const deleteHandler = async () => {
+        const shouldNuke = contentEl.querySelector('#nuke-all-data-checkbox').checked;
         const selectedGardens = Array.from(contentEl.querySelectorAll('.garden-select-checkbox:checked')).map(cb => cb.value);
+
+        if (!shouldNuke && selectedGardens.length === 0) {
+            modal.destroy();
+            return;
+        }
+
         modal.clearFooter();
         modal.updateContent('Starting deletion...');
         
         let progressHTML = '';
+        const logCallback = (msg) => {
+            progressHTML += `${msg}<br>`;
+            modal.updateContent(`<div style="font-family: monospace; max-height: 300px; overflow-y: auto; white-space: pre-wrap;">${progressHTML}</div>`);
+        };
+
         try {
-            await deleteGardens(selectedGardens, (msg) => {
-                progressHTML += `${msg}<br>`;
-                modal.updateContent(progressHTML);
-            });
+            if (shouldNuke) {
+                // If nuking, pass the complete list of all known gardens.
+                await nukeAllData(gardens, logCallback);
+            } else {
+                // Otherwise, perform a standard selective deletion.
+                await deleteGardens(selectedGardens, logCallback);
+            }
         } catch (e) {
             modal.updateContent(`<strong>Error during deletion:</strong><br>${e.message}`);
             const closeBtn = modal.addFooterButton('Close', () => modal.destroy());

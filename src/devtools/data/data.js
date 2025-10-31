@@ -256,3 +256,60 @@ export async function deleteGardens(gardensToDelete, log) {
     }
   }, 2000);
 }
+
+/**
+ * Wipes ALL application data, including all gardens, localStorage, and sessionStorage.
+ * This is the ultimate reset.
+ * @param {string[]} allGardens - An array of ALL garden names to be deleted.
+ * @param {function(string)} log - A logging callback for progress.
+ */
+export async function nukeAllData(allGardens, log) {
+  log('<strong>NUKE INITIATED. Wiping all application data.</strong>');
+
+  // 1. Delete all IndexedDB databases
+  for (const gardenName of allGardens) {
+    log(`  Deleting database for garden: "${gardenName}"...`);
+    const dbName = `garden-fs-${gardenName}`;
+    await new Promise((resolve, reject) => {
+      const deleteRequest = indexedDB.deleteDatabase(dbName);
+      deleteRequest.onsuccess = () => {
+        log(`    - Success.`);
+        resolve();
+      };
+      deleteRequest.onerror = (e) => {
+        log(`    - <span style="color: var(--base-accent-warning);">Error: ${e.target.error.message}</span>`);
+        reject(e.target.error);
+      };
+      deleteRequest.onblocked = () => {
+        log(`    - <span style="color: var(--base-accent-destructive);">Deletion blocked. Please refresh the app and try again.</span>`);
+        reject(new Error('Deletion blocked'));
+      };
+    });
+  }
+  log('All garden databases deleted.');
+
+  // 2. Clear localStorage
+  try {
+    localStorage.clear();
+    log('Local storage cleared.');
+  } catch (e) {
+    log(`Error clearing local storage: ${e.message}`);
+  }
+
+  // 3. Clear sessionStorage
+  try {
+    sessionStorage.clear();
+    log('Session storage cleared.');
+  } catch (e) {
+    log(`Error clearing session storage: ${e.message}`);
+  }
+
+  log('Nuke complete. Reloading to a fresh state...');
+  setTimeout(() => {
+    // Navigate to the absolute root, as all gardens including 'home' are gone.
+    const fullPath = new URL(import.meta.url).pathname;
+    const srcIndex = fullPath.lastIndexOf('/src/');
+    const basePath = srcIndex > -1 ? fullPath.substring(0, srcIndex) : '';
+    window.location.href = `${window.location.origin}${basePath}/`;
+  }, 2000);
+}
