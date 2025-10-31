@@ -178,8 +178,6 @@ export class WorkspaceManager {
     }
     await window.thoughtform.sidebar.refresh();
 
-    // --- DEFINITIVE FIX (Part 1) ---
-    // Re-activate sync after the switch is fully complete.
     this.activateLiveSyncForCurrentFile();
   }
 
@@ -224,8 +222,6 @@ export class WorkspaceManager {
     await editor.loadFile(path);
     this.setActivePane(this.activePaneId);
 
-    // --- DEFINITIVE FIX (Part 2) ---
-    // After any file is loaded, always check if it needs to be synced.
     this.activateLiveSyncForCurrentFile();
   }
 
@@ -280,6 +276,7 @@ export class WorkspaceManager {
       const activeBuffer = info.node.buffers[info.node.activeBufferIndex];
       
       const fullUrl = this._urlManager.buildUrl(activeBuffer.garden, activeBuffer.path);
+      
       const isWindowed = this._urlManager.getSessionParams().has('windowed');
       
       const currentFullUrl = window.location.pathname + window.location.hash;

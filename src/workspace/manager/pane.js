@@ -80,14 +80,11 @@ export class PaneManager {
     if (panes.length <= 1) {
       const isPreviewWindow = window.self !== window.top;
       if (isPreviewWindow) {
-        // --- THIS IS THE FIX ---
-        // Get the window's unique ID from the URL and ask the parent to close it.
-        const hash = window.location.hash;
-        const params = new URLSearchParams(hash.substring(hash.indexOf('?')));
-        const windowId = params.get('windowId');
-        if (windowId) {
-          window.top.postMessage({ type: 'close-preview-window', payload: { windowId } }, '*');
-        }
+        // --- THIS IS THE DEFINITIVE FIX ---
+        // Simply ask the parent window to close the iframe that sent this message.
+        // Then, immediately stop execution to prevent the slow re-render.
+        window.top.postMessage({ type: 'request-close-self' }, '*');
+        return;
         // --- END OF FIX ---
       }
       return;

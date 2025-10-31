@@ -76,13 +76,11 @@ function hidePreview(windowEl) {
       windowEl.remove();
       saveWindowStates();
 
-      // --- THIS IS THE FIX ---
       // After closing a window, return focus to the active editor in the main workspace.
       const activeEditor = window.thoughtform.workspace.getActiveEditor();
       if (activeEditor && activeEditor.editorView) {
         activeEditor.editorView.focus();
       }
-      // --- END OF FIX ---
       
     }, 200);
   }
@@ -123,14 +121,7 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
 
     const iframe = document.createElement('iframe');
     iframe.className = 'preview-iframe';
-    
-    let iframeSrc = savedState ? savedState.url : url;
-    if (iframeSrc.includes('?')) {
-        iframeSrc += `&windowId=${windowId}`;
-    } else {
-        iframeSrc += `?windowId=${windowId}`;
-    }
-    iframe.src = iframeSrc;
+    iframe.src = savedState ? savedState.url : url;
 
     const searchResultsEl = document.createElement('ul');
     searchResultsEl.className = 'preview-search-results';
@@ -274,33 +265,35 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
     }, 10);
 }
 
+// --- THIS IS THE FIX ---
+// This listener is now simpler and more robust.
 window.addEventListener('message', (event) => {
-  if (!event.data || typeof event.data.type === 'undefined') {
+  if (!event.data || !event.data.type) {
+    return;
+  }
+  
+  const { type, payload } = event.data;
+  
+  // Handle the request from an iframe to be closed.
+  if (type === 'request-close-self') {
+    // Find the window element whose iframe sent the message.
+    for (const windowEl of previewState.activeWindows.values()) {
+      const iframe = windowEl.querySelector('iframe');
+      if (iframe && iframe.contentWindow === event.source) {
+        hidePreview(windowEl);
+        break; // Stop searching once found.
+      }
+    }
     return;
   }
 
+  // The rest of the messages require knowing which iframe sent them.
   let iframe;
   try {
     iframe = event.source.frameElement;
   } catch (e) {
-    // This can happen if the message source is not an iframe, which is fine.
+    return; // Source is not an iframe we have access to.
   }
-  
-  const { type, payload } = event.data;
-
-  // The 'close' message doesn't depend on the iframe context,
-  // so we handle it before the iframe checks.
-  if (type === 'close-preview-window') {
-    if (payload && payload.windowId) {
-      const windowEl = previewState.activeWindows.get(payload.windowId);
-      if (windowEl) {
-        hidePreview(windowEl);
-      }
-    }
-    return; // We've handled the message.
-  }
-
-  // The rest of the messages require an iframe source.
   if (!iframe) return;
 
   const previewWindow = iframe.closest('.preview-window');
@@ -324,6 +317,7 @@ window.addEventListener('message', (event) => {
       break;
   }
 });
+// --- END OF FIX ---
 
 function startDrag(windowEl, e) {
   windowEl.classList.add('is-dragging');
