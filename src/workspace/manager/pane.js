@@ -76,8 +76,21 @@ export class PaneManager {
   closeActivePane() {
     if (this.isMaximized) this.toggleMaximizePane();
     const panes = this._getPaneList();
+    
     if (panes.length <= 1) {
-        return;
+      const isPreviewWindow = window.self !== window.top;
+      if (isPreviewWindow) {
+        // --- THIS IS THE FIX ---
+        // Get the window's unique ID from the URL and ask the parent to close it.
+        const hash = window.location.hash;
+        const params = new URLSearchParams(hash.substring(hash.indexOf('?')));
+        const windowId = params.get('windowId');
+        if (windowId) {
+          window.top.postMessage({ type: 'close-preview-window', payload: { windowId } }, '*');
+        }
+        // --- END OF FIX ---
+      }
+      return;
     }
 
     const currentIndex = panes.findIndex(p => p.id === this.workspace.activePaneId);

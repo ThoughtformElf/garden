@@ -75,6 +75,15 @@ function hidePreview(windowEl) {
     setTimeout(() => {
       windowEl.remove();
       saveWindowStates();
+
+      // --- THIS IS THE FIX ---
+      // After closing a window, return focus to the active editor in the main workspace.
+      const activeEditor = window.thoughtform.workspace.getActiveEditor();
+      if (activeEditor && activeEditor.editorView) {
+        activeEditor.editorView.focus();
+      }
+      // --- END OF FIX ---
+      
     }, 200);
   }
 }
@@ -114,7 +123,14 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
 
     const iframe = document.createElement('iframe');
     iframe.className = 'preview-iframe';
-    iframe.src = savedState ? savedState.url : url;
+    
+    let iframeSrc = savedState ? savedState.url : url;
+    if (iframeSrc.includes('?')) {
+        iframeSrc += `&windowId=${windowId}`;
+    } else {
+        iframeSrc += `?windowId=${windowId}`;
+    }
+    iframe.src = iframeSrc;
 
     const searchResultsEl = document.createElement('ul');
     searchResultsEl.className = 'preview-search-results';
@@ -267,12 +283,26 @@ window.addEventListener('message', (event) => {
   try {
     iframe = event.source.frameElement;
   } catch (e) {
-    return;
+    // This can happen if the message source is not an iframe, which is fine.
   }
   
+  const { type, payload } = event.data;
+
+  // The 'close' message doesn't depend on the iframe context,
+  // so we handle it before the iframe checks.
+  if (type === 'close-preview-window') {
+    if (payload && payload.windowId) {
+      const windowEl = previewState.activeWindows.get(payload.windowId);
+      if (windowEl) {
+        hidePreview(windowEl);
+      }
+    }
+    return; // We've handled the message.
+  }
+
+  // The rest of the messages require an iframe source.
   if (!iframe) return;
 
-  const { type, payload } = event.data;
   const previewWindow = iframe.closest('.preview-window');
   if (!previewWindow) return;
 
