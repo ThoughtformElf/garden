@@ -9,7 +9,8 @@ export function initializeDevTools() {
 
   eruda.init({
     container: el,
-    tool: ['console', 'elements', 'network', 'resources'],
+    //tool: ['console', 'elements', 'network', 'resources'],
+    tool: ['console'],
     inline: true,
     useShadowDom: false,
   });
