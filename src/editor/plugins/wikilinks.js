@@ -61,7 +61,6 @@ function getLinkURL(linkContent, appContext) {
   let garden = appContext.gitClient.gardenName;
   if (path.includes('#')) [garden, path] = path.split('#');
   
-  // Use the new centralized URL builder
   return window.thoughtform.workspace.buildUrl(garden, path, true);
 }
 
@@ -76,7 +75,6 @@ function hidePreview(windowEl) {
       windowEl.remove();
       saveWindowStates();
 
-      // After closing a window, return focus to the active editor in the main workspace.
       const activeEditor = window.thoughtform.workspace.getActiveEditor();
       if (activeEditor && activeEditor.editorView) {
         activeEditor.editorView.focus();
@@ -265,8 +263,6 @@ function createPreviewWindow(url, initialX, initialY, savedState = null) {
     }, 10);
 }
 
-// --- THIS IS THE FIX ---
-// This listener is now simpler and more robust.
 window.addEventListener('message', (event) => {
   if (!event.data || !event.data.type) {
     return;
@@ -274,25 +270,22 @@ window.addEventListener('message', (event) => {
   
   const { type, payload } = event.data;
   
-  // Handle the request from an iframe to be closed.
   if (type === 'request-close-self') {
-    // Find the window element whose iframe sent the message.
     for (const windowEl of previewState.activeWindows.values()) {
       const iframe = windowEl.querySelector('iframe');
       if (iframe && iframe.contentWindow === event.source) {
         hidePreview(windowEl);
-        break; // Stop searching once found.
+        break;
       }
     }
     return;
   }
 
-  // The rest of the messages require knowing which iframe sent them.
   let iframe;
   try {
     iframe = event.source.frameElement;
   } catch (e) {
-    return; // Source is not an iframe we have access to.
+    return;
   }
   if (!iframe) return;
 
@@ -317,12 +310,17 @@ window.addEventListener('message', (event) => {
       break;
   }
 });
-// --- END OF FIX ---
 
 function startDrag(windowEl, e) {
   windowEl.classList.add('is-dragging');
   const rect = windowEl.getBoundingClientRect();
   previewState.dragState = { windowEl, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top };
+  
+  // --- THIS IS THE FIX (Part 1) ---
+  const iframe = windowEl.querySelector('iframe');
+  if (iframe) iframe.style.pointerEvents = 'none';
+  // --- END OF FIX ---
+
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd, { once: true });
 }
@@ -337,8 +335,14 @@ function onDragMove(e) {
 
 function onDragEnd() {
   if (previewState.dragState) {
-    previewState.dragState.windowEl.classList.remove('is-dragging');
+    const { windowEl } = previewState.dragState;
+    windowEl.classList.remove('is-dragging');
     saveWindowStates();
+
+    // --- THIS IS THE FIX (Part 2) ---
+    const iframe = windowEl.querySelector('iframe');
+    if (iframe) iframe.style.pointerEvents = 'auto';
+    // --- END OF FIX ---
   }
   previewState.dragState = null;
   document.removeEventListener('mousemove', onDragMove);
