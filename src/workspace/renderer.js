@@ -18,8 +18,9 @@ export class WorkspaceRenderer {
       }
     });
 
-    // 2. Clear the old grid structure
+    // 2. Clear the old grid structure and, crucially, its inline styles
     this.workspace.mainContainer.innerHTML = '';
+    this.workspace.mainContainer.removeAttribute('style');
     
     // 3. Rebuild the grid structure from the paneTree and re-attach editors
     await this._renderNode(this.workspace.paneTree, this.workspace.mainContainer);
